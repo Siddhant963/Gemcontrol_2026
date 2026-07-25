@@ -143,7 +143,12 @@ module.exports.loginUser = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.cookie("token", token, { httpOnly: true });
+    const crossSiteCookie = process.env.NODE_ENV === "production";
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: crossSiteCookie ? "none" : "lax",
+      secure: crossSiteCookie,
+    });
     res
       .status(200)
       .json({ message: "Login successful", token, role: user.role });
@@ -154,7 +159,12 @@ module.exports.loginUser = async (req, res) => {
 };
 
 module.exports.logoutUser = (req, res) => {
-  res.clearCookie("token");
+  const crossSiteCookie = process.env.NODE_ENV === "production";
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: crossSiteCookie ? "none" : "lax",
+    secure: crossSiteCookie,
+  });
   res.status(200).json({ message: "Logout successful" });
 };
 

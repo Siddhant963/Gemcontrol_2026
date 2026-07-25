@@ -1,5 +1,8 @@
 import axios from "axios";
 import { performanceMonitor } from "./performanceMonitor";
+import store from "../redux/store";
+import { logout } from "../redux/authSlice";
+import { ROUTES } from "./routes";
 
 // Use environment variable for API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/admin";
@@ -51,6 +54,16 @@ api.interceptors.response.use(
       message: error.message,
       data: error.response?.data
     });
+
+    // A 401 means the session is actually invalid (expired token, cookie not
+    // sent, etc). Log out here so isAuthenticated flips to false -- otherwise
+    // pages that only set an error message leave Redux thinking the user is
+    // still authenticated, and the login route bounces straight back to the
+    // dashboard, which re-fires the same failing request forever.
+    if (error.response?.status === 401 && window.location.pathname !== ROUTES.LOGIN) {
+      store.dispatch(logout());
+      window.location.href = ROUTES.LOGIN;
+    }
 
     return Promise.reject(error);
   }
