@@ -1,0 +1,85 @@
+/* Print Styles for Professional Invoice */
+
+@media print {
+  /* Hide everything except the invoice */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show only the invoice dialog content */
+  .MuiDialog-root,
+  .MuiDialog-root * {
+    visibility: visible;
+  }
+  
+  /* Position the dialog properly */
+  .MuiDialog-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  
+  /* Remove dialog styling for print */
+  .MuiDialog-paper {
+    box-shadow: none !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+  
+  /* Hide dialog title and actions */
+  .MuiDialogTitle-root,
+  .MuiDialogActions-root {
+    display: none !important;
+  }
+  
+  /* Ensure proper page breaks */
+  .invoice-page {
+    page-break-after: always;
+  }
+  
+  /* Remove backgrounds for print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Ensure borders print */
+  table,
+  th,
+  td {
+    border: 1px solid #000 !important;
+  }
+  
+  /* Set page size and margins */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+  
+  /* Remove any shadows or effects */
+  .MuiPaper-root {
+    box-shadow: none !important;
+  }
+  
+  /* Ensure proper font sizes */
+  body {
+    font-size: 12pt;
+  }
+  
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Screen styles for invoice preview */
+@media screen {
+  .invoice-container {
+    max-width: 210mm;
+    margin: 0 auto;
+    background: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+}

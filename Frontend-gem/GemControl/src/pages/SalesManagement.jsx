@@ -1,0 +1,1775 @@
+import {
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Button,
+  Select,
+  MenuItem,
+  Box,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  CircularProgress,
+  Pagination,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Chip,
+  InputBase,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
+} from "@mui/material";
+import { Close, Search, Add, Delete } from "@mui/icons-material";
+import { useTheme } from "@mui/material/styles";
+import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSelector } from "react-redux";
+import api from "../utils/api";
+import NotificationModal from "../components/NotificationModal";
+import ProfessionalInvoice from "../components/ProfessionalInvoice";
+
+function useDebounce(value, wait = 500) {
+  const [debounceValue, setDebounceValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounceValue(value), wait);
+    return () => clearTimeout(timer);
+  }, [value, wait]);
+  return debounceValue;
+}
+
+function SalesManagement() {
+  const theme = useTheme();
+  const { user: currentUser } = useSelector((state) => state.auth);
+  const isAdmin = currentUser?.role?.toLowerCase() === "admin";
+
+  // State variables
+  const [sales, setSales] = useState([]);
+  const [stocks, setStocks] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [firms, setFirms] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [udharData, setUdharData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterValue, setFilterValue] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Modal states
+  const [openSaleModal, setOpenSaleModal] = useState(false);
+  const [openCustomerModal, setOpenCustomerModal] = useState(false);
+  const [openCustomerListModal, setOpenCustomerListModal] = useState(false);
+  const [openStockListModal, setOpenStockListModal] = useState(false);
+  const [openMaterialListModal, setOpenMaterialListModal] = useState(false);
+  const [currentItemIndex, setCurrentItemIndex] = useState(null);
+
+  // Form states
+  const [newSale, setNewSale] = useState({
+    customer: "",
+    firm: "",
+    items: [
+      { saleType: "stock", salematerialId: "", quantity: "", amount: "" },
+    ],
+    totalAmount: "",
+    udharAmount: "0",
+    paymentMethod: "cash",
+    paymentAmount: "0",
+  });
+
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    email: "",
+    contact: "",
+    firm: "",
+    address: "",
+  });
+
+  // UI states
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [touchedSaleFields, setTouchedSaleFields] = useState({});
+  const [manualPaymentEdit, setManualPaymentEdit] = useState(false);
+  const [manualUdharEdit, setManualUdharEdit] = useState(false);
+  const [touchedCustomerFields, setTouchedCustomerFields] = useState({});
+  const [saveAttemptedSale, setSaveAttemptedSale] = useState(false);
+  const [saveAttemptedCustomer, setSaveAttemptedCustomer] = useState(false);
+
+  // Notification and dialog states
+  const [notificationDialog, setNotificationDialog] = useState({
+    open: false,
+    message: "",
+    type: "info",
+    title: "",
+  });
+
+  const [invoiceDialog, setInvoiceDialog] = useState({
+    open: false,
+    sale: null,
+  });
+
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const debouncedFilterValue = useDebounce(filterValue, 500);
+  const debouncedCustomerSearchQuery = useDebounce(customerSearchQuery, 300);
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: "easeOut" },
+    },
+  };
+
+  const tableVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { duration: 0.5, delay: 0.3, ease: "easeOut" },
+    },
+  };
+
+  const getAvailableQuantity = useCallback(
+    (item) => {
+      if (!item?.salematerialId) return 0;
+      if (item.saleType === "stock") {
+        const stock = stocks.find((s) => s._id === item.salematerialId);
+        const quantity = Number(stock?.quantity);
+        return Number.isFinite(quantity) ? quantity : 0;
+      }
+
+      const material = materials.find((m) => m._id === item.salematerialId);
+      const weight = Number(material?.weight);
+      if (Number.isFinite(weight) && weight > 0) return weight;
+
+      const quantity = Number(material?.quantity);
+      return Number.isFinite(quantity) ? quantity : 0;
+    },
+    [stocks, materials]
+  );
+
+  const getMaterialUnitPrice = useCallback((material) => {
+    const price = Number(material?.price);
+    return Number.isFinite(price) ? price : 0;
+  }, []);
+
+  const isFirmMatch = useCallback(
+    (itemFirm, selectedFirmId) => {
+      if (!selectedFirmId) return false;
+      const selectedFirm = firms.find((firm) => firm._id === selectedFirmId);
+      const selectedFirmName = selectedFirm?.name?.toLowerCase?.() || "";
+
+      if (!itemFirm) return false;
+      if (typeof itemFirm === "object") {
+        const firmId = itemFirm?._id || itemFirm?.id || "";
+        if (firmId && firmId === selectedFirmId) return true;
+        const firmName = itemFirm?.name?.toLowerCase?.() || "";
+        return firmName && firmName === selectedFirmName;
+      }
+
+      if (typeof itemFirm === "string") {
+        return itemFirm === selectedFirmId ||
+          (selectedFirmName && itemFirm.toLowerCase() === selectedFirmName);
+      }
+
+      return false;
+    },
+    [firms]
+  );
+
+  // Fetch initial data
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [
+        salesRes,
+        customersRes,
+        firmsRes,
+        materialsRes,
+        stocksRes,
+        udharRes,
+      ] = await Promise.all([
+        api.get("/getAllSales"),
+        api.get("/getAllCustomers"),
+        api.get("/getAllFirms"),
+        api.get("/getAllRawMaterials"),
+        api.get("/getAllStocks"),
+        api.get("/getAllUdhar"),
+      ]);
+      setSales(Array.isArray(salesRes.data) ? salesRes.data : []);
+      setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
+      setFirms(Array.isArray(firmsRes.data) ? firmsRes.data : []);
+      setMaterials(Array.isArray(materialsRes.data) ? materialsRes.data : []);
+      setStocks(Array.isArray(stocksRes.data) ? stocksRes.data : []);
+      setUdharData(Array.isArray(udharRes.data) ? udharRes.data : []);
+    } catch (error) {
+      console.error("FetchInitialData error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to fetch initial data";
+      setNotificationDialog({
+        open: true,
+        message: errorMessage,
+        type: "error",
+        title: "Error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  // Search and filter handlers
+  const handleSearch = useCallback((e) => setSearchQuery(e.target.value), []);
+
+  const handleFilter = useCallback(async (type, value) => {
+    try {
+      setLoading(true);
+      let response;
+      if (type === "customer" && value) {
+        response = await api.get("/getSaleByCustomer", {
+          params: { customerId: value },
+        });
+      } else if (type === "firm" && value) {
+        response = await api.get("/getSaleByFirm", {
+          params: { firmId: value },
+        });
+      } else if (type === "date" && value) {
+        const formattedDate = new Date(value).toISOString().slice(0, 10);
+        response = await api.get("/getSaleByDate", {
+          params: { date: formattedDate },
+        });
+      } else {
+        response = await api.get("/getAllSales");
+      }
+      setSales(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("HandleFilter error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Error applying filter";
+      setNotificationDialog({
+        open: true,
+        message: errorMessage,
+        type: "error",
+        title: "Error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (filterType !== "all" && debouncedFilterValue) {
+      handleFilter(filterType, debouncedFilterValue);
+    } else if (filterType === "all") {
+      fetchInitialData();
+    }
+  }, [debouncedFilterValue, filterType, fetchInitialData, handleFilter]);
+  // Sale management handlers
+  const handleOpenSaleModal = useCallback(() => {
+    setNewSale({
+      customer: "",
+      firm: "",
+      items: [
+        { saleType: "stock", salematerialId: "", quantity: "", amount: "" },
+      ],
+      totalAmount: "",
+      udharAmount: "0",
+      paymentMethod: "cash",
+      paymentAmount: "0",
+    });
+    setTouchedSaleFields({});
+    setSaveAttemptedSale(false);
+    setManualPaymentEdit(false);
+    setManualUdharEdit(false);
+    setOpenSaleModal(true);
+  }, []);
+
+  const handleInputChange = useCallback(
+    (e, index = null) => {
+      const { name, value } = e.target;
+      setNewSale((prev) => {
+        let updatedSale = { ...prev };
+        if (typeof index === "number") {
+          const updatedItems = [...prev.items];
+          const currentItem = { ...updatedItems[index] };
+
+          if (name === "saleType" && value !== currentItem.saleType) {
+            currentItem.saleType = value;
+            currentItem.salematerialId = "";
+            currentItem.quantity = "";
+            currentItem.amount = "";
+            updatedItems[index] = currentItem;
+            updatedSale = { ...prev, items: updatedItems };
+          }
+          
+          // Validate quantity against available stock
+          if (name === "quantity" && currentItem.salematerialId) {
+            const quantity = parseFloat(value) || 0;
+            let availableQuantity = 0;
+            
+            if (currentItem.saleType === "stock") {
+              const stock = stocks.find((s) => s._id === currentItem.salematerialId);
+              availableQuantity = stock?.quantity || 0;
+            } else {
+              const material = materials.find((m) => m._id === currentItem.salematerialId);
+              availableQuantity = material?.weight || material?.quantity || 0;
+            }
+            
+            // If quantity exceeds available, show error and set to max available
+            if (quantity > availableQuantity) {
+              setNotificationDialog({
+                open: true,
+                message: `Only ${availableQuantity} units available in stock. Quantity set to maximum available.`,
+                type: "warning",
+                title: "Insufficient Stock",
+              });
+              currentItem[name] = availableQuantity.toString();
+            } else {
+              currentItem[name] = value;
+            }
+          } else {
+            currentItem[name] = value;
+          }
+          
+          updatedItems[index] = currentItem;
+          updatedSale = { ...prev, items: updatedItems };
+
+          // When material is selected, prefill sensible defaults
+          if (name === "salematerialId") {
+            if (!currentItem.quantity) {
+              currentItem.quantity = "1";
+            }
+            if (currentItem.saleType === "stock") {
+              const stock = stocks.find((s) => s._id === value);
+              if (stock) {
+                const baseAmount =
+                  typeof stock.totalValue === "number"
+                    ? stock.totalValue
+                    : (parseFloat(stock.price) || 0) +
+                      (parseFloat(stock.makingCharge) || 0);
+                const quantity = parseFloat(currentItem.quantity) || 1;
+                currentItem.amount = (baseAmount * quantity).toString();
+              }
+            } else {
+              const material = materials.find((m) => m._id === value);
+              if (material) {
+                const quantity = parseFloat(currentItem.quantity) || 1;
+                const unitPrice = getMaterialUnitPrice(material);
+                currentItem.amount = (unitPrice * quantity).toString();
+              }
+            }
+            updatedSale = { ...updatedSale, items: updatedItems };
+          }
+
+          // When quantity changes, recalculate amount
+          if (name === "quantity") {
+            const quantity = parseFloat(currentItem.quantity) || 0;
+            
+            if (currentItem.salematerialId && quantity > 0) {
+              if (currentItem.saleType === "stock") {
+                const stock = stocks.find((s) => s._id === currentItem.salematerialId);
+                if (stock) {
+                  const baseAmount =
+                    typeof stock.totalValue === "number"
+                      ? stock.totalValue
+                      : (parseFloat(stock.price) || 0) +
+                        (parseFloat(stock.makingCharge) || 0);
+                  currentItem.amount = (baseAmount * quantity).toString();
+                }
+              } else {
+                const material = materials.find((m) => m._id === currentItem.salematerialId);
+                if (material) {
+                  const unitPrice = getMaterialUnitPrice(material);
+                  currentItem.amount = (unitPrice * quantity).toString();
+                }
+              }
+              updatedSale = { ...updatedSale, items: updatedItems };
+            }
+          }
+
+          // Recalculate total amount from item amounts
+          const itemsTotal = updatedSale.items.reduce(
+            (sum, it) => sum + (parseFloat(it.amount) || 0),
+            0
+          );
+          updatedSale.totalAmount = itemsTotal ? itemsTotal.toString() : "";
+
+          // Recalculate payment amount when items total changes
+          if (!manualPaymentEdit) {
+            const total = itemsTotal || 0;
+            const udhar = parseFloat(updatedSale.udharAmount) || 0;
+            updatedSale.paymentAmount = Math.max(total - udhar, 0).toString();
+          }
+        } else {
+          updatedSale = { ...prev, [name]: value };
+        }
+
+        // Auto-calculate paymentAmount when totalAmount or udharAmount changes
+        if (name === "totalAmount" || name === "udharAmount") {
+          const total =
+            parseFloat(name === "totalAmount" ? value : prev.totalAmount) || 0;
+          const udhar =
+            parseFloat(name === "udharAmount" ? value : prev.udharAmount) || 0;
+
+          // Always calculate payment amount from total - udhar (unless manually edited)
+          if (!manualPaymentEdit) {
+            const payment = Math.max(total - udhar, 0);
+            updatedSale = {
+              ...updatedSale,
+              paymentAmount: payment.toString(),
+            };
+          }
+
+          // Auto-set udhar amount when total changes and customer is selected
+          if (
+            name === "totalAmount" &&
+            value &&
+            prev.customer &&
+            !manualUdharEdit
+          ) {
+            const customerUdhar = udharData.find(
+              (udhar) => udhar.customer === prev.customer
+            );
+            const availableUdharAmount = customerUdhar
+              ? parseFloat(customerUdhar.amount) || 0
+              : 0;
+            updatedSale.udharAmount = Math.min(
+              availableUdharAmount,
+              total
+            ).toString();
+            // Recalculate payment after udhar update
+            if (!manualPaymentEdit) {
+              const newUdhar = parseFloat(updatedSale.udharAmount) || 0;
+              updatedSale.paymentAmount = Math.max(
+                total - newUdhar,
+                0
+              ).toString();
+            }
+          }
+
+          // Track manual udhar editing
+          if (name === "udharAmount") {
+            setManualUdharEdit(true);
+            // Recalculate payment when udhar is manually changed
+            if (!manualPaymentEdit) {
+              const payment = Math.max(total - udhar, 0);
+              updatedSale.paymentAmount = payment.toString();
+            }
+          }
+        }
+
+        return updatedSale;
+      });
+      setTouchedSaleFields((prev) => ({ ...prev, [name]: true }));
+    },
+    [
+      udharData,
+      stocks,
+      materials,
+      manualPaymentEdit,
+      manualUdharEdit,
+      setNotificationDialog,
+      getMaterialUnitPrice,
+    ]
+  );
+
+  // Customer management handlers
+  const handleCustomerSelect = useCallback(
+    (customerId) => {
+      setNewSale((prev) => {
+        const customerUdhar = udharData.find(
+          (udhar) => udhar.customer === customerId
+        );
+        const udharAmount = customerUdhar
+          ? parseFloat(customerUdhar.amount) || 0
+          : 0;
+        const total = parseFloat(prev.totalAmount) || 0;
+        const payment = Math.max(total - udharAmount, 0);
+        return {
+          ...prev,
+          customer: customerId,
+          udharAmount:
+            total && !manualUdharEdit
+              ? Math.min(udharAmount, total).toString()
+              : prev.udharAmount || "0",
+          paymentAmount: payment.toString(),
+        };
+      });
+      setCustomerSearchQuery("");
+      setShowAllCustomers(false);
+      setTouchedSaleFields((prev) => ({ ...prev, customer: true }));
+    },
+    [udharData, manualUdharEdit]
+  );
+
+  const handleCustomerInputChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setNewCustomer((prev) => ({ ...prev, [name]: value }));
+    setTouchedCustomerFields((prev) => ({ ...prev, [name]: true }));
+  }, []);
+
+  const handleSaveCustomer = useCallback(async () => {
+    setSaveAttemptedCustomer(true);
+    try {
+      if (
+        !newCustomer.name ||
+        !newCustomer.email ||
+        !newCustomer.contact ||
+        !newCustomer.firm ||
+        !newCustomer.address
+      ) {
+        setNotificationDialog({
+          open: true,
+          message: "All customer fields are required",
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
+      }
+      setCustomerLoading(true);
+      const response = await api.post("/AddCustomer", {
+        name: newCustomer.name,
+        email: newCustomer.email,
+        contact: newCustomer.contact,
+        firm: newCustomer.firm,
+        address: newCustomer.address,
+      });
+      const createdCustomer = response.data.customer;
+      setCustomers((prev) => [...prev, createdCustomer]);
+      setNewSale((prev) => ({ ...prev, customer: createdCustomer._id }));
+      setOpenCustomerModal(false);
+      setNewCustomer({
+        name: "",
+        email: "",
+        contact: "",
+        firm: "",
+        address: "",
+      });
+      setTouchedCustomerFields({});
+      setSaveAttemptedCustomer(false);
+      setNotificationDialog({
+        open: true,
+        message: "Customer created successfully",
+        type: "success",
+        title: "Success",
+      });
+    } catch (error) {
+      console.error("SaveCustomer error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to create customer";
+      setNotificationDialog({
+        open: true,
+        message: errorMessage,
+        type: "error",
+        title: "Error",
+      });
+    } finally {
+      setCustomerLoading(false);
+    }
+  }, [newCustomer]);
+
+  // Item management handlers
+  const handleAddItem = useCallback(() => {
+    setNewSale((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { saleType: "stock", salematerialId: "", quantity: "", amount: "" },
+      ],
+    }));
+  }, []);
+
+  const handleRemoveItem = useCallback((index) => {
+    setNewSale((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  // Sale operations
+  const handleSaveSale = useCallback(async () => {
+    setSaveAttemptedSale(true);
+    try {
+      if (!newSale.customer || !newSale.firm) {
+        setNotificationDialog({
+          open: true,
+          message: "Customer and Firm are required",
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
+      }
+      if (
+        !newSale.items.length ||
+        newSale.items.some(
+          (item) =>
+            !item.salematerialId ||
+            item.quantity === "" ||
+            item.amount === "" ||
+            parseFloat(item.quantity) <= 0 ||
+            parseFloat(item.amount) < 0
+        )
+      ) {
+        setNotificationDialog({
+          open: true,
+          message:
+            "All items must have material, positive quantity, and non-negative amount",
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
+      }
+      if (
+        newSale.totalAmount === "" ||
+        isNaN(newSale.totalAmount) ||
+        parseFloat(newSale.totalAmount) <= 0
+      ) {
+        setNotificationDialog({
+          open: true,
+          message: "Valid total amount (greater than 0) is required",
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
+      }
+
+      // Validate udhar amount doesn't exceed total and calculate payment
+      const totalAmount = parseFloat(newSale.totalAmount) || 0;
+      const udharAmount = parseFloat(newSale.udharAmount) || 0;
+
+      if (udharAmount > totalAmount) {
+        setNotificationDialog({
+          open: true,
+          message: "Udhar amount cannot be greater than total amount",
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
+      }
+
+      // Ensure paymentAmount is calculated correctly before saving
+      const calculatedPaymentAmount = Math.max(totalAmount - udharAmount, 0);
+
+      // Use calculated payment amount if paymentAmount is empty, invalid, or zero
+      const paymentAmount =
+        newSale.paymentAmount && parseFloat(newSale.paymentAmount) >= 0
+          ? parseFloat(newSale.paymentAmount)
+          : calculatedPaymentAmount;
+
+      const saleData = {
+        customer: newSale.customer,
+        firm: newSale.firm,
+        items: newSale.items.map((item) => ({
+          saleType: item.saleType,
+          salematerialId: item.salematerialId,
+          quantity: parseFloat(item.quantity),
+          amount: parseFloat(item.amount),
+        })),
+        totalAmount: totalAmount,
+        udharAmount: udharAmount,
+        paymentMethod: newSale.paymentMethod,
+        paymentAmount: paymentAmount,
+      };
+
+      setLoading(true);
+      const response = await api.post("/createSale", saleData);
+      setSales((prev) => [...prev, response.data.sale]);
+      setOpenSaleModal(false);
+      setInvoiceDialog({ open: true, sale: response.data.sale });
+
+      // Reset form
+      setNewSale({
+        customer: "",
+        firm: "",
+        items: [
+          { saleType: "stock", salematerialId: "", quantity: "", amount: "" },
+        ],
+        totalAmount: "",
+        udharAmount: "0",
+        paymentMethod: "cash",
+        paymentAmount: "0",
+      });
+      setTouchedSaleFields({});
+      setManualUdharEdit(false);
+      setManualPaymentEdit(false);
+      setSaveAttemptedSale(false);
+
+      setNotificationDialog({
+        open: true,
+        message: "Sale created successfully",
+        type: "success",
+        title: "Success",
+      });
+    } catch (error) {
+      console.error("SaveSale error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to create sale";
+      setNotificationDialog({
+        open: true,
+        message: errorMessage,
+        type: "error",
+        title: "Error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [newSale]);
+
+  const handleDeleteSale = useCallback(async (saleId) => {
+    if (!window.confirm("Are you sure you want to delete this sale?")) return;
+    try {
+      setLoading(true);
+      await api.get(`/removeSale?saleId=${saleId}`);
+      setSales((prev) => prev.filter((sale) => sale._id !== saleId));
+      setNotificationDialog({
+        open: true,
+        message: "Sale deleted successfully!",
+        type: "success",
+        title: "Success",
+      });
+    } catch (error) {
+      console.error("DeleteSale error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to delete sale";
+      setNotificationDialog({
+        open: true,
+        message: errorMessage,
+        type: "error",
+        title: "Error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Utility functions
+  const handleCancel = useCallback(() => {
+    setOpenSaleModal(false);
+    setNewSale({
+      customer: "",
+      firm: "",
+      items: [
+        { saleType: "stock", salematerialId: "", quantity: "", amount: "" },
+      ],
+      totalAmount: "",
+      udharAmount: "0",
+      paymentMethod: "cash",
+      paymentAmount: "0",
+    });
+    setTouchedSaleFields({});
+    setSaveAttemptedSale(false);
+    setManualPaymentEdit(false);
+    setManualUdharEdit(false);
+  }, []);
+
+  const handleSaleFieldBlur = useCallback((fieldName, index = null) => {
+    setTouchedSaleFields((prev) => ({
+      ...prev,
+      [index !== null ? `items[${index}].${fieldName}` : fieldName]: true,
+    }));
+  }, []);
+
+  const handleNotificationClose = useCallback(() => {
+    setNotificationDialog({
+      open: false,
+      message: "",
+      type: "info",
+      title: "",
+    });
+  }, []);
+
+  // Computed values
+  const filteredCustomers = useMemo(
+    () =>
+      customers.filter((customer) =>
+        customer.name
+          .toLowerCase()
+          .includes(debouncedCustomerSearchQuery.toLowerCase())
+      ),
+    [customers, debouncedCustomerSearchQuery]
+  );
+
+  const filteredSales = useMemo(
+    () =>
+      sales.filter(
+        (sale) =>
+          (
+            sale.paymentMethod ||
+            customers.find((c) => c._id === sale.paymentMethod) ||
+            ""
+          )
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          (
+            sale.firm?.name ||
+            firms.find((f) => f._id === sale.firm)?.name ||
+            ""
+          )
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+      ),
+    [sales, customers, firms, searchQuery]
+  );
+  console.log(sales, "f");
+
+  const paginatedSales = useMemo(
+    () => filteredSales.slice((page - 1) * itemsPerPage, page * itemsPerPage),
+    [filteredSales, page]
+  );
+
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c._id === newSale.customer),
+    [customers, newSale.customer]
+  );
+
+  return (
+    <Box
+      sx={{
+        maxWidth: "100%",
+        margin: "0 auto",
+        width: "100%",
+        px: { xs: 2, sm: 3, md: 4 },
+        py: { xs: 2, sm: 3 },
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+      }}
+    >
+      {/* Header Section */}
+      <Box
+        sx={{
+          flexShrink: 0,
+          mb: { xs: 2, sm: 3 },
+        }}
+        component={motion.div}
+        variants={sectionVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            gap: { xs: 1.5, sm: 2 },
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography
+            variant="h4"
+            sx={{
+              color: theme.palette.text.primary,
+              fontWeight: "bold",
+              fontSize: { xs: "1.5rem", sm: "1.75rem", md: "2rem" },
+              textAlign: { xs: "center", sm: "left" },
+              mb: { xs: 1, sm: 0 },
+            }}
+          >
+            Sales Management
+          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: { xs: 1.5, sm: 2 },
+              width: { xs: "100%", sm: "auto" },
+              alignItems: { xs: "stretch", sm: "center" },
+            }}
+          >
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleOpenSaleModal}
+              sx={{
+                bgcolor: theme.palette.primary.main,
+                color: theme.palette.getContrastText(
+                  theme.palette.primary.main
+                ),
+                "&:hover": { bgcolor: theme.palette.primary.dark },
+                borderRadius: 2,
+                fontSize: { xs: "0.875rem", sm: "1rem" },
+                px: { xs: 2, sm: 3 },
+                py: { xs: 1, sm: 1.5 },
+                width: { xs: "100%", sm: "auto" },
+                textTransform: "none",
+                boxShadow: theme.shadows[2],
+              }}
+            >
+              Create Sale
+            </Button>
+            <Paper
+              sx={{
+                p: "6px 12px",
+                display: "flex",
+                alignItems: "center",
+                width: { xs: "100%", sm: 240, md: 300 },
+                bgcolor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2,
+                boxShadow: theme.shadows[1],
+              }}
+            >
+              <IconButton sx={{ p: { xs: 0.75, sm: 1 } }}>
+                <Search sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+              </IconButton>
+              <InputBase
+                sx={{
+                  ml: 1,
+                  flex: 1,
+                  fontSize: { xs: "0.875rem", sm: "1rem" },
+                }}
+                placeholder="Search sales..."
+                value={searchQuery}
+                onChange={handleSearch}
+              />
+            </Paper>
+          </Box>
+        </Box>
+      </Box>{" "}
+      {/* Sales Table/List */}
+      <Box sx={{ flexGrow: 1, overflow: "auto" }}>
+        <motion.div variants={tableVariants} initial="hidden" animate="visible">
+          {loading ? (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "50vh",
+              }}
+            >
+              <CircularProgress
+                sx={{
+                  color: theme.palette.primary.main,
+                  size: { xs: 40, sm: 48 },
+                }}
+              />
+            </Box>
+          ) : filteredSales.length === 0 ? (
+            <Typography
+              sx={{
+                color: theme.palette.text.primary,
+                textAlign: "center",
+                py: { xs: 2, sm: 3 },
+                fontSize: { xs: "0.875rem", sm: "1rem" },
+              }}
+            >
+              No sales found.
+            </Typography>
+          ) : (
+            <>
+              {/* Mobile Card View */}
+              <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                {paginatedSales.map((sale) => (
+                  <Card
+                    key={sale._id}
+                    sx={{
+                      mb: 2,
+                      borderRadius: 2,
+                      boxShadow: theme.shadows[3],
+                      transition: "all 0.3s ease",
+                      "&:hover": {
+                        boxShadow: theme.shadows[6],
+                        transform: "translateY(-4px)",
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: "0.875rem", sm: "1rem" },
+                          fontWeight: "bold",
+                          mb: 1,
+                        }}
+                      >
+                        Customer: {sale.customer?.name || "N/A"}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          mb: 0.5,
+                        }}
+                      >
+                        Firm: {sale.firm?.name || "N/A"}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          mb: 0.5,
+                        }}
+                      >
+                        Total Amount: ₹{sale.totalAmount?.toLocaleString() || 0}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          mb: 0.5,
+                        }}
+                      >
+                        Payment Method: {sale.paymentMethod || "N/A"}
+                      </Typography>
+                    </CardContent>
+                    <CardActions
+                      sx={{ p: 1.5, justifyContent: "space-between" }}
+                    >
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setInvoiceDialog({ open: true, sale })}
+                        sx={{
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          textTransform: "none",
+                          borderRadius: 2,
+                        }}
+                      >
+                        View Invoice
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          startIcon={<Delete fontSize="small" />}
+                          onClick={() => handleDeleteSale(sale._id)}
+                          sx={{
+                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                            textTransform: "none",
+                            borderRadius: 2,
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </CardActions>
+                  </Card>
+                ))}
+              </Box>
+
+              {/* Desktop Table View */}
+              <TableContainer
+                component={Paper}
+                sx={{
+                  display: { xs: "none", sm: "block" },
+                  width: "100%",
+                  overflowX: "auto",
+                  borderRadius: 2,
+                  boxShadow: theme.shadows[4],
+                  "&:hover": { boxShadow: theme.shadows[8] },
+                }}
+              >
+                <Table
+                  sx={{
+                    minWidth: 650,
+                    "& .MuiTableCell-root": {
+                      fontSize: { xs: "0.8rem", sm: "0.9rem" },
+                    },
+                  }}
+                >
+                  <TableHead>
+                    <TableRow
+                      sx={{
+                        bgcolor: theme.palette.background.paper,
+                        "& th": {
+                          fontWeight: "bold",
+                          borderBottom: `2px solid ${theme.palette.secondary.main}`,
+                          px: { xs: 1, sm: 2 },
+                          py: 1,
+                        },
+                      }}
+                    >
+                      <TableCell sx={{ minWidth: 150 }}>Customer</TableCell>
+                      <TableCell sx={{ minWidth: 120 }}>Firm</TableCell>
+                      <TableCell sx={{ minWidth: 120 }}>Total Amount</TableCell>
+                      <TableCell sx={{ minWidth: 130 }}>
+                        Payment Method
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 200 }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {paginatedSales.map((sale) => (
+                      <TableRow
+                        key={sale._id}
+                        sx={{
+                          "&:hover": { bgcolor: theme.palette.action.hover },
+                          "& td": {
+                            px: { xs: 1, sm: 2 },
+                            py: 1,
+                          },
+                        }}
+                      >
+                        <TableCell>{sale.customer?.name || "N/A"}</TableCell>
+                        <TableCell>{sale.firm?.name || "N/A"}</TableCell>
+                        <TableCell>
+                          ₹{sale.totalAmount?.toLocaleString() || 0}
+                        </TableCell>
+                        <TableCell>{sale.paymentMethod || "N/A"}</TableCell>
+                        <TableCell
+                          sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}
+                        >
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() =>
+                              setInvoiceDialog({ open: true, sale })
+                            }
+                            sx={{
+                              fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                              px: 1,
+                              textTransform: "none",
+                            }}
+                          >
+                            View Invoice
+                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              startIcon={<Delete fontSize="small" />}
+                              onClick={() => handleDeleteSale(sale._id)}
+                              sx={{
+                                fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                                px: 1,
+                                textTransform: "none",
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Pagination */}
+              {filteredSales.length > 0 && (
+                <Box
+                  sx={{
+                    mt: 3,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 2,
+                    flexDirection: { xs: "column", sm: "row" },
+                  }}
+                >
+                  <Typography sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
+                    Total Sales: {filteredSales.length}
+                  </Typography>
+                  <Pagination
+                    count={Math.ceil(filteredSales.length / itemsPerPage)}
+                    page={page}
+                    onChange={(e, value) => setPage(value)}
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </motion.div>
+      </Box>
+      {/* Create Sale Modal */}
+      <Dialog
+        open={openSaleModal}
+        onClose={handleCancel}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            maxHeight: "90vh",
+            overflowY: "auto",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+            position: "relative",
+          }}
+        >
+          Create Sale
+          <IconButton
+            onClick={handleCancel}
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              color: theme.palette.primary.contrastText,
+            }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          {/* Customer Selection */}
+          <Box sx={{ mb: 3 }}>
+            {selectedCustomer && (
+              <Box
+                sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1.5 }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                  Selected: {selectedCustomer.name}
+                </Typography>
+                <Chip
+                  label="Clear"
+                  size="small"
+                  onClick={() => handleCustomerSelect("")}
+                  sx={{
+                    bgcolor: theme.palette.error.main,
+                    color: theme.palette.error.contrastText,
+                    "&:hover": { bgcolor: theme.palette.error.dark },
+                  }}
+                />
+              </Box>
+            )}
+            <Paper sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => setOpenCustomerListModal(true)}
+                  sx={{
+                    flex: 1,
+                    minWidth: 200,
+                    justifyContent: "flex-start",
+                    textTransform: "none",
+                  }}
+                >
+                  {selectedCustomer ? selectedCustomer.name : "Select Customer"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<Add />}
+                  onClick={() => setOpenCustomerModal(true)}
+                  sx={{ textTransform: "none" }}
+                >
+                  New Customer
+                </Button>
+              </Box>
+            </Paper>
+          </Box>
+
+          {/* Firm Selection - Must select first */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              Step 1: Select Firm (Required before selecting items)
+            </Typography>
+            <Select
+              name="firm"
+              value={newSale.firm || ""}
+              onChange={handleInputChange}
+              fullWidth
+              displayEmpty
+              error={saveAttemptedSale && !newSale.firm}
+              sx={{
+                mb: saveAttemptedSale && !newSale.firm ? 1 : 0,
+              }}
+            >
+              <MenuItem value="" disabled>
+                Select Firm
+              </MenuItem>
+              {firms.map((firm) => (
+                <MenuItem key={firm._id} value={firm._id}>
+                  {firm.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {saveAttemptedSale && !newSale.firm && (
+              <Typography
+                sx={{
+                  color: theme.palette.error.main,
+                  fontSize: "0.75rem",
+                  mt: 0.5,
+                }}
+              >
+                Firm is required
+              </Typography>
+            )}
+          </Box>
+
+          {/* Items */}
+          {newSale.items.map((item, index) => (
+            <Paper
+              key={index}
+              sx={{
+                mb: 2,
+                p: 2,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Select
+                    name="saleType"
+                    value={item.saleType || ""}
+                    onChange={(e) => handleInputChange(e, index)}
+                    fullWidth
+                    displayEmpty
+                  >
+                    <MenuItem value="" disabled>
+                      Select Sale Type
+                    </MenuItem>
+                    <MenuItem value="stock">Stock</MenuItem>
+                    <MenuItem value="rawMaterial">Raw Material</MenuItem>
+                  </Select>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Select
+                    name="salematerialId"
+                    value={item.salematerialId || ""}
+                    onChange={(e) => handleInputChange(e, index)}
+                    fullWidth
+                    displayEmpty
+                    disabled={!newSale.firm}
+                  >
+                    <MenuItem value="" disabled>
+                      {!newSale.firm
+                        ? "Select Firm First"
+                        : `Select ${
+                            item.saleType === "stock" ? "Stock" : "Raw Material"
+                          }`}
+                    </MenuItem>
+                    {(item.saleType === "stock"
+                      ? stocks.filter((s) => isFirmMatch(s.firm, newSale.firm))
+                      : materials.filter((m) => isFirmMatch(m.firm, newSale.firm))
+                    ).map((option) => (
+                      <MenuItem key={option._id} value={option._id}>
+                        {item.saleType === "stock"
+                          ? `${option.name} — ${option.waight}g${
+                              option.karat ? " " + option.karat : ""
+                            } (Stock: ${option.quantity})`
+                          : `${option.name} (${option.quantity ?? option.weight ?? "?"} available)`}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <TextField
+                    name="quantity"
+                    label="Quantity"
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => handleInputChange(e, index)}
+                    fullWidth
+                    InputProps={{ 
+                      inputProps: { 
+                        min: 1,
+                        max: item.salematerialId 
+                          ? getAvailableQuantity(item) || 999
+                          : 999
+                      } 
+                    }}
+                    helperText={
+                      item.salematerialId
+                        ? (() => {
+                            const available = `Available: ${getAvailableQuantity(item)} ${
+                              item.saleType === "stock" ? "units" : "weight"
+                            }`;
+                            if (item.saleType !== "stock") return available;
+                            const stock = stocks.find((s) => s._id === item.salematerialId);
+                            if (!stock) return available;
+                            return `${available} • Weight: ${stock.waight}g${
+                              stock.karat ? ` • ${stock.karat}` : ""
+                            }`;
+                          })()
+                        : ""
+                    }
+                  />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <TextField
+                    name="amount"
+                    label="Amount"
+                    type="number"
+                    value={item.amount}
+                    onChange={(e) => handleInputChange(e, index)}
+                    fullWidth
+                    InputProps={{ inputProps: { min: 0 } }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleRemoveItem(index)}
+                    disabled={newSale.items.length === 1}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Remove Item
+                  </Button>
+                </Grid>
+              </Grid>
+            </Paper>
+          ))}
+
+          <Button
+            variant="outlined"
+            onClick={handleAddItem}
+            sx={{ mb: 3, textTransform: "none" }}
+          >
+            Add Item
+          </Button>
+
+          {/* Total Amount */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12}>
+              <TextField
+                name="totalAmount"
+                label="Total Amount"
+                type="number"
+                value={newSale.totalAmount}
+                onChange={handleInputChange}
+                onBlur={() => handleSaleFieldBlur("totalAmount")}
+                fullWidth
+                InputProps={{ inputProps: { min: 0 } }}
+                error={
+                  (touchedSaleFields.totalAmount || saveAttemptedSale) &&
+                  (!newSale.totalAmount || parseFloat(newSale.totalAmount) <= 0)
+                }
+                helperText={
+                  (touchedSaleFields.totalAmount || saveAttemptedSale) &&
+                  (!newSale.totalAmount
+                    ? "Total amount is required"
+                    : parseFloat(newSale.totalAmount) <= 0
+                    ? "Total amount must be greater than 0"
+                    : "")
+                }
+              />
+            </Grid>
+          </Grid>
+
+          {/* Payment Details */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="udharAmount"
+                label="Udhar Amount"
+                type="number"
+                value={newSale.udharAmount || "0"}
+                onChange={handleInputChange}
+                fullWidth
+                InputProps={{ inputProps: { min: 0 } }}
+                helperText={
+                  parseFloat(newSale.udharAmount || 0) >
+                  parseFloat(newSale.totalAmount || 0)
+                    ? "Udhar cannot exceed total amount"
+                    : ""
+                }
+                error={
+                  parseFloat(newSale.udharAmount || 0) >
+                  parseFloat(newSale.totalAmount || 0)
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="paymentAmount"
+                label="Payment Amount"
+                type="number"
+                value={newSale.paymentAmount || ""}
+                onChange={(e) => {
+                  setManualPaymentEdit(true);
+                  handleInputChange(e);
+                }}
+                fullWidth
+                InputProps={{ inputProps: { min: 0 } }}
+                helperText={
+                  !newSale.paymentAmount ||
+                  parseFloat(newSale.paymentAmount) === 0
+                    ? `Calculated: ₹${Math.max(
+                        (parseFloat(newSale.totalAmount) || 0) -
+                          (parseFloat(newSale.udharAmount) || 0),
+                        0
+                      ).toFixed(2)}`
+                    : ""
+                }
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Select
+                name="paymentMethod"
+                value={newSale.paymentMethod}
+                onChange={handleInputChange}
+                fullWidth
+              >
+                <MenuItem value="cash">Cash</MenuItem>
+                <MenuItem value="credit">Credit</MenuItem>
+                <MenuItem value="online">Online</MenuItem>
+                <MenuItem value="bankTransfer">Bank Transfer</MenuItem>
+                <MenuItem value="Upi">UPI</MenuItem>
+              </Select>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={handleCancel} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveSale}
+            variant="contained"
+            sx={{ textTransform: "none" }}
+          >
+            Save Sale
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Customer List Modal */}
+      <Dialog
+        open={openCustomerListModal}
+        onClose={() => setOpenCustomerListModal(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 2, maxHeight: "80vh" } }}
+      >
+        <DialogTitle>Select Customer</DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+            <List>
+              {customers.map((customer) => (
+                <ListItem key={customer._id} disablePadding>
+                  <ListItemButton
+                    onClick={() => {
+                      handleCustomerSelect(customer._id);
+                      setOpenCustomerListModal(false);
+                    }}
+                    sx={{
+                      bgcolor:
+                        newSale.customer === customer._id
+                          ? theme.palette.primary.light
+                          : "transparent",
+                      "&:hover": { bgcolor: theme.palette.action.hover },
+                    }}
+                  >
+                    <ListItemText
+                      primary={customer.name}
+                      secondary={`${customer.email} | ${
+                        customer.firm?.name ||
+                        firms.find((f) => f._id === customer.firm)?.name ||
+                        "N/A"
+                      }`}
+                      primaryTypographyProps={{
+                        fontWeight:
+                          newSale.customer === customer._id ? "bold" : "normal",
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenCustomerListModal(false)}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* New Customer Modal */}
+      <Dialog
+        open={openCustomerModal}
+        onClose={() => setOpenCustomerModal(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+          }}
+        >
+          Create New Customer
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                name="name"
+                label="Customer Name"
+                value={newCustomer.name}
+                onChange={handleCustomerInputChange}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                name="email"
+                label="Email"
+                type="email"
+                value={newCustomer.email}
+                onChange={handleCustomerInputChange}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                name="contact"
+                label="Contact"
+                value={newCustomer.contact}
+                onChange={handleCustomerInputChange}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Select
+                name="firm"
+                value={newCustomer.firm || ""}
+                onChange={handleCustomerInputChange}
+                fullWidth
+                displayEmpty
+              >
+                <MenuItem value="" disabled>
+                  Select Firm
+                </MenuItem>
+                {firms.map((firm) => (
+                  <MenuItem key={firm._id} value={firm._id}>
+                    {firm.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                name="address"
+                label="Address"
+                value={newCustomer.address}
+                onChange={handleCustomerInputChange}
+                fullWidth
+                multiline
+                rows={3}
+                required
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => setOpenCustomerModal(false)}
+            sx={{ textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveCustomer}
+            variant="contained"
+            disabled={customerLoading}
+            sx={{ textTransform: "none" }}
+          >
+            {customerLoading ? <CircularProgress size={20} /> : "Save Customer"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Invoice Dialog */}
+      <Dialog
+        open={invoiceDialog.open}
+        onClose={() => setInvoiceDialog({ open: false, sale: null })}
+        fullWidth
+        maxWidth="lg"
+        PaperProps={{ 
+          sx: { 
+            borderRadius: 2,
+            '@media print': {
+              maxWidth: '100%',
+              margin: 0,
+              boxShadow: 'none',
+            }
+          } 
+        }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+            textAlign: "center",
+            '@media print': {
+              display: 'none',
+            }
+          }}
+        >
+          Sales Invoice
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, '@media print': { p: 0 } }}>
+          {invoiceDialog.sale && (() => {
+            const saleFirmId =
+              invoiceDialog.sale.firm?._id || invoiceDialog.sale.firm;
+            const saleCustomerId =
+              invoiceDialog.sale.customer?._id || invoiceDialog.sale.customer;
+
+            // Prefer the fully-loaded firm/customer records (from getAllFirms /
+            // getAllCustomers) over the sale's own populated copies, since the
+            // sale only needs to keep its item/amount data fixed — the firm's
+            // GST/contact/stamp/signature and the customer's current address
+            // should always reflect the latest master record. Fall back to
+            // whatever the sale has embedded if the record was since deleted.
+            const firm =
+              firms.find((f) => f._id === saleFirmId) || invoiceDialog.sale.firm;
+            const customer =
+              customers.find((c) => c._id === saleCustomerId) ||
+              invoiceDialog.sale.customer;
+            const owner = firm?.owner?.name ? firm.owner : {};
+
+            return (
+              <ProfessionalInvoice
+                sale={invoiceDialog.sale}
+                customer={customer}
+                firm={firm}
+                items={invoiceDialog.sale.items || []}
+                stocks={stocks}
+                materials={materials}
+                owner={owner}
+              />
+            );
+          })()}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1, '@media print': { display: 'none' } }}>
+          <Button
+            onClick={() => window.print()}
+            variant="contained"
+            sx={{ textTransform: "none", px: 3 }}
+          >
+            Print Invoice
+          </Button>
+          <Button
+            onClick={() => setInvoiceDialog({ open: false, sale: null })}
+            variant="outlined"
+            sx={{ textTransform: "none", px: 3 }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={notificationDialog.open}
+        onClose={handleNotificationClose}
+        message={notificationDialog.message}
+        type={notificationDialog.type}
+        title={notificationDialog.title}
+      />
+    </Box>
+  );
+}
+
+export default SalesManagement;
