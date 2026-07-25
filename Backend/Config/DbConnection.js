@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
+const dns = require("dns");
 require("dotenv").config();
 
+// Node's default DNS resolver can fail SRV lookups (mongodb+srv://) on some
+// Windows setups where the OS-assigned DNS server is an IPv6 link-local
+// address (e.g. router-assigned fe80::1). Point it at public resolvers instead.
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+ 
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGO_URI;
