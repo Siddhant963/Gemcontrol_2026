@@ -25,6 +25,7 @@ import {
   Card,
   CardContent,
   Pagination,
+  Chip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,6 +58,17 @@ import {
   Line,
   Legend,
 } from "recharts";
+
+// Mirrors GOLD_PURITY_FACTORS in Backend/Controllers/adminController.js —
+// used only to preview derived rates before saving; the backend is the
+// source of truth for what actually gets stored.
+const GOLD_PURITY_FACTORS = {
+  "24K": 1,
+  "23K": 0.9583,
+  "22K": 0.9167,
+  "20K": 0.8333,
+  "18K": 0.75,
+};
 
 const EMPTY_GOLD_RATES = { "24K": "N/A", "23K": "N/A", "22K": "N/A", "20K": "N/A", "18K": "N/A" };
 const EMPTY_DIAMOND_RATES = {
@@ -409,22 +421,11 @@ function Dashboard() {
     }
 
     if (material === "gold") {
-      const purities = ["24K", "23K", "22K", "20K", "18K"];
-      purities.forEach((purity) => {
-        const value = newRates.gold[purity];
-        if (value === "" || isNaN(parseFloat(value)) || parseFloat(value) <= 0) {
-          errors[purity] = `${purity} rate must be a positive number`;
-        }
-      });
-
-      for (let i = 0; i < purities.length - 1; i++) {
-        const higherPurity = purities[i];
-        const lowerPurity = purities[i + 1];
-        const higherRate = parseFloat(newRates.gold[higherPurity]);
-        const lowerRate = parseFloat(newRates.gold[lowerPurity]);
-        if (!isNaN(higherRate) && !isNaN(lowerRate) && higherRate <= lowerRate) {
-          errors[higherPurity] = `${higherPurity} rate must be greater than ${lowerPurity}`;
-        }
+      // Only 24K is entered by hand — 23K/22K/20K/18K are derived by the
+      // backend from GOLD_PURITY_FACTORS, so there's nothing else to validate.
+      const value = newRates.gold["24K"];
+      if (value === "" || isNaN(parseFloat(value)) || parseFloat(value) <= 0) {
+        errors["24K"] = "24K rate must be a positive number";
       }
     } else if (material === "silver") {
       if (
@@ -1528,23 +1529,35 @@ function Dashboard() {
             sx={{ mb: 2 }}
           />
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-            Gold Rates (₹/gm)
+            Gold Rate (₹/gm)
           </Typography>
-          {["24K", "23K", "22K", "20K", "18K"].map((purity) => (
-            <TextField
-              key={purity}
-              label={`${purity} Rate`}
-              type="number"
-              fullWidth
-              margin="dense"
-              value={newRates.gold[purity]}
-              onChange={handleNewRateChange("gold", purity)}
-              error={!!rateFormErrors[purity]}
-              helperText={rateFormErrors[purity]}
-              inputProps={{ min: 0 }}
-              sx={{ mb: 2 }}
-            />
-          ))}
+          <TextField
+            label="24K Rate"
+            type="number"
+            fullWidth
+            margin="dense"
+            value={newRates.gold["24K"]}
+            onChange={handleNewRateChange("gold", "24K")}
+            error={!!rateFormErrors["24K"]}
+            helperText={rateFormErrors["24K"] || "23K/22K/20K/18K are calculated automatically"}
+            inputProps={{ min: 0 }}
+            sx={{ mb: 2 }}
+          />
+          {parseFloat(newRates.gold["24K"]) > 0 && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1 }}>
+              {Object.entries(GOLD_PURITY_FACTORS)
+                .filter(([purity]) => purity !== "24K")
+                .map(([purity, factor]) => (
+                  <Chip
+                    key={purity}
+                    label={`${purity}: ₹${(
+                      Math.round(parseFloat(newRates.gold["24K"]) * factor * 100) / 100
+                    ).toLocaleString("en-IN")}`}
+                    size="small"
+                  />
+                ))}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ flexDirection: { xs: "column", sm: "row" }, gap: 1, px: 2, pb: 2 }}>
           <Button onClick={handleCloseGoldModal} sx={{ width: { xs: "100%", sm: "auto" }, textTransform: "none" }}>

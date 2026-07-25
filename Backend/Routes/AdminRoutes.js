@@ -1,7 +1,20 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const { upload } = require("../Utils/UploadFile.js");
 const { isLoggedIn, isAdmin, isStaff } = require("../Utils/islogedin");
+
+// Bulk stock Excel uploads are parsed in memory (not saved to disk like
+// product images) since they're read once and discarded.
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedExt = /\.(xlsx|xls)$/i;
+    if (allowedExt.test(file.originalname)) return cb(null, true);
+    cb(new Error("Only .xlsx or .xls files are allowed"));
+  },
+});
 
 const {
   RegisterUser,
@@ -66,6 +79,9 @@ const {
   updateDailrate,
   getRecentActivities,
   getAllActivities,
+  downloadStockBulkTemplate,
+  bulkImportStock,
+  getDayBook,
   // New Girvi Interest functions
   calculateGirviInterest,
   updateGirviInterestMonthly,
@@ -92,6 +108,7 @@ const firmUploads = upload.fields([
   { name: "logo", maxCount: 1 },
   { name: "firmStamp", maxCount: 1 },
   { name: "ownerSignature", maxCount: 1 },
+  { name: "secondLogo", maxCount: 1 },
 ]);
 router.post("/createFirm", isLoggedIn, isAdmin, firmUploads, createFirm);
 router.put("/updateFirm", isLoggedIn, isAdmin, firmUploads, updateFirm);
@@ -100,10 +117,12 @@ router.get("/removeFirm", isLoggedIn, isAdmin, removeFirm);
 router.post("/AddCustomer", isLoggedIn, AddCustomer);
 router.get("/getAllCustomers", isLoggedIn, getAllCustomers);
 router.get("/removeCustomer", isLoggedIn, isAdmin, removeCustomer);
+// Categories are shared reference data every user needs while adding items
+// day-to-day, so creating one isn't gated behind isAdmin — only removing a
+// category (which can affect items already filed under it) stays admin-only.
 router.post(
   "/createStockCategory",
   isLoggedIn,
-  isAdmin,
   upload.single("CategoryImg"),
   createStockCategory
 );
@@ -120,6 +139,13 @@ router.get("/getAllStocks", isLoggedIn, getAllStocks);
 router.get("/removeStock", isLoggedIn, isAdmin, removeStock);
 router.get("/getStockbyCategory", isLoggedIn, getStockbyCategory);
 router.get("/getStockbyFirm", isLoggedIn, getStockbyFirm);
+router.get("/downloadStockBulkTemplate", isLoggedIn, downloadStockBulkTemplate);
+router.post(
+  "/bulkImportStock",
+  isLoggedIn,
+  uploadExcel.single("file"),
+  bulkImportStock
+);
 router.post(
   "/createRawMaterial",
   isLoggedIn,
@@ -160,6 +186,7 @@ router.get(
 );
 router.get("/getUdharSetelmentByDate", isLoggedIn, getUdharsetelmentBydate);
 router.get("/getFiveMonthlySales", isLoggedIn, getFiveMonthlySales);
+router.get("/getDayBook", isLoggedIn, getDayBook);
 router.post(
   "/AddGirviItem",
   isLoggedIn,

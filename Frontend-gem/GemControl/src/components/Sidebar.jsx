@@ -10,7 +10,9 @@ import {
   PointOfSale,
   Payment,
   AccountBalance,
-  Inventory2Rounded
+  Inventory2Rounded,
+  Diamond,
+  MenuBook,
 } from "@mui/icons-material";
 import {
   Drawer,
@@ -40,7 +42,7 @@ const menuItems = [
     path: ROUTES.CUSTOMER_MANAGEMENT,
   },
   { text: "Raw Materials", icon: <Inventory />, path: ROUTES.RAW_MATERIALS },
-  { text: "Categories", icon: <Category />, path: ROUTES.CATEGORIES, adminOnly: true },
+  { text: "Categories", icon: <Category />, path: ROUTES.CATEGORIES },
   {
     text: "Items Management",
     icon: <Inventory />,
@@ -50,6 +52,16 @@ const menuItems = [
     text: "Sales Management",
     icon: <PointOfSale />,
     path: ROUTES.SALES_MANAGEMENT,
+  },
+  {
+    text: "Jewellery Panel",
+    icon: <Diamond />,
+    path: ROUTES.JEWELLERY_PANEL,
+  },
+  {
+    text: "Day Book",
+    icon: <MenuBook />,
+    path: ROUTES.DAY_BOOK,
   },
   { text: "Payments", icon: <Payment />, path: ROUTES.PAYMENTS, adminOnly: true },
   {

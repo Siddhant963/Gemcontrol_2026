@@ -24,6 +24,8 @@ import NotFound from "./pages/NotFound";
 import { ROUTES } from "./utils/routes";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GirviManagement from "./pages/GirviManagement.jsx";
+import JewelleryPanel from "./pages/JewelleryPanel.jsx";
+import DayBook from "./pages/DayBook.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import {useTheme} from "@mui/material/styles";
 
@@ -89,12 +91,14 @@ function MainApp() {
             <Route path={ROUTES.RAW_MATERIALS} element={<RawMaterials />} />
             <Route path={ROUTES.ITEMS_MANAGEMENT} element={<ItemsManagement />} />
             <Route path={ROUTES.SALES_MANAGEMENT} element={<SalesManagement />} />
+            <Route path={ROUTES.JEWELLERY_PANEL} element={<JewelleryPanel />} />
+            <Route path={ROUTES.DAY_BOOK} element={<DayBook />} />
+            <Route path={ROUTES.CATEGORIES} element={<Categories />} />
 
             {/* Admin-only routes */}
             <Route element={<AdminRoute />}>
               <Route path={ROUTES.USER_MANAGEMENT} element={<UserManagement />} />
               <Route path={ROUTES.FIRM_MANAGEMENT} element={<FirmManagement />} />
-              <Route path={ROUTES.CATEGORIES} element={<Categories />} />
               <Route path={ROUTES.PAYMENTS} element={<PaymentManagement />} />
               <Route path={ROUTES.UDHAR_MANAGEMENT} element={<UdharManagement />} />
               <Route path={ROUTES.GIRVI_MANAGEMENT} element={<GirviManagement />} />

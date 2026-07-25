@@ -23,6 +23,9 @@ import {
   Card,
   CardContent,
   CardActions,
+  Tabs,
+  Tab,
+  Menu,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
@@ -80,6 +83,18 @@ function ItemManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [metalFilter, setMetalFilter] = useState("all");
+  const [columnFilters, setColumnFilters] = useState({
+    stockcode: "",
+    name: "",
+    karat: "",
+    priceMin: "",
+    priceMax: "",
+  });
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkImportFile, setBulkImportFile] = useState(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportResult, setBulkImportResult] = useState(null);
   const [openAddModal, setOpenAddModal] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -90,13 +105,22 @@ function ItemManagement() {
   const [newItem, setNewItem] = useState({
     name: "",
     materialgitType: "gold", // Fixed typo
-    waight: "", // Fixed typo
+    waight: "", // Fixed typo — this is the Gross Weight
+    lessWeight: "",
     karat: "",
     category: "",
     firm: "",
     quantity: "",
     price: "",
+    stockType: "retail",
+    hsnCode: "",
+    wastageSupplier: "",
+    wastageCustomer: "",
     makingCharge: "",
+    makingChargeUnit: "fixed",
+    labourChargeValue: "",
+    labourChargeUnit: "fixed",
+    stoneCharge: "",
     stockImg: null,
   });
   const [priceTouched, setPriceTouched] = useState(false);
@@ -108,12 +132,21 @@ function ItemManagement() {
     name: "",
     materialgitType: "gold",
     waight: "",
+    lessWeight: "",
     karat: "",
     category: "",
     firm: "",
     quantity: "",
     price: "",
+    stockType: "retail",
+    hsnCode: "",
+    wastageSupplier: "",
+    wastageCustomer: "",
     makingCharge: "",
+    makingChargeUnit: "fixed",
+    labourChargeValue: "",
+    labourChargeUnit: "fixed",
+    stoneCharge: "",
     stockImg: null,
   });
   const [editPriceTouched, setEditPriceTouched] = useState(true);
@@ -229,13 +262,22 @@ function ItemManagement() {
     setNewItem({
       name: "",
       materialgitType: "gold", // Fixed typo
-      waight: "", // Fixed typo
+      waight: "", // Fixed typo — this is the Gross Weight
+      lessWeight: "",
       karat: "",
       category: "",
       firm: "",
       quantity: "",
       price: "",
+      stockType: "retail",
+      hsnCode: "",
+      wastageSupplier: "",
+      wastageCustomer: "",
       makingCharge: "",
+      makingChargeUnit: "fixed",
+      labourChargeValue: "",
+      labourChargeUnit: "fixed",
+      stoneCharge: "",
       stockImg: null,
     });
     setPriceTouched(false);
@@ -254,6 +296,11 @@ function ItemManagement() {
     setFormErrors((prev) => ({ ...prev, [name]: null, submit: null }));
   }, []);
 
+  // Net weight is what the customer actually pays metal-rate on — gross
+  // weight minus any artificial stone / moti weight.
+  const newItemNetWeight =
+    (parseFloat(newItem.waight) || 0) - (parseFloat(newItem.lessWeight) || 0);
+
   // Auto-suggest the price from today's rate whenever material/karat/weight change,
   // as long as the user hasn't manually edited the price field themselves.
   useEffect(() => {
@@ -261,13 +308,13 @@ function ItemManagement() {
     const suggested = computeSuggestedPrice(
       newItem.materialgitType,
       newItem.karat,
-      newItem.waight,
+      newItemNetWeight,
       latestRate
     );
     if (suggested != null) {
       setNewItem((prev) => ({ ...prev, price: String(suggested) }));
     }
-  }, [newItem.materialgitType, newItem.karat, newItem.waight, latestRate, priceTouched]);
+  }, [newItem.materialgitType, newItem.karat, newItemNetWeight, latestRate, priceTouched]);
 
   const handleFileChange = useCallback((e) => {
     const file = e.target.files[0];
@@ -292,13 +339,23 @@ function ItemManagement() {
       const formData = new FormData();
       formData.append("name", newItem.name);
       formData.append("materialgitType", newItem.materialgitType); // Fixed typo
-      formData.append("waight", newItem.waight); // Fixed typo
+      formData.append("waight", newItem.waight); // Fixed typo — legacy, treated as gross weight fallback
+      formData.append("grossWeight", newItem.waight);
+      formData.append("lessWeight", newItem.lessWeight || "0");
       formData.append("karat", newItem.materialgitType === "silver" ? "" : newItem.karat);
       formData.append("category", newItem.category);
       formData.append("firm", newItem.firm);
       formData.append("quantity", newItem.quantity);
       formData.append("price", newItem.price);
-      formData.append("makingCharge", newItem.makingCharge);
+      formData.append("stockType", newItem.stockType || "retail");
+      formData.append("hsnCode", newItem.hsnCode || "");
+      formData.append("wastageSupplier", newItem.wastageSupplier || "0");
+      formData.append("wastageCustomer", newItem.wastageCustomer || "0");
+      formData.append("makingChargeValue", newItem.makingCharge || "0");
+      formData.append("makingChargeUnit", newItem.makingChargeUnit || "fixed");
+      formData.append("labourChargeValue", newItem.labourChargeValue || "0");
+      formData.append("labourChargeUnit", newItem.labourChargeUnit || "fixed");
+      formData.append("stoneCharge", newItem.stoneCharge || "0");
       formData.append("stockcode", stockcode);
       if (newItem.stockImg) formData.append("stock", newItem.stockImg);
 
@@ -309,11 +366,20 @@ function ItemManagement() {
         name: "",
         materialgitType: "gold", // Fixed typo
         waight: "", // Fixed typo
+        lessWeight: "",
         category: "",
         firm: "",
         quantity: "",
         price: "",
+        stockType: "retail",
+        hsnCode: "",
+        wastageSupplier: "",
+        wastageCustomer: "",
         makingCharge: "",
+        makingChargeUnit: "fixed",
+        labourChargeValue: "",
+        labourChargeUnit: "fixed",
+        stoneCharge: "",
         stockImg: null,
       });
       setFormErrors({});
@@ -504,12 +570,21 @@ function ItemManagement() {
       name: "",
       materialgitType: "gold", // Fixed typo
       waight: "", // Fixed typo
+      lessWeight: "",
       karat: "",
       category: "",
       firm: "",
       quantity: "",
       price: "",
+      stockType: "retail",
+      hsnCode: "",
+      wastageSupplier: "",
+      wastageCustomer: "",
       makingCharge: "",
+      makingChargeUnit: "fixed",
+      labourChargeValue: "",
+      labourChargeUnit: "fixed",
+      stoneCharge: "",
       stockImg: null,
     });
     setPriceTouched(false);
@@ -521,13 +596,22 @@ function ItemManagement() {
     setEditItem({
       name: item.name,
       materialgitType: item.materialgitType,
-      waight: item.waight,
+      waight: item.grossWeight || item.waight,
+      lessWeight: item.lessWeight || "",
       karat: item.karat || "",
       category: item.category._id || item.category,
       firm: item.firm._id || item.firm,
       quantity: item.quantity,
       price: item.price,
-      makingCharge: item.makingCharge,
+      stockType: item.stockType || "retail",
+      hsnCode: item.hsnCode || "",
+      wastageSupplier: item.wastage?.supplier || "",
+      wastageCustomer: item.wastage?.customer || "",
+      makingCharge: item.makingChargeConfig?.value ?? item.makingCharge,
+      makingChargeUnit: item.makingChargeConfig?.unit || "fixed",
+      labourChargeValue: item.labourCharge?.value || "",
+      labourChargeUnit: item.labourCharge?.unit || "fixed",
+      stoneCharge: item.stoneCharge || "",
       stockImg: null,
     });
     setEditPriceTouched(true);
@@ -543,11 +627,15 @@ function ItemManagement() {
       if (name === "materialgitType" && value === "silver") updated.karat = "";
       return updated;
     });
-    if (name === "karat" || name === "waight" || name === "materialgitType") {
+    if (name === "karat" || name === "waight" || name === "lessWeight" || name === "materialgitType") {
       setEditPriceTouched(false);
     }
     setFormErrors((prev) => ({ ...prev, [name]: null, submit: null }));
   }, []);
+
+  // Net weight is what the customer actually pays metal-rate on.
+  const editItemNetWeight =
+    (parseFloat(editItem.waight) || 0) - (parseFloat(editItem.lessWeight) || 0);
 
   // Same auto-suggest behavior as the Add form, but only once the user has actively
   // changed karat/weight/material type in this edit session (not on initial dialog open,
@@ -557,13 +645,13 @@ function ItemManagement() {
     const suggested = computeSuggestedPrice(
       editItem.materialgitType,
       editItem.karat,
-      editItem.waight,
+      editItemNetWeight,
       latestRate
     );
     if (suggested != null) {
       setEditItem((prev) => ({ ...prev, price: String(suggested) }));
     }
-  }, [editItem.materialgitType, editItem.karat, editItem.waight, latestRate, editPriceTouched]);
+  }, [editItem.materialgitType, editItem.karat, editItemNetWeight, latestRate, editPriceTouched]);
 
   const handleEditFileChange = useCallback((e) => {
     const file = e.target.files[0];
@@ -620,12 +708,22 @@ function ItemManagement() {
       formData.append("name", editItem.name);
       formData.append("materialgitType", editItem.materialgitType);
       formData.append("waight", String(editItem.waight));
+      formData.append("grossWeight", String(editItem.waight));
+      formData.append("lessWeight", String(editItem.lessWeight || "0"));
       formData.append("karat", editItem.materialgitType === "silver" ? "" : editItem.karat || "");
       formData.append("category", editItem.category);
       formData.append("firm", editItem.firm);
       formData.append("quantity", String(editItem.quantity));
       formData.append("price", String(editItem.price));
-      formData.append("makingCharge", String(editItem.makingCharge));
+      formData.append("stockType", editItem.stockType || "retail");
+      formData.append("hsnCode", editItem.hsnCode || "");
+      formData.append("wastageSupplier", String(editItem.wastageSupplier || "0"));
+      formData.append("wastageCustomer", String(editItem.wastageCustomer || "0"));
+      formData.append("makingChargeValue", String(editItem.makingCharge || "0"));
+      formData.append("makingChargeUnit", editItem.makingChargeUnit || "fixed");
+      formData.append("labourChargeValue", String(editItem.labourChargeValue || "0"));
+      formData.append("labourChargeUnit", editItem.labourChargeUnit || "fixed");
+      formData.append("stoneCharge", String(editItem.stoneCharge || "0"));
       if (editItem.stockImg) formData.append("stock", editItem.stockImg);
 
       const response = await api.put(
@@ -644,12 +742,21 @@ function ItemManagement() {
         name: "",
         materialgitType: "gold",
         waight: "",
+        lessWeight: "",
         karat: "",
         category: "",
         firm: "",
         quantity: "",
         price: "",
+        stockType: "retail",
+        hsnCode: "",
+        wastageSupplier: "",
+        wastageCustomer: "",
         makingCharge: "",
+        makingChargeUnit: "fixed",
+        labourChargeValue: "",
+        labourChargeUnit: "fixed",
+        stoneCharge: "",
         stockImg: null,
       });
       setEditPriceTouched(true);
@@ -686,12 +793,21 @@ function ItemManagement() {
       name: "",
       materialgitType: "gold",
       waight: "",
+      lessWeight: "",
       karat: "",
       category: "",
       firm: "",
       quantity: "",
       price: "",
+      stockType: "retail",
+      hsnCode: "",
+      wastageSupplier: "",
+      wastageCustomer: "",
       makingCharge: "",
+      makingChargeUnit: "fixed",
+      labourChargeValue: "",
+      labourChargeUnit: "fixed",
+      stoneCharge: "",
       stockImg: null,
     });
     setEditPriceTouched(true);
@@ -709,23 +825,218 @@ function ItemManagement() {
 
   const filteredItems = useMemo(
     () =>
-      stocks.filter(
-        (item) =>
-          ((item.category.name || "")
+      stocks.filter((item) => {
+        const matchesGlobalSearch =
+          (item.category.name || "")
             .toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
-            (item.materialgitType || "")
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase()) ||
-            (item.stockcode || "")
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase())) &&
-          (categoryFilter === "all" ||
-            item.category?.name === categoryFilter) &&
-          (metalFilter === "all" || item.materialgitType === metalFilter) // Fixed typo
-      ),
-    [stocks, searchQuery, categoryFilter, metalFilter]
+          (item.materialgitType || "")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          (item.stockcode || "").toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory =
+          categoryFilter === "all" || item.category?.name === categoryFilter;
+        const matchesMetal = metalFilter === "all" || item.materialgitType === metalFilter; // Fixed typo
+        const matchesStockcode = (item.stockcode || "")
+          .toLowerCase()
+          .includes(columnFilters.stockcode.toLowerCase());
+        const matchesName = (item.name || "")
+          .toLowerCase()
+          .includes(columnFilters.name.toLowerCase());
+        const matchesKarat = (item.karat || "")
+          .toLowerCase()
+          .includes(columnFilters.karat.toLowerCase());
+        const price = Number(item.price) || 0;
+        const matchesPriceMin =
+          columnFilters.priceMin === "" || price >= Number(columnFilters.priceMin);
+        const matchesPriceMax =
+          columnFilters.priceMax === "" || price <= Number(columnFilters.priceMax);
+        return (
+          matchesGlobalSearch &&
+          matchesCategory &&
+          matchesMetal &&
+          matchesStockcode &&
+          matchesName &&
+          matchesKarat &&
+          matchesPriceMin &&
+          matchesPriceMax
+        );
+      }),
+    [stocks, searchQuery, categoryFilter, metalFilter, columnFilters]
   );
+
+  const handleColumnFilterChange = useCallback((field) => (e) => {
+    setColumnFilters((prev) => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  // ---- Export (Excel/CSV/PDF/Word) ----
+  // Excel/Word are generated as an HTML table saved with the matching MIME
+  // type + extension — both applications open HTML tables natively, so this
+  // avoids pulling in a heavy client-side spreadsheet/docx library just for
+  // a flat export.
+  const EXPORT_COLUMNS = [
+    { key: "stockcode", label: "Stock Code" },
+    { key: "name", label: "Name" },
+    { key: "materialgitType", label: "Material" },
+    { key: "karat", label: "Karat" },
+    { key: "categoryName", label: "Category" },
+    { key: "grossWeight", label: "Gross Wt (g)" },
+    { key: "lessWeight", label: "Less Wt (g)" },
+    { key: "netWeight", label: "Net Wt (g)" },
+    { key: "quantity", label: "Quantity" },
+    { key: "price", label: "Price" },
+    { key: "makingCharge", label: "Making Charge" },
+    { key: "totalValue", label: "Total Value" },
+    { key: "hsnCode", label: "HSN Code" },
+  ];
+
+  const buildExportRows = useCallback(
+    () =>
+      filteredItems.map((item) => ({
+        stockcode: item.stockcode || "",
+        name: item.name || "",
+        materialgitType: item.materialgitType || "",
+        karat: item.karat || "",
+        categoryName: item.category?.name || "",
+        grossWeight: item.grossWeight || item.waight || 0,
+        lessWeight: item.lessWeight || 0,
+        netWeight: item.netWeight || item.waight || 0,
+        quantity: item.quantity || 0,
+        price: item.price || 0,
+        makingCharge: item.makingCharge || 0,
+        totalValue: item.totalValue || 0,
+        hsnCode: item.hsnCode || "",
+      })),
+    [filteredItems]
+  );
+
+  const downloadBlob = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = useCallback(
+    (format) => {
+      setExportMenuAnchor(null);
+      const rows = buildExportRows();
+      if (rows.length === 0) return;
+
+      if (format === "csv") {
+        const header = EXPORT_COLUMNS.map((c) => `"${c.label}"`).join(",");
+        const body = rows
+          .map((row) =>
+            EXPORT_COLUMNS.map((c) => `"${String(row[c.key]).replace(/"/g, '""')}"`).join(",")
+          )
+          .join("\n");
+        downloadBlob(`${header}\n${body}`, "stock-export.csv", "text/csv;charset=utf-8;");
+        return;
+      }
+
+      const tableHtml = `
+        <table border="1">
+          <thead><tr>${EXPORT_COLUMNS.map((c) => `<th>${c.label}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) =>
+                  `<tr>${EXPORT_COLUMNS.map((c) => `<td>${row[c.key]}</td>`).join("")}</tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>`;
+
+      if (format === "excel") {
+        downloadBlob(
+          `<html><head><meta charset="utf-8"></head><body>${tableHtml}</body></html>`,
+          "stock-export.xls",
+          "application/vnd.ms-excel"
+        );
+      } else if (format === "word") {
+        downloadBlob(
+          `<html><head><meta charset="utf-8"></head><body>${tableHtml}</body></html>`,
+          "stock-export.doc",
+          "application/msword"
+        );
+      } else if (format === "pdf") {
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) return;
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Stock Export</title>
+              <style>
+                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+                th, td { border: 1px solid #999; padding: 4px 6px; text-align: left; }
+                th { background: #eee; }
+              </style>
+            </head>
+            <body>${tableHtml}</body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+    },
+    [buildExportRows] // eslint-disable-line react-hooks/exhaustive-deps -- EXPORT_COLUMNS is a static local constant
+  );
+
+  // ---- Bulk stock import (wholesale, via Excel) ----
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const response = await api.get("/downloadStockBulkTemplate", {
+        responseType: "blob",
+      });
+      downloadBlob(response.data, "stock-bulk-template.xlsx", response.data.type);
+    } catch {
+      setNotificationDialog({
+        open: true,
+        message: "Failed to download the bulk stock template.",
+        type: "error",
+        title: "Error",
+      });
+    }
+  }, []);
+
+  const handleBulkImportFileChange = useCallback((e) => {
+    setBulkImportFile(e.target.files[0] || null);
+    setBulkImportResult(null);
+  }, []);
+
+  const handleBulkImportSubmit = useCallback(async () => {
+    if (!bulkImportFile) return;
+    try {
+      setBulkImporting(true);
+      const formData = new FormData();
+      formData.append("file", bulkImportFile);
+      const response = await api.post("/bulkImportStock", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setBulkImportResult(response.data);
+      await fetchData();
+    } catch (err) {
+      setBulkImportResult(
+        err.response?.data || { message: "Failed to import stock.", errors: [] }
+      );
+    } finally {
+      setBulkImporting(false);
+    }
+  }, [bulkImportFile, fetchData]);
+
+  const handleCloseBulkImport = useCallback(() => {
+    setBulkImportOpen(false);
+    setBulkImportFile(null);
+    setBulkImportResult(null);
+  }, []);
   console.log(stocks, "d");
   return (
     <Box
@@ -908,6 +1219,104 @@ function ItemManagement() {
               </MenuItem>
             </Select>
           </Box>
+        </Box>
+
+        <Tabs
+          value={metalFilter}
+          onChange={(e, value) => setMetalFilter(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ mt: { xs: 1, sm: 2 }, borderBottom: 1, borderColor: "divider" }}
+        >
+          <Tab label="All" value="all" />
+          <Tab label="Gold" value="gold" />
+          <Tab label="Silver" value="silver" />
+          <Tab label="Platinum" value="platinum" />
+          <Tab label="Diamond" value="diamond" />
+          <Tab label="Other" value="other" />
+        </Tabs>
+
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+            mt: { xs: 1, sm: 2 },
+            alignItems: "center",
+          }}
+        >
+          <TextField
+            size="small"
+            label="Search Code"
+            value={columnFilters.stockcode}
+            onChange={handleColumnFilterChange("stockcode")}
+            sx={{ width: 140 }}
+          />
+          <TextField
+            size="small"
+            label="Search Name"
+            value={columnFilters.name}
+            onChange={handleColumnFilterChange("name")}
+            sx={{ width: 140 }}
+          />
+          <TextField
+            size="small"
+            label="Search Karat"
+            value={columnFilters.karat}
+            onChange={handleColumnFilterChange("karat")}
+            sx={{ width: 120 }}
+          />
+          <TextField
+            size="small"
+            label="Min Price"
+            type="number"
+            value={columnFilters.priceMin}
+            onChange={handleColumnFilterChange("priceMin")}
+            sx={{ width: 110 }}
+          />
+          <TextField
+            size="small"
+            label="Max Price"
+            type="number"
+            value={columnFilters.priceMax}
+            onChange={handleColumnFilterChange("priceMax")}
+            sx={{ width: 110 }}
+          />
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleDownloadTemplate}
+            sx={{ textTransform: "none" }}
+          >
+            Download Bulk Template
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setBulkImportOpen(true)}
+            sx={{ textTransform: "none" }}
+          >
+            Bulk Import (Wholesale)
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+            sx={{ textTransform: "none" }}
+          >
+            Export
+          </Button>
+          <Menu
+            anchorEl={exportMenuAnchor}
+            open={Boolean(exportMenuAnchor)}
+            onClose={() => setExportMenuAnchor(null)}
+          >
+            <MenuItem onClick={() => handleExport("excel")}>Excel (.xls)</MenuItem>
+            <MenuItem onClick={() => handleExport("csv")}>CSV</MenuItem>
+            <MenuItem onClick={() => handleExport("pdf")}>PDF (print)</MenuItem>
+            <MenuItem onClick={() => handleExport("word")}>Word (.doc)</MenuItem>
+          </Menu>
         </Box>
       </Box>
 
@@ -1567,10 +1976,21 @@ function ItemManagement() {
               </MenuItem>
             ))}
           </Select>
+          <Select
+            name="stockType"
+            value={newItem.stockType}
+            onChange={handleInputChange}
+            fullWidth
+            displayEmpty
+            sx={{ mb: { xs: 1, sm: 2 }, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+          >
+            <MenuItem value="retail">Retail (added individually)</MenuItem>
+            <MenuItem value="wholesale">Wholesale (bulk stock)</MenuItem>
+          </Select>
           <TextField
             margin="dense"
-            name="waight" // Fixed typo
-            label="Weight (g)"
+            name="waight" // Fixed typo — this is the Gross Weight
+            label="Gross Weight (g)"
             type="number"
             fullWidth
             value={newItem.waight}
@@ -1588,6 +2008,30 @@ function ItemManagement() {
             }}
             required
           />
+          <TextField
+            margin="dense"
+            name="lessWeight"
+            label="Less Weight — stone/moti (g)"
+            type="number"
+            fullWidth
+            value={newItem.lessWeight}
+            onChange={handleInputChange}
+            sx={{
+              mb: { xs: 1, sm: 2 },
+              "& .MuiInputBase-input": {
+                fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              },
+              "& .MuiInputLabel-root": {
+                fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              },
+            }}
+          />
+          <Typography
+            variant="body2"
+            sx={{ mb: { xs: 1, sm: 2 }, color: theme.palette.text.secondary }}
+          >
+            Net Weight: {newItemNetWeight > 0 ? newItemNetWeight.toFixed(3) : 0} g
+          </Typography>
           <TextField
             margin="dense"
             name="quantity"
@@ -1611,6 +2055,16 @@ function ItemManagement() {
           />
           <TextField
             margin="dense"
+            name="hsnCode"
+            label="HSN Code"
+            type="text"
+            fullWidth
+            value={newItem.hsnCode}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+          />
+          <TextField
+            margin="dense"
             name="price"
             label="Price (₹)"
             type="number"
@@ -1630,26 +2084,84 @@ function ItemManagement() {
             }}
             required
           />
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="wastageSupplier"
+              label="Supplier Wastage %"
+              type="number"
+              fullWidth
+              value={newItem.wastageSupplier}
+              onChange={handleInputChange}
+            />
+            <TextField
+              margin="dense"
+              name="wastageCustomer"
+              label="Customer Wastage %"
+              type="number"
+              fullWidth
+              value={newItem.wastageCustomer}
+              onChange={handleInputChange}
+            />
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="makingCharge"
+              label="Making Charge"
+              type="number"
+              fullWidth
+              value={newItem.makingCharge}
+              onChange={handleInputChange}
+              error={!!formErrors.makingCharge}
+              helperText={formErrors.makingCharge}
+              required
+            />
+            <Select
+              name="makingChargeUnit"
+              value={newItem.makingChargeUnit}
+              onChange={handleInputChange}
+              sx={{ minWidth: 130 }}
+            >
+              <MenuItem value="fixed">Fixed (₹)</MenuItem>
+              <MenuItem value="per_gram">Per Gram</MenuItem>
+              <MenuItem value="per_kg">Per Kg</MenuItem>
+              <MenuItem value="per_mg">Per Mg</MenuItem>
+              <MenuItem value="percent">% of Price</MenuItem>
+            </Select>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="labourChargeValue"
+              label="Labour / Polishing Charge"
+              type="number"
+              fullWidth
+              value={newItem.labourChargeValue}
+              onChange={handleInputChange}
+            />
+            <Select
+              name="labourChargeUnit"
+              value={newItem.labourChargeUnit}
+              onChange={handleInputChange}
+              sx={{ minWidth: 130 }}
+            >
+              <MenuItem value="fixed">Fixed (₹)</MenuItem>
+              <MenuItem value="per_gram">Per Gram</MenuItem>
+              <MenuItem value="per_kg">Per Kg</MenuItem>
+              <MenuItem value="per_mg">Per Mg</MenuItem>
+              <MenuItem value="percent">% of Price</MenuItem>
+            </Select>
+          </Box>
           <TextField
             margin="dense"
-            name="makingCharge"
-            label="Making Charge (₹)"
+            name="stoneCharge"
+            label="Stone Charge (₹)"
             type="number"
             fullWidth
-            value={newItem.makingCharge}
+            value={newItem.stoneCharge}
             onChange={handleInputChange}
-            error={!!formErrors.makingCharge}
-            helperText={formErrors.makingCharge}
-            sx={{
-              mb: { xs: 1, sm: 2 },
-              "& .MuiInputBase-input": {
-                fontSize: { xs: "0.8rem", sm: "0.9rem" },
-              },
-              "& .MuiInputLabel-root": {
-                fontSize: { xs: "0.8rem", sm: "0.9rem" },
-              },
-            }}
-            required
+            sx={{ mb: { xs: 1, sm: 2 } }}
           />
           <Box sx={{ mb: { xs: 1, sm: 2 } }}>
             <Button
@@ -1858,9 +2370,23 @@ function ItemManagement() {
           )}
 
           <Box sx={{ mb: 2 }}>
+            <Select
+              fullWidth
+              name="stockType"
+              value={editItem.stockType}
+              onChange={handleEditInputChange}
+              size="small"
+              sx={{ mb: 1 }}
+            >
+              <MenuItem value="retail">Retail (added individually)</MenuItem>
+              <MenuItem value="wholesale">Wholesale (bulk stock)</MenuItem>
+            </Select>
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
             <TextField
               fullWidth
-              label="Weight (g)"
+              label="Gross Weight (g)"
               name="waight"
               type="number"
               value={editItem.waight}
@@ -1870,6 +2396,19 @@ function ItemManagement() {
               size="small"
               sx={{ mb: 1 }}
             />
+            <TextField
+              fullWidth
+              label="Less Weight — stone/moti (g)"
+              name="lessWeight"
+              type="number"
+              value={editItem.lessWeight}
+              onChange={handleEditInputChange}
+              size="small"
+              sx={{ mb: 1 }}
+            />
+            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+              Net Weight: {editItemNetWeight > 0 ? editItemNetWeight.toFixed(3) : 0} g
+            </Typography>
           </Box>
 
           <Box sx={{ mb: 2 }}>
@@ -1941,6 +2480,15 @@ function ItemManagement() {
               size="small"
               sx={{ mb: 1 }}
             />
+            <TextField
+              fullWidth
+              label="HSN Code"
+              name="hsnCode"
+              type="text"
+              value={editItem.hsnCode}
+              onChange={handleEditInputChange}
+              size="small"
+            />
           </Box>
 
           <Box sx={{ mb: 2 }}>
@@ -1956,12 +2504,32 @@ function ItemManagement() {
               size="small"
               sx={{ mb: 1 }}
             />
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <TextField
+                fullWidth
+                label="Supplier Wastage %"
+                name="wastageSupplier"
+                type="number"
+                value={editItem.wastageSupplier}
+                onChange={handleEditInputChange}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="Customer Wastage %"
+                name="wastageCustomer"
+                type="number"
+                value={editItem.wastageCustomer}
+                onChange={handleEditInputChange}
+                size="small"
+              />
+            </Box>
           </Box>
 
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2, display: "flex", gap: 1 }}>
             <TextField
               fullWidth
-              label="Making Charge (₹)"
+              label="Making Charge"
               name="makingCharge"
               type="number"
               value={editItem.makingCharge}
@@ -1969,7 +2537,56 @@ function ItemManagement() {
               error={!!formErrors.makingCharge}
               helperText={formErrors.makingCharge}
               size="small"
-              sx={{ mb: 1 }}
+            />
+            <Select
+              name="makingChargeUnit"
+              value={editItem.makingChargeUnit}
+              onChange={handleEditInputChange}
+              size="small"
+              sx={{ minWidth: 130 }}
+            >
+              <MenuItem value="fixed">Fixed (₹)</MenuItem>
+              <MenuItem value="per_gram">Per Gram</MenuItem>
+              <MenuItem value="per_kg">Per Kg</MenuItem>
+              <MenuItem value="per_mg">Per Mg</MenuItem>
+              <MenuItem value="percent">% of Price</MenuItem>
+            </Select>
+          </Box>
+
+          <Box sx={{ mb: 2, display: "flex", gap: 1 }}>
+            <TextField
+              fullWidth
+              label="Labour / Polishing Charge"
+              name="labourChargeValue"
+              type="number"
+              value={editItem.labourChargeValue}
+              onChange={handleEditInputChange}
+              size="small"
+            />
+            <Select
+              name="labourChargeUnit"
+              value={editItem.labourChargeUnit}
+              onChange={handleEditInputChange}
+              size="small"
+              sx={{ minWidth: 130 }}
+            >
+              <MenuItem value="fixed">Fixed (₹)</MenuItem>
+              <MenuItem value="per_gram">Per Gram</MenuItem>
+              <MenuItem value="per_kg">Per Kg</MenuItem>
+              <MenuItem value="per_mg">Per Mg</MenuItem>
+              <MenuItem value="percent">% of Price</MenuItem>
+            </Select>
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <TextField
+              fullWidth
+              label="Stone Charge (₹)"
+              name="stoneCharge"
+              type="number"
+              value={editItem.stoneCharge}
+              onChange={handleEditInputChange}
+              size="small"
             />
           </Box>
 
@@ -2032,6 +2649,80 @@ function ItemManagement() {
             }}
           >
             Update Item
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkImportOpen} onClose={handleCloseBulkImport} fullWidth maxWidth="sm">
+        <DialogTitle
+          sx={{
+            bgcolor: theme.palette.primary.main,
+            color: theme.palette.getContrastText(theme.palette.primary.main),
+          }}
+        >
+          Bulk Import Stock (Wholesale)
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Download the template, fill in one row per item, then upload it here.
+            Every row is imported as <strong>wholesale</strong> stock.
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={handleDownloadTemplate}
+            sx={{ mb: 2, textTransform: "none" }}
+          >
+            Download Template
+          </Button>
+          <Box>
+            <Button variant="contained" component="label" sx={{ textTransform: "none" }}>
+              Choose Excel File
+              <input
+                type="file"
+                hidden
+                accept=".xlsx,.xls"
+                onChange={handleBulkImportFileChange}
+              />
+            </Button>
+            {bulkImportFile && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {bulkImportFile.name}
+              </Typography>
+            )}
+          </Box>
+
+          {bulkImportResult && (
+            <Box sx={{ mt: 2 }}>
+              <Alert severity={bulkImportResult.insertedCount > 0 ? "success" : "error"}>
+                {bulkImportResult.message}
+              </Alert>
+              {bulkImportResult.errors?.length > 0 && (
+                <Box sx={{ mt: 1, maxHeight: 200, overflowY: "auto" }}>
+                  {bulkImportResult.errors.map((err, idx) => (
+                    <Typography
+                      key={idx}
+                      variant="body2"
+                      sx={{ color: theme.palette.error.main, fontSize: "0.8rem" }}
+                    >
+                      Row {err.row} ({err.name}): {err.message}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBulkImport} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleBulkImportSubmit}
+            disabled={!bulkImportFile || bulkImporting}
+            sx={{ textTransform: "none" }}
+          >
+            {bulkImporting ? <CircularProgress size={20} /> : "Import"}
           </Button>
         </DialogActions>
       </Dialog>

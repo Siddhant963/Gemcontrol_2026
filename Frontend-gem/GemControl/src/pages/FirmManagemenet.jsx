@@ -49,6 +49,7 @@ function FirmManagement() {
     logo: null,
     firmStamp: null,
     ownerSignature: null,
+    secondLogo: null,
     name: "",
     location: "",
     size: "",
@@ -60,6 +61,18 @@ function FirmManagement() {
     branch: "",
     accountNo: "",
     ifscCode: "",
+    registrationNo: "",
+    shopName: "",
+    description: "",
+    address: "",
+    city: "",
+    pincode: "",
+    firmStartDate: "",
+    panNo: "",
+    invoicePrefix: "",
+    cgstRate: "1.5",
+    sgstRate: "1.5",
+    igstRate: "0",
   };
   const [newFirm, setNewFirm] = useState(emptyFirm);
   const [editFirm, setEditFirm] = useState(null);
@@ -125,13 +138,19 @@ function FirmManagement() {
 
   const validateForm = (firm) => {
     const errors = {};
-    
-    if (!firm.name.trim()) errors.name = "Name is required";
-    if (!firm.location.trim()) errors.location = "Location is required";
-    else if (!/^([^0-9]*)$/.test(firm.location))
+    // size (and occasionally other fields) can arrive as a Number when
+    // populated from an existing firm record fetched from the API, rather
+    // than a String typed into the form — coerce before calling .trim().
+    const name = String(firm.name ?? "");
+    const location = String(firm.location ?? "");
+    const size = String(firm.size ?? "");
+
+    if (!name.trim()) errors.name = "Name is required";
+    if (!location.trim()) errors.location = "Location is required";
+    else if (!/^([^0-9]*)$/.test(location))
       errors.location = "Invalid location ";
-    if (!firm.size.trim()) errors.size = "Size is required";
-    else if (/^([^0-9]*)$/.test(firm.size))
+    if (!size.trim()) errors.size = "Size is required";
+    else if (/^([^0-9]*)$/.test(size))
       errors.size = "Size should be number ";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -160,9 +179,11 @@ function FirmManagement() {
       logo: null,
       firmStamp: null,
       ownerSignature: null,
+      secondLogo: null,
       existingLogo: firm.logo || "",
       existingFirmStamp: firm.firmStamp || "",
       existingOwnerSignature: firm.ownerSignature || "",
+      existingSecondLogo: firm.secondLogo || "",
       name: firm.name || "",
       location: firm.location || "",
       size: firm.size || "",
@@ -174,6 +195,18 @@ function FirmManagement() {
       branch: firm.branch || "",
       accountNo: firm.accountNo || "",
       ifscCode: firm.ifscCode || "",
+      registrationNo: firm.registrationNo || "",
+      shopName: firm.shopName || "",
+      description: firm.description || "",
+      address: firm.address || "",
+      city: firm.city || "",
+      pincode: firm.pincode || "",
+      firmStartDate: firm.firmStartDate ? firm.firmStartDate.slice(0, 10) : "",
+      panNo: firm.panNo || "",
+      invoicePrefix: firm.invoicePrefix || "",
+      cgstRate: String(firm.gstConfig?.cgstRate ?? 1.5),
+      sgstRate: String(firm.gstConfig?.sgstRate ?? 1.5),
+      igstRate: String(firm.gstConfig?.igstRate ?? 0),
     });
     setFormErrors({});
     setOpenEditModal(true);
@@ -242,6 +275,7 @@ function FirmManagement() {
       if (newFirm.firmStamp) formData.append("firmStamp", newFirm.firmStamp);
       if (newFirm.ownerSignature)
         formData.append("ownerSignature", newFirm.ownerSignature);
+      if (newFirm.secondLogo) formData.append("secondLogo", newFirm.secondLogo);
       formData.append("name", newFirm.name);
       formData.append("location", newFirm.location);
       formData.append("size", newFirm.size);
@@ -253,6 +287,18 @@ function FirmManagement() {
       formData.append("branch", newFirm.branch);
       formData.append("accountNo", newFirm.accountNo);
       formData.append("ifscCode", newFirm.ifscCode);
+      formData.append("registrationNo", newFirm.registrationNo);
+      formData.append("shopName", newFirm.shopName);
+      formData.append("description", newFirm.description);
+      formData.append("address", newFirm.address);
+      formData.append("city", newFirm.city);
+      formData.append("pincode", newFirm.pincode);
+      formData.append("firmStartDate", newFirm.firmStartDate);
+      formData.append("panNo", newFirm.panNo);
+      formData.append("invoicePrefix", newFirm.invoicePrefix);
+      formData.append("cgstRate", newFirm.cgstRate);
+      formData.append("sgstRate", newFirm.sgstRate);
+      formData.append("igstRate", newFirm.igstRate);
 
       await api.post("/createFirm", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -314,6 +360,7 @@ function FirmManagement() {
       if (editFirm.firmStamp) formData.append("firmStamp", editFirm.firmStamp);
       if (editFirm.ownerSignature)
         formData.append("ownerSignature", editFirm.ownerSignature);
+      if (editFirm.secondLogo) formData.append("secondLogo", editFirm.secondLogo);
       formData.append("name", editFirm.name);
       formData.append("location", editFirm.location);
       formData.append("size", editFirm.size);
@@ -325,6 +372,18 @@ function FirmManagement() {
       formData.append("branch", editFirm.branch);
       formData.append("accountNo", editFirm.accountNo);
       formData.append("ifscCode", editFirm.ifscCode);
+      formData.append("registrationNo", editFirm.registrationNo);
+      formData.append("shopName", editFirm.shopName);
+      formData.append("description", editFirm.description);
+      formData.append("address", editFirm.address);
+      formData.append("city", editFirm.city);
+      formData.append("pincode", editFirm.pincode);
+      formData.append("firmStartDate", editFirm.firmStartDate);
+      formData.append("panNo", editFirm.panNo);
+      formData.append("invoicePrefix", editFirm.invoicePrefix);
+      formData.append("cgstRate", editFirm.cgstRate);
+      formData.append("sgstRate", editFirm.sgstRate);
+      formData.append("igstRate", editFirm.igstRate);
 
       await api.put("/updateFirm", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -858,6 +917,30 @@ function FirmManagement() {
           />
           <TextField
             margin="dense"
+            name="shopName"
+            label="Shop Name"
+            type="text"
+            fullWidth
+            value={newFirm.shopName}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+            inputProps={{ "aria-label": "Shop name" }}
+          />
+          <TextField
+            margin="dense"
+            name="description"
+            label="Firm Description"
+            type="text"
+            fullWidth
+            multiline
+            rows={2}
+            value={newFirm.description}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+            inputProps={{ "aria-label": "Firm description" }}
+          />
+          <TextField
+            margin="dense"
             name="location"
             label="Location"
             type="text"
@@ -913,6 +996,73 @@ function FirmManagement() {
           />
           <TextField
             margin="dense"
+            name="address"
+            label="Address"
+            type="text"
+            fullWidth
+            value={newFirm.address}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+            inputProps={{ "aria-label": "Firm address" }}
+          />
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="city"
+              label="City"
+              type="text"
+              fullWidth
+              value={newFirm.city}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "City" }}
+            />
+            <TextField
+              margin="dense"
+              name="pincode"
+              label="Pincode"
+              type="text"
+              fullWidth
+              value={newFirm.pincode}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "Pincode" }}
+            />
+          </Box>
+          <TextField
+            margin="dense"
+            name="registrationNo"
+            label="Registration No."
+            type="text"
+            fullWidth
+            value={newFirm.registrationNo}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+            inputProps={{ "aria-label": "Registration number" }}
+          />
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="panNo"
+              label="PAN No."
+              type="text"
+              fullWidth
+              value={newFirm.panNo}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "PAN number" }}
+            />
+            <TextField
+              margin="dense"
+              name="firmStartDate"
+              label="Firm Start Date"
+              type="date"
+              fullWidth
+              value={newFirm.firmStartDate}
+              onChange={handleInputChange}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ "aria-label": "Firm start date" }}
+            />
+          </Box>
+          <TextField
+            margin="dense"
             name="gst"
             label="GSTIN"
             type="text"
@@ -922,6 +1072,49 @@ function FirmManagement() {
             sx={{ mb: { xs: 1, sm: 2 } }}
             inputProps={{ "aria-label": "GSTIN" }}
           />
+          <TextField
+            margin="dense"
+            name="invoicePrefix"
+            label="Invoice Prefix (e.g. IS — invoices become IS/1/25-26)"
+            type="text"
+            fullWidth
+            value={newFirm.invoicePrefix}
+            onChange={handleInputChange}
+            sx={{ mb: { xs: 1, sm: 2 } }}
+            inputProps={{ "aria-label": "Invoice prefix" }}
+          />
+          <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+            <TextField
+              margin="dense"
+              name="cgstRate"
+              label="CGST %"
+              type="number"
+              fullWidth
+              value={newFirm.cgstRate}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "CGST rate", step: "0.01" }}
+            />
+            <TextField
+              margin="dense"
+              name="sgstRate"
+              label="SGST %"
+              type="number"
+              fullWidth
+              value={newFirm.sgstRate}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "SGST rate", step: "0.01" }}
+            />
+            <TextField
+              margin="dense"
+              name="igstRate"
+              label="IGST %"
+              type="number"
+              fullWidth
+              value={newFirm.igstRate}
+              onChange={handleInputChange}
+              inputProps={{ "aria-label": "IGST rate", step: "0.01" }}
+            />
+          </Box>
           <TextField
             margin="dense"
             name="email"
@@ -1113,6 +1306,37 @@ function FirmManagement() {
               {newFirm.ownerSignature ? newFirm.ownerSignature.name : "No file chosen"}
             </Typography>
           </Box>
+          <Box sx={{ mb: { xs: 1, sm: 2 } }}>
+            <Button
+              variant="contained"
+              component="label"
+              sx={{
+                bgcolor: theme.palette.secondary.main,
+                color: theme.palette.getContrastText(theme.palette.secondary.main),
+                "&:hover": { bgcolor: theme.palette.secondary.dark },
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                width: { xs: "100%", sm: "auto" },
+                textTransform: "none",
+              }}
+              aria-label="Upload second logo"
+            >
+              Upload Second Logo (Hallmark, top-right on invoice)
+              <input
+                type="file"
+                hidden
+                name="secondLogo"
+                onChange={handleInputChange}
+                accept="image/*"
+                aria-label="Select second logo"
+              />
+            </Button>
+            <Typography
+              variant="body2"
+              sx={{ mt: 1, color: theme.palette.text.secondary, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}
+            >
+              {newFirm.secondLogo ? newFirm.secondLogo.name : "No file chosen"}
+            </Typography>
+          </Box>
         </DialogContent>
         <DialogActions
           sx={{
@@ -1223,6 +1447,26 @@ function FirmManagement() {
               />
               <TextField
                 margin="dense"
+                name="shopName"
+                label="Shop Name"
+                fullWidth
+                value={editFirm.shopName}
+                onChange={handleEditInputChange}
+                sx={{ mb: { xs: 1, sm: 2 } }}
+              />
+              <TextField
+                margin="dense"
+                name="description"
+                label="Firm Description"
+                fullWidth
+                multiline
+                rows={2}
+                value={editFirm.description}
+                onChange={handleEditInputChange}
+                sx={{ mb: { xs: 1, sm: 2 } }}
+              />
+              <TextField
+                margin="dense"
                 name="location"
                 label="Location"
                 fullWidth
@@ -1256,6 +1500,62 @@ function FirmManagement() {
               />
               <TextField
                 margin="dense"
+                name="address"
+                label="Address"
+                fullWidth
+                value={editFirm.address}
+                onChange={handleEditInputChange}
+                sx={{ mb: { xs: 1, sm: 2 } }}
+              />
+              <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+                <TextField
+                  margin="dense"
+                  name="city"
+                  label="City"
+                  fullWidth
+                  value={editFirm.city}
+                  onChange={handleEditInputChange}
+                />
+                <TextField
+                  margin="dense"
+                  name="pincode"
+                  label="Pincode"
+                  fullWidth
+                  value={editFirm.pincode}
+                  onChange={handleEditInputChange}
+                />
+              </Box>
+              <TextField
+                margin="dense"
+                name="registrationNo"
+                label="Registration No."
+                fullWidth
+                value={editFirm.registrationNo}
+                onChange={handleEditInputChange}
+                sx={{ mb: { xs: 1, sm: 2 } }}
+              />
+              <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+                <TextField
+                  margin="dense"
+                  name="panNo"
+                  label="PAN No."
+                  fullWidth
+                  value={editFirm.panNo}
+                  onChange={handleEditInputChange}
+                />
+                <TextField
+                  margin="dense"
+                  name="firmStartDate"
+                  label="Firm Start Date"
+                  type="date"
+                  fullWidth
+                  value={editFirm.firmStartDate}
+                  onChange={handleEditInputChange}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+              <TextField
+                margin="dense"
                 name="gst"
                 label="GSTIN"
                 fullWidth
@@ -1263,6 +1563,47 @@ function FirmManagement() {
                 onChange={handleEditInputChange}
                 sx={{ mb: { xs: 1, sm: 2 } }}
               />
+              <TextField
+                margin="dense"
+                name="invoicePrefix"
+                label="Invoice Prefix (e.g. IS — invoices become IS/1/25-26)"
+                fullWidth
+                value={editFirm.invoicePrefix}
+                onChange={handleEditInputChange}
+                sx={{ mb: { xs: 1, sm: 2 } }}
+              />
+              <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
+                <TextField
+                  margin="dense"
+                  name="cgstRate"
+                  label="CGST %"
+                  type="number"
+                  fullWidth
+                  value={editFirm.cgstRate}
+                  onChange={handleEditInputChange}
+                  inputProps={{ step: "0.01" }}
+                />
+                <TextField
+                  margin="dense"
+                  name="sgstRate"
+                  label="SGST %"
+                  type="number"
+                  fullWidth
+                  value={editFirm.sgstRate}
+                  onChange={handleEditInputChange}
+                  inputProps={{ step: "0.01" }}
+                />
+                <TextField
+                  margin="dense"
+                  name="igstRate"
+                  label="IGST %"
+                  type="number"
+                  fullWidth
+                  value={editFirm.igstRate}
+                  onChange={handleEditInputChange}
+                  inputProps={{ step: "0.01" }}
+                />
+              </Box>
               <TextField
                 margin="dense"
                 name="email"
@@ -1323,6 +1664,7 @@ function FirmManagement() {
                 { key: "logo", label: "Logo", existingKey: "existingLogo" },
                 { key: "firmStamp", label: "Firm Stamp", existingKey: "existingFirmStamp" },
                 { key: "ownerSignature", label: "Owner Signature", existingKey: "existingOwnerSignature" },
+                { key: "secondLogo", label: "Second Logo (Hallmark)", existingKey: "existingSecondLogo" },
               ].map(({ key, label, existingKey }) => (
                 <Box key={key} sx={{ mb: { xs: 1, sm: 2 } }}>
                   <Button

@@ -61,6 +61,7 @@ const fieldToFolder = {
   logo: 'firm',
   firmStamp: 'firm',
   ownerSignature: 'firm',
+  secondLogo: 'firm',
   CategoryImg: 'category',
   stockImg: 'stock',
   rawMaterial: 'rawMaterial',

@@ -3,7 +3,8 @@ const StockCategorySchema = mongoose.Schema({
           name: {
           type: String,
           required: true,
-          unique: true
+          unique: true,
+          trim: true
           },
           description: {
           type: String,

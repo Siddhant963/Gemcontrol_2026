@@ -3,10 +3,12 @@ const farmSchema = mongoose.Schema({
   name: {
     type: String,
     required: true,
+    trim: true,
   },
   location: {
     type: String,
     required: true,
+    trim: true,
   },
   size: {
     type: Number,
@@ -56,9 +58,72 @@ const farmSchema = mongoose.Schema({
     type: String,
     default: "",
   },
+  // Second logo shown top-right on the invoice (hallmark/BIS-style mark).
+  secondLogo: {
+    type: String,
+    default: "",
+  },
   lastInvoiceNumber: {
     type: Number,
     default: 0,
+  },
+  // ---- Registration / identity details ----
+  registrationNo: {
+    type: String,
+    default: "",
+  },
+  shopName: {
+    type: String,
+    default: "",
+  },
+  description: {
+    type: String,
+    default: "",
+  },
+  address: {
+    type: String,
+    default: "",
+  },
+  city: {
+    type: String,
+    default: "",
+  },
+  pincode: {
+    type: String,
+    default: "",
+  },
+  firmStartDate: {
+    type: Date,
+    default: null,
+  },
+  panNo: {
+    type: String,
+    default: "",
+  },
+  // ---- GST configuration used to auto-calculate every invoice ----
+  gstConfig: {
+    enabled: {
+      type: Boolean,
+      default: true,
+    },
+    cgstRate: {
+      type: Number,
+      default: 1.5,
+    },
+    sgstRate: {
+      type: Number,
+      default: 1.5,
+    },
+    igstRate: {
+      type: Number,
+      default: 0,
+    },
+  },
+  // ---- Invoice numbering ----
+  // e.g. "IS" produces invoice numbers like IS/297/24-25
+  invoicePrefix: {
+    type: String,
+    default: "",
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,

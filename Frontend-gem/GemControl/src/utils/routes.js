@@ -13,4 +13,6 @@ export const ROUTES = {
   PAYMENTS: "/payments",
   UDHAR_MANAGEMENT: "/udhar",
   GIRVI_MANAGEMENT: "/girvi",
+  JEWELLERY_PANEL: "/jewellery-panel",
+  DAY_BOOK: "/day-book",
 };

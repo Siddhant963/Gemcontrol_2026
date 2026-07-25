@@ -29,6 +29,9 @@ import {
   CardContent,
   CardActions,
   Grid,
+  Checkbox,
+  FormControlLabel,
+  Alert,
 } from "@mui/material";
 import { Close, Search, Add, Delete } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
@@ -47,6 +50,40 @@ function useDebounce(value, wait = 500) {
   }, [value, wait]);
   return debounceValue;
 }
+
+// Turns the raw items subtotal into what the customer actually owes: apply
+// the discount, then GST (from the selected firm's own rates, never
+// hardcoded) on what's left. Pure function so it can drive both the live
+// preview in the form and the actual submitted totals without drifting.
+function computeBillBreakdown(subtotal, discountType, discountValue, firm) {
+  const sub = Number(subtotal) || 0;
+  const discVal = Number(discountValue) || 0;
+  const discountAmount =
+    discountType === "percent" ? sub * (discVal / 100) : Math.min(discVal, sub);
+  const taxableAmount = Math.max(sub - discountAmount, 0);
+  const gstConfig = firm?.gstConfig || { enabled: true, cgstRate: 1.5, sgstRate: 1.5, igstRate: 0 };
+  const cgstRate = gstConfig.enabled ? Number(gstConfig.cgstRate) || 0 : 0;
+  const sgstRate = gstConfig.enabled ? Number(gstConfig.sgstRate) || 0 : 0;
+  const igstRate = gstConfig.enabled ? Number(gstConfig.igstRate) || 0 : 0;
+  const cgstAmount = taxableAmount * (cgstRate / 100);
+  const sgstAmount = taxableAmount * (sgstRate / 100);
+  const igstAmount = taxableAmount * (igstRate / 100);
+  const grandTotal = taxableAmount + cgstAmount + sgstAmount + igstAmount;
+  return {
+    subtotal: sub,
+    discountAmount,
+    taxableAmount,
+    cgstRate,
+    sgstRate,
+    igstRate,
+    cgstAmount,
+    sgstAmount,
+    igstAmount,
+    grandTotal,
+  };
+}
+
+const PAYMENT_METHODS = ["cash", "card", "Upi", "online", "bankTransfer", "credit"];
 
 function SalesManagement() {
   const theme = useTheme();
@@ -85,6 +122,12 @@ function SalesManagement() {
     paymentMethod: "cash",
     paymentAmount: "0",
   });
+  const [discountType, setDiscountType] = useState("fixed");
+  const [discountValue, setDiscountValue] = useState("0");
+  const [useSplitPayment, setUseSplitPayment] = useState(false);
+  const [splitPayments, setSplitPayments] = useState([
+    { method: "cash", amount: "" },
+  ]);
 
   const [newCustomer, setNewCustomer] = useState({
     name: "",
@@ -189,6 +232,73 @@ function SalesManagement() {
     [firms]
   );
 
+  const selectedFirm = useMemo(
+    () => firms.find((f) => f._id === newSale.firm) || null,
+    [firms, newSale.firm]
+  );
+
+  const billBreakdown = useMemo(
+    () =>
+      computeBillBreakdown(
+        parseFloat(newSale.totalAmount) || 0,
+        discountType,
+        discountValue,
+        selectedFirm
+      ),
+    [newSale.totalAmount, discountType, discountValue, selectedFirm]
+  );
+
+  // Keep paymentAmount (the non-split path) in sync with the grand total
+  // (after discount + GST) rather than the raw items subtotal, without
+  // touching the existing per-keystroke item/udhar auto-calc logic above.
+  useEffect(() => {
+    if (manualPaymentEdit || useSplitPayment) return;
+    const udhar = parseFloat(newSale.udharAmount) || 0;
+    const payment = Math.max(billBreakdown.grandTotal - udhar, 0);
+    setNewSale((prev) =>
+      prev.paymentAmount === payment.toString()
+        ? prev
+        : { ...prev, paymentAmount: payment.toString() }
+    );
+  }, [billBreakdown.grandTotal, newSale.udharAmount, manualPaymentEdit, useSplitPayment]);
+
+  const handleSplitPaymentChange = useCallback((index, field, value) => {
+    setSplitPayments((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  }, []);
+
+  const handleAddSplitPaymentRow = useCallback(() => {
+    setSplitPayments((prev) => [...prev, { method: "cash", amount: "" }]);
+  }, []);
+
+  const handleRemoveSplitPaymentRow = useCallback((index) => {
+    setSplitPayments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const splitPaymentsTotal = useMemo(
+    () => splitPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+    [splitPayments]
+  );
+
+  // Whatever the split payments don't cover automatically becomes Udhar
+  // (credit) — the user enters payment amounts, not a separate udhar figure,
+  // matching how the reference bill's "AMT BALANCE ... DR" behaves.
+  useEffect(() => {
+    if (!useSplitPayment) return;
+    const remainder = Math.max(
+      Math.round((billBreakdown.grandTotal - splitPaymentsTotal) * 100) / 100,
+      0
+    );
+    setNewSale((prev) =>
+      prev.udharAmount === remainder.toString()
+        ? prev
+        : { ...prev, udharAmount: remainder.toString() }
+    );
+  }, [useSplitPayment, billBreakdown.grandTotal, splitPaymentsTotal]);
+
   // Fetch initial data
   const fetchInitialData = useCallback(async () => {
     try {
@@ -292,6 +402,10 @@ function SalesManagement() {
       paymentMethod: "cash",
       paymentAmount: "0",
     });
+    setDiscountType("fixed");
+    setDiscountValue("0");
+    setUseSplitPayment(false);
+    setSplitPayments([{ method: "cash", amount: "" }]);
     setTouchedSaleFields({});
     setSaveAttemptedSale(false);
     setManualPaymentEdit(false);
@@ -363,14 +477,14 @@ function SalesManagement() {
                     : (parseFloat(stock.price) || 0) +
                       (parseFloat(stock.makingCharge) || 0);
                 const quantity = parseFloat(currentItem.quantity) || 1;
-                currentItem.amount = (baseAmount * quantity).toString();
+                currentItem.amount = (Math.round(baseAmount * quantity * 100) / 100).toString();
               }
             } else {
               const material = materials.find((m) => m._id === value);
               if (material) {
                 const quantity = parseFloat(currentItem.quantity) || 1;
                 const unitPrice = getMaterialUnitPrice(material);
-                currentItem.amount = (unitPrice * quantity).toString();
+                currentItem.amount = (Math.round(unitPrice * quantity * 100) / 100).toString();
               }
             }
             updatedSale = { ...updatedSale, items: updatedItems };
@@ -389,13 +503,13 @@ function SalesManagement() {
                       ? stock.totalValue
                       : (parseFloat(stock.price) || 0) +
                         (parseFloat(stock.makingCharge) || 0);
-                  currentItem.amount = (baseAmount * quantity).toString();
+                  currentItem.amount = (Math.round(baseAmount * quantity * 100) / 100).toString();
                 }
               } else {
                 const material = materials.find((m) => m._id === currentItem.salematerialId);
                 if (material) {
                   const unitPrice = getMaterialUnitPrice(material);
-                  currentItem.amount = (unitPrice * quantity).toString();
+                  currentItem.amount = (Math.round(unitPrice * quantity * 100) / 100).toString();
                 }
               }
               updatedSale = { ...updatedSale, items: updatedItems };
@@ -648,28 +762,40 @@ function SalesManagement() {
         return;
       }
 
-      // Validate udhar amount doesn't exceed total and calculate payment
-      const totalAmount = parseFloat(newSale.totalAmount) || 0;
-      const udharAmount = parseFloat(newSale.udharAmount) || 0;
+      const subtotalAmount = parseFloat(newSale.totalAmount) || 0;
+      const grandTotal = Math.round(billBreakdown.grandTotal * 100) / 100;
 
-      if (udharAmount > totalAmount) {
-        setNotificationDialog({
-          open: true,
-          message: "Udhar amount cannot be greater than total amount",
-          type: "error",
-          title: "Validation Error",
-        });
-        return;
+      let paymentsPayload;
+      let udharAmount;
+      let paymentAmount;
+
+      if (useSplitPayment) {
+        paymentsPayload = splitPayments
+          .filter((p) => parseFloat(p.amount) > 0)
+          .map((p) => ({ method: p.method, amount: parseFloat(p.amount) || 0 }));
+        const paidSum = paymentsPayload.reduce((sum, p) => sum + p.amount, 0);
+        // Whatever the split payments don't cover is recorded as Udhar
+        // automatically — no need for the entered amounts to reconcile
+        // exactly with a separately-entered udhar figure.
+        udharAmount = Math.max(Math.round((grandTotal - paidSum) * 100) / 100, 0);
+        paymentAmount = paidSum;
+      } else {
+        udharAmount = parseFloat(newSale.udharAmount) || 0;
+        if (udharAmount > grandTotal) {
+          setNotificationDialog({
+            open: true,
+            message: "Udhar amount cannot be greater than the total amount (after discount and GST)",
+            type: "error",
+            title: "Validation Error",
+          });
+          return;
+        }
+        const amountToBePaid = Math.max(grandTotal - udharAmount, 0);
+        paymentAmount =
+          newSale.paymentAmount && parseFloat(newSale.paymentAmount) >= 0
+            ? parseFloat(newSale.paymentAmount)
+            : amountToBePaid;
       }
-
-      // Ensure paymentAmount is calculated correctly before saving
-      const calculatedPaymentAmount = Math.max(totalAmount - udharAmount, 0);
-
-      // Use calculated payment amount if paymentAmount is empty, invalid, or zero
-      const paymentAmount =
-        newSale.paymentAmount && parseFloat(newSale.paymentAmount) >= 0
-          ? parseFloat(newSale.paymentAmount)
-          : calculatedPaymentAmount;
 
       const saleData = {
         customer: newSale.customer,
@@ -680,10 +806,25 @@ function SalesManagement() {
           quantity: parseFloat(item.quantity),
           amount: parseFloat(item.amount),
         })),
-        totalAmount: totalAmount,
+        subtotal: subtotalAmount,
+        discount: {
+          type: discountType,
+          value: parseFloat(discountValue) || 0,
+          amount: Math.round(billBreakdown.discountAmount * 100) / 100,
+        },
+        gst: {
+          cgstRate: billBreakdown.cgstRate,
+          sgstRate: billBreakdown.sgstRate,
+          igstRate: billBreakdown.igstRate,
+          cgstAmount: Math.round(billBreakdown.cgstAmount * 100) / 100,
+          sgstAmount: Math.round(billBreakdown.sgstAmount * 100) / 100,
+          igstAmount: Math.round(billBreakdown.igstAmount * 100) / 100,
+        },
+        totalAmount: grandTotal,
         udharAmount: udharAmount,
-        paymentMethod: newSale.paymentMethod,
-        paymentAmount: paymentAmount,
+        ...(useSplitPayment
+          ? { payments: paymentsPayload }
+          : { paymentMethod: newSale.paymentMethod, paymentAmount: paymentAmount }),
       };
 
       setLoading(true);
@@ -704,6 +845,10 @@ function SalesManagement() {
         paymentMethod: "cash",
         paymentAmount: "0",
       });
+      setDiscountType("fixed");
+      setDiscountValue("0");
+      setUseSplitPayment(false);
+      setSplitPayments([{ method: "cash", amount: "" }]);
       setTouchedSaleFields({});
       setManualUdharEdit(false);
       setManualPaymentEdit(false);
@@ -728,7 +873,7 @@ function SalesManagement() {
     } finally {
       setLoading(false);
     }
-  }, [newSale]);
+  }, [newSale, billBreakdown, discountType, discountValue, useSplitPayment, splitPayments]);
 
   const handleDeleteSale = useCallback(async (saleId) => {
     if (!window.confirm("Are you sure you want to delete this sale?")) return;
@@ -1433,7 +1578,7 @@ function SalesManagement() {
             <Grid item xs={12}>
               <TextField
                 name="totalAmount"
-                label="Total Amount"
+                label="Items Subtotal (before discount & GST)"
                 type="number"
                 value={newSale.totalAmount}
                 onChange={handleInputChange}
@@ -1456,68 +1601,196 @@ function SalesManagement() {
             </Grid>
           </Grid>
 
+          {/* Discount */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} sm={4}>
+              <Select
+                value={discountType}
+                onChange={(e) => setDiscountType(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="fixed">Discount (₹)</MenuItem>
+                <MenuItem value="percent">Discount (%)</MenuItem>
+              </Select>
+            </Grid>
+            <Grid item xs={6} sm={4}>
+              <TextField
+                label="Discount Value"
+                type="number"
+                fullWidth
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+          </Grid>
+
+          {/* Bill Summary — GST comes from the selected firm's own rates */}
+          <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Bill Summary
+            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography variant="body2">Subtotal</Typography>
+              <Typography variant="body2">₹{billBreakdown.subtotal.toFixed(2)}</Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography variant="body2">Discount</Typography>
+              <Typography variant="body2">-₹{billBreakdown.discountAmount.toFixed(2)}</Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography variant="body2">Taxable Amount</Typography>
+              <Typography variant="body2">₹{billBreakdown.taxableAmount.toFixed(2)}</Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography variant="body2">CGST ({billBreakdown.cgstRate}%)</Typography>
+              <Typography variant="body2">₹{billBreakdown.cgstAmount.toFixed(2)}</Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography variant="body2">SGST ({billBreakdown.sgstRate}%)</Typography>
+              <Typography variant="body2">₹{billBreakdown.sgstAmount.toFixed(2)}</Typography>
+            </Box>
+            {billBreakdown.igstRate > 0 && (
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography variant="body2">IGST ({billBreakdown.igstRate}%)</Typography>
+                <Typography variant="body2">₹{billBreakdown.igstAmount.toFixed(2)}</Typography>
+              </Box>
+            )}
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
+              <Typography variant="subtitle1" fontWeight="bold">Grand Total</Typography>
+              <Typography variant="subtitle1" fontWeight="bold">
+                ₹{billBreakdown.grandTotal.toFixed(2)}
+              </Typography>
+            </Box>
+          </Paper>
+
           {/* Payment Details */}
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField
                 name="udharAmount"
-                label="Udhar Amount"
+                label={useSplitPayment ? "Udhar Amount (auto — whatever the split payments don't cover)" : "Udhar Amount"}
                 type="number"
                 value={newSale.udharAmount || "0"}
                 onChange={handleInputChange}
                 fullWidth
+                disabled={useSplitPayment}
                 InputProps={{ inputProps: { min: 0 } }}
                 helperText={
-                  parseFloat(newSale.udharAmount || 0) >
-                  parseFloat(newSale.totalAmount || 0)
-                    ? "Udhar cannot exceed total amount"
+                  parseFloat(newSale.udharAmount || 0) > billBreakdown.grandTotal
+                    ? "Udhar cannot exceed the grand total"
                     : ""
                 }
-                error={
-                  parseFloat(newSale.udharAmount || 0) >
-                  parseFloat(newSale.totalAmount || 0)
-                }
+                error={parseFloat(newSale.udharAmount || 0) > billBreakdown.grandTotal}
               />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="paymentAmount"
-                label="Payment Amount"
-                type="number"
-                value={newSale.paymentAmount || ""}
-                onChange={(e) => {
-                  setManualPaymentEdit(true);
-                  handleInputChange(e);
-                }}
-                fullWidth
-                InputProps={{ inputProps: { min: 0 } }}
-                helperText={
-                  !newSale.paymentAmount ||
-                  parseFloat(newSale.paymentAmount) === 0
-                    ? `Calculated: ₹${Math.max(
-                        (parseFloat(newSale.totalAmount) || 0) -
-                          (parseFloat(newSale.udharAmount) || 0),
-                        0
-                      ).toFixed(2)}`
-                    : ""
-                }
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Select
-                name="paymentMethod"
-                value={newSale.paymentMethod}
-                onChange={handleInputChange}
-                fullWidth
-              >
-                <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="credit">Credit</MenuItem>
-                <MenuItem value="online">Online</MenuItem>
-                <MenuItem value="bankTransfer">Bank Transfer</MenuItem>
-                <MenuItem value="Upi">UPI</MenuItem>
-              </Select>
             </Grid>
           </Grid>
+
+          <FormControlLabel
+            sx={{ mt: 2 }}
+            control={
+              <Checkbox
+                checked={useSplitPayment}
+                onChange={(e) => setUseSplitPayment(e.target.checked)}
+              />
+            }
+            label="Split payment across multiple modes (cash + card + UPI + bank...)"
+          />
+
+          {useSplitPayment ? (
+            <Box sx={{ mt: 1 }}>
+              {splitPayments.map((payment, index) => (
+                <Grid container spacing={1} key={index} sx={{ mb: 1 }} alignItems="center">
+                  <Grid item xs={5}>
+                    <Select
+                      value={payment.method}
+                      onChange={(e) =>
+                        handleSplitPaymentChange(index, "method", e.target.value)
+                      }
+                      fullWidth
+                    >
+                      {PAYMENT_METHODS.map((method) => (
+                        <MenuItem key={method} value={method}>
+                          {method === "Upi" ? "UPI" : method.charAt(0).toUpperCase() + method.slice(1)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Grid>
+                  <Grid item xs={5}>
+                    <TextField
+                      label="Amount"
+                      type="number"
+                      fullWidth
+                      value={payment.amount}
+                      onChange={(e) =>
+                        handleSplitPaymentChange(index, "amount", e.target.value)
+                      }
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={2}>
+                    <IconButton
+                      color="error"
+                      onClick={() => handleRemoveSplitPaymentRow(index)}
+                      disabled={splitPayments.length === 1}
+                    >
+                      <Delete />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              ))}
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleAddSplitPaymentRow}
+                sx={{ textTransform: "none", mb: 1 }}
+              >
+                Add Payment Mode
+              </Button>
+              <Alert severity={splitPaymentsTotal >= billBreakdown.grandTotal ? "success" : "info"}>
+                Payments received: ₹{splitPaymentsTotal.toFixed(2)} of ₹{billBreakdown.grandTotal.toFixed(2)}
+                {splitPaymentsTotal < billBreakdown.grandTotal && (
+                  <> — remaining ₹{(billBreakdown.grandTotal - splitPaymentsTotal).toFixed(2)} will be recorded as Udhar.</>
+                )}
+              </Alert>
+            </Box>
+          ) : (
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  name="paymentAmount"
+                  label="Payment Amount"
+                  type="number"
+                  value={newSale.paymentAmount || ""}
+                  onChange={(e) => {
+                    setManualPaymentEdit(true);
+                    handleInputChange(e);
+                  }}
+                  fullWidth
+                  InputProps={{ inputProps: { min: 0 } }}
+                  helperText={`Calculated: ₹${Math.max(
+                    billBreakdown.grandTotal - (parseFloat(newSale.udharAmount) || 0),
+                    0
+                  ).toFixed(2)}`}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Select
+                  name="paymentMethod"
+                  value={newSale.paymentMethod}
+                  onChange={handleInputChange}
+                  fullWidth
+                >
+                  <MenuItem value="cash">Cash</MenuItem>
+                  <MenuItem value="card">Card</MenuItem>
+                  <MenuItem value="credit">Credit</MenuItem>
+                  <MenuItem value="online">Online</MenuItem>
+                  <MenuItem value="bankTransfer">Bank Transfer</MenuItem>
+                  <MenuItem value="Upi">UPI</MenuItem>
+                </Select>
+              </Grid>
+            </Grid>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={handleCancel} sx={{ textTransform: "none" }}>

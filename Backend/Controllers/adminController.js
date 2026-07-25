@@ -41,6 +41,22 @@ function getRelativeFilePath(absolutePath) {
   return absolutePath;
 }
 
+// Builds invoice numbers like "IS/297/24-25" — prefix from the firm's
+// invoicePrefix (falling back to its name), the running counter, and the
+// Indian financial year (April-March) the sale falls in.
+function buildInvoiceNumber(firm, date = new Date()) {
+  const prefix =
+    (firm?.invoicePrefix || firm?.name || "INV")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 6) || "INV";
+  const counter = firm?.lastInvoiceNumber || 1;
+  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+  const fyStart = String(year).slice(-2);
+  const fyEnd = String(year + 1).slice(-2);
+  return `${prefix}/${counter}/${fyStart}-${fyEnd}`;
+}
+
 module.exports.RegisterUser = async (req, res) => {
   const { name, email, contact, password } = req.body;
   // Only an already-authenticated admin (isAdmin middleware on /admin/register) may pick a
@@ -173,6 +189,9 @@ module.exports.createFirm = async (req, res) => {
     const {
       name, location, size, gst, email, contact,
       bankName, branch, accountNo, ifscCode, proprietorName,
+      registrationNo, shopName, description, address, city, pincode,
+      firmStartDate, panNo, invoicePrefix,
+      cgstRate, sgstRate, igstRate, gstEnabled,
     } = req.body;
 
     // Validate required fields
@@ -183,6 +202,7 @@ module.exports.createFirm = async (req, res) => {
     const logoUrl = req.files?.logo?.[0] ? getRelativeFilePath(req.files.logo[0].path) : "";
     const firmStampUrl = req.files?.firmStamp?.[0] ? getRelativeFilePath(req.files.firmStamp[0].path) : "";
     const ownerSignatureUrl = req.files?.ownerSignature?.[0] ? getRelativeFilePath(req.files.ownerSignature[0].path) : "";
+    const secondLogoUrl = req.files?.secondLogo?.[0] ? getRelativeFilePath(req.files.secondLogo[0].path) : "";
 
     const newFirm = new FirmModel({
       name,
@@ -191,6 +211,7 @@ module.exports.createFirm = async (req, res) => {
       logo: logoUrl,
       firmStamp: firmStampUrl,
       ownerSignature: ownerSignatureUrl,
+      secondLogo: secondLogoUrl,
       owner: req.user?._id,
       proprietorName: proprietorName || "",
       gst: gst || "",
@@ -200,6 +221,21 @@ module.exports.createFirm = async (req, res) => {
       branch: branch || "",
       accountNo: accountNo || "",
       ifscCode: ifscCode || "",
+      registrationNo: registrationNo || "",
+      shopName: shopName || "",
+      description: description || "",
+      address: address || "",
+      city: city || "",
+      pincode: pincode || "",
+      firmStartDate: firmStartDate || null,
+      panNo: panNo || "",
+      invoicePrefix: invoicePrefix || "",
+      gstConfig: {
+        enabled: gstEnabled === undefined ? true : gstEnabled === "true" || gstEnabled === true,
+        cgstRate: cgstRate !== undefined ? Number(cgstRate) : 1.5,
+        sgstRate: sgstRate !== undefined ? Number(sgstRate) : 1.5,
+        igstRate: igstRate !== undefined ? Number(igstRate) : 0,
+      },
     });
 
     await newFirm.save();
@@ -233,6 +269,9 @@ module.exports.updateFirm = async (req, res) => {
     const {
       name, location, size, gst, email, contact,
       bankName, branch, accountNo, ifscCode, proprietorName,
+      registrationNo, shopName, description, address, city, pincode,
+      firmStartDate, panNo, invoicePrefix,
+      cgstRate, sgstRate, igstRate, gstEnabled,
     } = req.body;
 
     if (name) firm.name = name;
@@ -246,6 +285,20 @@ module.exports.updateFirm = async (req, res) => {
     if (branch !== undefined) firm.branch = branch;
     if (accountNo !== undefined) firm.accountNo = accountNo;
     if (ifscCode !== undefined) firm.ifscCode = ifscCode;
+    if (registrationNo !== undefined) firm.registrationNo = registrationNo;
+    if (shopName !== undefined) firm.shopName = shopName;
+    if (description !== undefined) firm.description = description;
+    if (address !== undefined) firm.address = address;
+    if (city !== undefined) firm.city = city;
+    if (pincode !== undefined) firm.pincode = pincode;
+    if (firmStartDate !== undefined) firm.firmStartDate = firmStartDate || null;
+    if (panNo !== undefined) firm.panNo = panNo;
+    if (invoicePrefix !== undefined) firm.invoicePrefix = invoicePrefix;
+    if (!firm.gstConfig) firm.gstConfig = {};
+    if (gstEnabled !== undefined) firm.gstConfig.enabled = gstEnabled === "true" || gstEnabled === true;
+    if (cgstRate !== undefined) firm.gstConfig.cgstRate = Number(cgstRate);
+    if (sgstRate !== undefined) firm.gstConfig.sgstRate = Number(sgstRate);
+    if (igstRate !== undefined) firm.gstConfig.igstRate = Number(igstRate);
 
     const replaceImage = (field, file) => {
       if (!file) return;
@@ -258,6 +311,7 @@ module.exports.updateFirm = async (req, res) => {
     replaceImage("logo", req.files?.logo?.[0]);
     replaceImage("firmStamp", req.files?.firmStamp?.[0]);
     replaceImage("ownerSignature", req.files?.ownerSignature?.[0]);
+    replaceImage("secondLogo", req.files?.secondLogo?.[0]);
 
     await firm.save();
 
@@ -436,22 +490,35 @@ module.exports.Addstock = async (req, res) => {
     firm,
     quantity,
     price,
-    makingCharge,
+    makingCharge, // legacy flat number, still accepted if makingChargeUnit isn't sent
+    stockType,
+    grossWeight,
+    lessWeight,
+    hsnCode,
+    wastageSupplier,
+    wastageCustomer,
+    makingChargeValue,
+    makingChargeUnit,
+    labourChargeValue,
+    labourChargeUnit,
+    stoneCharge,
   } = req.body;
-  //   console.log("Received data:", req.body
-  // , req.file ? req.file.path : "No file uploaded"
-  //   );
 
   try {
+    const grossWeightNum = grossWeight !== undefined && grossWeight !== ""
+      ? Number(grossWeight)
+      : Number(waight) || 0;
+    const lessWeightNum = Number(lessWeight) || 0;
+    const netWeightNum = Math.max(grossWeightNum - lessWeightNum, 0) || Number(waight) || 0;
+
     if (
       !name ||
       !materialgitType ||
-      !waight ||
+      !netWeightNum ||
       !category ||
       !firm ||
       !quantity ||
-      !price ||
-      !makingCharge
+      !price
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -461,22 +528,45 @@ module.exports.Addstock = async (req, res) => {
     const stockcode = `STOCK-${Date.now()}-${Math.random()
       .toString(10)
       .substring(2, 10)}`; // Generate a unique stock code
-    pricenum = Number(price);
-    const makingChargeNum = Number(makingCharge);
-    const totalValue = pricenum + makingChargeNum;
-    // Calculate total value
+    const priceNum = Number(price);
+
+    const makingConfig = makingChargeUnit
+      ? { value: Number(makingChargeValue) || 0, unit: makingChargeUnit }
+      : { value: Number(makingCharge) || 0, unit: "fixed" };
+    const labourConfig = labourChargeUnit
+      ? { value: Number(labourChargeValue) || 0, unit: labourChargeUnit }
+      : { value: 0, unit: "fixed" };
+    const stoneChargeNum = Number(stoneCharge) || 0;
+    const wastageSupplierNum = Number(wastageSupplier) || 0;
+    const wastageCustomerNum = Number(wastageCustomer) || 0;
+
+    const makingChargeAmount = computeChargeAmount(makingConfig, netWeightNum, priceNum);
+    const labourChargeAmount = computeChargeAmount(labourConfig, netWeightNum, priceNum);
+    const wastageAmount = priceNum * (wastageCustomerNum / 100);
+    const totalValue =
+      priceNum + makingChargeAmount + labourChargeAmount + stoneChargeNum + wastageAmount;
+
     const newStock = new StockModel({
       name,
       materialgitType,
-      waight,
+      stockType: stockType === "wholesale" ? "wholesale" : "retail",
+      waight: netWeightNum,
+      grossWeight: grossWeightNum || netWeightNum,
+      lessWeight: lessWeightNum,
+      netWeight: netWeightNum,
       karat: materialgitType === "silver" ? "" : karat || "",
       category,
       firm,
       quantity,
-      price,
-      makingCharge,
+      price: priceNum,
+      wastage: { supplier: wastageSupplierNum, customer: wastageCustomerNum },
+      makingCharge: Math.round(makingChargeAmount * 100) / 100,
+      makingChargeConfig: makingConfig,
+      labourCharge: labourConfig,
+      stoneCharge: stoneChargeNum,
+      hsnCode: hsnCode || "",
       stockcode,
-      totalValue,
+      totalValue: Math.round(totalValue * 100) / 100,
       stockImg: req.file ? getRelativeFilePath(req.file.path) : null, // Handle file upload
     });
 
@@ -503,7 +593,18 @@ module.exports.updateStock = async (req, res) => {
     firm,
     quantity,
     price,
-    makingCharge,
+    makingCharge, // legacy flat number, still accepted if makingChargeUnit isn't sent
+    stockType,
+    grossWeight,
+    lessWeight,
+    hsnCode,
+    wastageSupplier,
+    wastageCustomer,
+    makingChargeValue,
+    makingChargeUnit,
+    labourChargeValue,
+    labourChargeUnit,
+    stoneCharge,
   } = req.body;
 
   console.log("updateStock called with:", {
@@ -524,35 +625,35 @@ module.exports.updateStock = async (req, res) => {
     const trimmedFirm = firm ? String(firm).trim() : "";
 
     // Validate numeric fields
-    const waightNum = parseFloat(waight);
+    const grossWeightNum = grossWeight !== undefined && grossWeight !== ""
+      ? parseFloat(grossWeight)
+      : parseFloat(waight) || 0;
+    const lessWeightNum = parseFloat(lessWeight) || 0;
+    const netWeightNum = Math.max(grossWeightNum - lessWeightNum, 0) || parseFloat(waight) || 0;
     const quantityNum = parseFloat(quantity);
     const priceNum = parseFloat(price);
-    const makingChargeNum = parseFloat(makingCharge);
 
     console.log("Parsed values:", {
       trimmedName,
       trimmedType,
-      waightNum,
+      netWeightNum,
       trimmedCategory,
       trimmedFirm,
       quantityNum,
       priceNum,
-      makingChargeNum,
     });
 
     if (
       !trimmedName ||
       !trimmedType ||
-      isNaN(waightNum) ||
-      waightNum <= 0 ||
+      isNaN(netWeightNum) ||
+      netWeightNum <= 0 ||
       !trimmedCategory ||
       !trimmedFirm ||
       isNaN(quantityNum) ||
       quantityNum < 0 ||
       isNaN(priceNum) ||
-      priceNum < 0 ||
-      isNaN(makingChargeNum) ||
-      makingChargeNum < 0
+      priceNum < 0
     ) {
       console.log("Validation failed with parsed values");
       return res.status(400).json({
@@ -570,20 +671,46 @@ module.exports.updateStock = async (req, res) => {
       return res.status(404).json({ message: "Stock not found" });
     }
 
+    const makingConfig = makingChargeUnit
+      ? { value: Number(makingChargeValue) || 0, unit: makingChargeUnit }
+      : makingCharge !== undefined
+      ? { value: Number(makingCharge) || 0, unit: "fixed" }
+      : stock.makingChargeConfig || { value: stock.makingCharge || 0, unit: "fixed" };
+    const labourConfig = labourChargeUnit
+      ? { value: Number(labourChargeValue) || 0, unit: labourChargeUnit }
+      : stock.labourCharge || { value: 0, unit: "fixed" };
+    const stoneChargeNum = stoneCharge !== undefined ? Number(stoneCharge) || 0 : stock.stoneCharge || 0;
+    const wastageSupplierNum = wastageSupplier !== undefined ? Number(wastageSupplier) || 0 : stock.wastage?.supplier || 0;
+    const wastageCustomerNum = wastageCustomer !== undefined ? Number(wastageCustomer) || 0 : stock.wastage?.customer || 0;
+
+    const makingChargeAmount = computeChargeAmount(makingConfig, netWeightNum, priceNum);
+    const labourChargeAmount = computeChargeAmount(labourConfig, netWeightNum, priceNum);
+    const wastageAmount = priceNum * (wastageCustomerNum / 100);
+
     // Calculate new total value
-    const totalValue = priceNum + makingChargeNum;
+    const totalValue =
+      priceNum + makingChargeAmount + labourChargeAmount + stoneChargeNum + wastageAmount;
 
     // Update stock fields
     stock.name = trimmedName;
     stock.materialgitType = trimmedType;
-    stock.waight = waightNum;
+    stock.stockType = stockType === "wholesale" ? "wholesale" : stockType === "retail" ? "retail" : stock.stockType;
+    stock.waight = netWeightNum;
+    stock.grossWeight = grossWeightNum || netWeightNum;
+    stock.lessWeight = lessWeightNum;
+    stock.netWeight = netWeightNum;
     stock.karat = trimmedType === "silver" ? "" : karat || "";
     stock.category = trimmedCategory;
     stock.firm = trimmedFirm;
     stock.quantity = quantityNum;
     stock.price = priceNum;
-    stock.makingCharge = makingChargeNum;
-    stock.totalValue = totalValue;
+    stock.wastage = { supplier: wastageSupplierNum, customer: wastageCustomerNum };
+    stock.makingCharge = Math.round(makingChargeAmount * 100) / 100;
+    stock.makingChargeConfig = makingConfig;
+    stock.labourCharge = labourConfig;
+    stock.stoneCharge = stoneChargeNum;
+    if (hsnCode !== undefined) stock.hsnCode = hsnCode;
+    stock.totalValue = Math.round(totalValue * 100) / 100;
 
     // Update image only if new file is provided
     if (req.file) {
@@ -672,6 +799,206 @@ module.exports.getStockbyFirm = async (req, res) => {
     res.status(200).json(stocks);
   } catch (error) {
     console.error("Error fetching stocks by firm:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+};
+
+// ============ BULK STOCK EXCEL IMPORT / EXPORT (wholesale add) ============
+
+const STOCK_BULK_COLUMNS = [
+  "name",
+  "materialgitType",
+  "stockType",
+  "category",
+  "firm",
+  "grossWeight",
+  "lessWeight",
+  "karat",
+  "quantity",
+  "price",
+  "wastageSupplier",
+  "wastageCustomer",
+  "makingChargeValue",
+  "makingChargeUnit",
+  "labourChargeValue",
+  "labourChargeUnit",
+  "stoneCharge",
+  "hsnCode",
+];
+
+module.exports.downloadStockBulkTemplate = async (req, res) => {
+  try {
+    const XLSX = require("xlsx");
+    const categories = await StockCategoryModel.find({ removeAt: null });
+    const firms = await FirmModel.find({ removeAt: null });
+
+    const exampleRow = {
+      name: "Gold Ring 22K",
+      materialgitType: "gold",
+      stockType: "wholesale",
+      category: categories[0]?.name || "Ring",
+      firm: firms[0]?.name || "Your Firm Name",
+      grossWeight: 10,
+      lessWeight: 0.5,
+      karat: "22K",
+      quantity: 5,
+      price: 55000,
+      wastageSupplier: 2,
+      wastageCustomer: 4,
+      makingChargeValue: 500,
+      makingChargeUnit: "per_gram",
+      labourChargeValue: 0,
+      labourChargeUnit: "fixed",
+      stoneCharge: 0,
+      hsnCode: "7113",
+    };
+
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet([exampleRow], { header: STOCK_BULK_COLUMNS });
+    XLSX.utils.book_append_sheet(workbook, sheet, "Stock");
+
+    const instructions = [
+      { field: "materialgitType", validValues: "gold, silver, platinum, diamond, other" },
+      { field: "stockType", validValues: "wholesale, retail" },
+      { field: "makingChargeUnit / labourChargeUnit", validValues: "fixed, per_gram, per_kg, per_mg, percent" },
+      { field: "category", validValues: categories.map((c) => c.name).join(", ") || "(create a category first)" },
+      { field: "firm", validValues: firms.map((f) => f.name).join(", ") || "(create a firm first)" },
+      { field: "karat", validValues: "24K, 23K, 22K, 20K, 18K (gold/diamond only, leave blank for silver)" },
+    ];
+    const instructionsSheet = XLSX.utils.json_to_sheet(instructions);
+    XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Valid Values");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", "attachment; filename=stock-bulk-template.xlsx");
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error generating stock bulk template:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports.bulkImportStock = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "An Excel file is required" });
+    }
+    const XLSX = require("xlsx");
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: "The uploaded sheet has no data rows" });
+    }
+
+    const categories = await StockCategoryModel.find({ removeAt: null });
+    const firms = await FirmModel.find({ removeAt: null });
+    // Trim defensively — firm/category names entered via their own forms
+    // aren't trimmed on save, so stray leading/trailing whitespace ("Shri Ji
+    // Jwelleries ") would otherwise silently fail every case-insensitive
+    // match against a clean name typed into the spreadsheet.
+    const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
+    const firmByName = new Map(firms.map((f) => [f.name.trim().toLowerCase(), f]));
+    const validMaterialTypes = ["gold", "silver", "platinum", "diamond", "other"];
+    const validChargeUnits = ["fixed", "per_gram", "per_kg", "per_mg", "percent"];
+
+    const errors = [];
+    const toInsert = [];
+
+    rows.forEach((row, index) => {
+      const rowNum = index + 2; // header is row 1 in the spreadsheet
+      const name = String(row.name || "").trim();
+      const materialgitType = String(row.materialgitType || "").trim().toLowerCase();
+      const categoryName = String(row.category || "").trim();
+      const firmName = String(row.firm || "").trim();
+      const grossWeight = Number(row.grossWeight) || 0;
+      const lessWeight = Number(row.lessWeight) || 0;
+      const netWeight = Math.max(grossWeight - lessWeight, 0);
+      const quantity = Number(row.quantity);
+      const price = Number(row.price);
+      const karat = String(row.karat || "").trim();
+
+      const rowErrors = [];
+      if (!name) rowErrors.push("name is required");
+      if (!validMaterialTypes.includes(materialgitType)) {
+        rowErrors.push(`materialgitType must be one of ${validMaterialTypes.join(", ")}`);
+      }
+      const category = categoryByName.get(categoryName.toLowerCase());
+      if (!category) rowErrors.push(`category "${categoryName}" not found`);
+      const firm = firmByName.get(firmName.toLowerCase());
+      if (!firm) rowErrors.push(`firm "${firmName}" not found`);
+      if (!netWeight) rowErrors.push("grossWeight (after lessWeight) must be greater than 0");
+      if (!quantity || isNaN(quantity) || quantity <= 0) rowErrors.push("quantity must be a positive number");
+      if (!price || isNaN(price) || price <= 0) rowErrors.push("price must be a positive number");
+      if ((materialgitType === "gold" || materialgitType === "diamond") && !karat) {
+        rowErrors.push("karat is required for gold and diamond items");
+      }
+      const makingChargeUnit = validChargeUnits.includes(row.makingChargeUnit) ? row.makingChargeUnit : "fixed";
+      const labourChargeUnit = validChargeUnits.includes(row.labourChargeUnit) ? row.labourChargeUnit : "fixed";
+
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNum, name: name || "(blank)", message: rowErrors.join("; ") });
+        return;
+      }
+
+      const makingConfig = { value: Number(row.makingChargeValue) || 0, unit: makingChargeUnit };
+      const labourConfig = { value: Number(row.labourChargeValue) || 0, unit: labourChargeUnit };
+      const stoneChargeNum = Number(row.stoneCharge) || 0;
+      const wastageSupplierNum = Number(row.wastageSupplier) || 0;
+      const wastageCustomerNum = Number(row.wastageCustomer) || 0;
+
+      const makingChargeAmount = computeChargeAmount(makingConfig, netWeight, price);
+      const labourChargeAmount = computeChargeAmount(labourConfig, netWeight, price);
+      const wastageAmount = price * (wastageCustomerNum / 100);
+      const totalValue = price + makingChargeAmount + labourChargeAmount + stoneChargeNum + wastageAmount;
+
+      toInsert.push({
+        name,
+        materialgitType,
+        stockType: "wholesale",
+        stockcode: `STOCK-${Date.now()}-${index}-${Math.random().toString(10).substring(2, 8)}`,
+        waight: netWeight,
+        grossWeight,
+        lessWeight,
+        netWeight,
+        karat: materialgitType === "silver" ? "" : karat,
+        category: category._id,
+        firm: firm._id,
+        quantity,
+        price,
+        wastage: { supplier: wastageSupplierNum, customer: wastageCustomerNum },
+        makingCharge: Math.round(makingChargeAmount * 100) / 100,
+        makingChargeConfig: makingConfig,
+        labourCharge: labourConfig,
+        stoneCharge: stoneChargeNum,
+        hsnCode: String(row.hsnCode || ""),
+        totalValue: Math.round(totalValue * 100) / 100,
+      });
+    });
+
+    let inserted = [];
+    if (toInsert.length > 0) {
+      inserted = await StockModel.insertMany(toInsert);
+      addActivity(
+        req.user._id,
+        "bulkAddStock",
+        `Bulk-imported ${inserted.length} stock item(s) via Excel`
+      );
+    }
+
+    res.status(errors.length > 0 && inserted.length === 0 ? 400 : 200).json({
+      message: `Imported ${inserted.length} of ${rows.length} row(s)`,
+      insertedCount: inserted.length,
+      totalRows: rows.length,
+      errors,
+    });
+  } catch (error) {
+    console.error("Error bulk importing stock:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -792,11 +1119,59 @@ module.exports.AddRawMaterialStock = async (req, res) => {
   }
 };
 
+// User only ever keys in the 24K rate; every other purity is derived from it
+// so the daily rate entry stays a single-number job.
+const GOLD_PURITY_FACTORS = {
+  "24K": 1,
+  "23K": 0.9583,
+  "22K": 0.9167,
+  "20K": 0.8333,
+  "18K": 0.75,
+};
+
+function deriveGoldPurities(gold24K) {
+  const base = Number(gold24K) || 0;
+  return Object.fromEntries(
+    Object.entries(GOLD_PURITY_FACTORS).map(([karat, factor]) => [
+      karat,
+      Math.round(base * factor * 100) / 100,
+    ])
+  );
+}
+
+module.exports.GOLD_PURITY_FACTORS = GOLD_PURITY_FACTORS;
+module.exports.deriveGoldPurities = deriveGoldPurities;
+
+// Turns a { value, unit } charge config into a flat rupee amount.
+// per_gram/per_kg/per_mg scale against the item's net weight; percent scales
+// against the item's price; fixed is used as-is.
+function computeChargeAmount(config, netWeightGrams, baseAmount) {
+  if (!config) return 0;
+  const value = Number(config.value) || 0;
+  const weight = Number(netWeightGrams) || 0;
+  switch (config.unit) {
+    case "per_gram":
+      return value * weight;
+    case "per_kg":
+      return value * (weight / 1000);
+    case "per_mg":
+      return value * (weight * 1000);
+    case "percent":
+      return (Number(baseAmount) || 0) * (value / 100);
+    case "fixed":
+    default:
+      return value;
+  }
+}
+module.exports.computeChargeAmount = computeChargeAmount;
+
 module.exports.createDailrate = async (req, res) => {
   const { date, rate } = req.body;
   try {
-    if (!date || !rate) {
-      return res.status(400).json({ message: "Date and rate are required" });
+    if (!date || !rate || !rate.gold || !rate.gold["24K"]) {
+      return res
+        .status(400)
+        .json({ message: "Date and 24K gold rate are required" });
     }
     const existingRate = await DailrateModel.findOne({ date: new Date(date) });
     if (existingRate) {
@@ -806,7 +1181,10 @@ module.exports.createDailrate = async (req, res) => {
     }
     const newDailrate = new DailrateModel({
       date: new Date(date),
-      rate,
+      rate: {
+        ...rate,
+        gold: deriveGoldPurities(rate.gold["24K"]),
+      },
     });
     await newDailrate.save();
     addActivity(req.user._id, "todaysRateAdded", ` todays rate Added.`);
@@ -869,13 +1247,7 @@ module.exports.updateDailrate = async (req, res) => {
         date: new Date(date), // Ensure date is stored as a Date object
 
         rate: {
-          gold: {
-            "24K": rate.gold["24K"],
-            "23K": rate.gold["23K"],
-            "22K": rate.gold["22K"],
-            "20K": rate.gold["20K"],
-            "18K": rate.gold["18K"],
-          },
+          gold: deriveGoldPurities(rate.gold["24K"]),
           silver: rate.silver,
           daimond: {
             "0_5 Carat": rate.daimond["0_5 Carat"],
@@ -927,22 +1299,28 @@ module.exports.createSale = async (req, res) => {
     paymentAmount,
     UdharAmount,
     udharAmount,
+    payments, // new: [{ method, amount, reference }] — split payment across modes
+    discount, // new: { type: 'percent'|'fixed', value, amount }
+    subtotal, // new: items subtotal before discount/GST
+    gst, // new: { cgstRate, sgstRate, igstRate, cgstAmount, sgstAmount, igstAmount }
   } = req.body;
   console.log("Received sale data:", req.body); // Debug log
 
   try {
+    const hasSplitPayments = Array.isArray(payments) && payments.length > 0;
     if (
       !items ||
       !customer ||
       !firm ||
       !totalAmount ||
-      !paymentMethod ||
-      !paymentAmount
+      (!hasSplitPayments && (!paymentMethod || paymentAmount === undefined))
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Subtract value of stock and raw material
+    // Subtract value of stock and raw material, and snapshot the details
+    // needed to reprint this exact invoice later even if the stock's price,
+    // rate or making charge changes afterwards.
     for (const item of items) {
       if (item.saleType === "stock") {
         const stock = await StockModel.findById(item.salematerialId);
@@ -972,6 +1350,18 @@ module.exports.createSale = async (req, res) => {
           stock.quantity -= item.quantity;
         }
         await stock.save();
+
+        const netWeight = stock.netWeight || stock.waight || 0;
+        item.name = stock.name;
+        item.hsnCode = stock.hsnCode || "";
+        item.karat = stock.karat || "";
+        item.grossWeight = stock.grossWeight || stock.waight || 0;
+        item.lessWeight = stock.lessWeight || 0;
+        item.netWeight = netWeight;
+        item.rate = netWeight ? Math.round((stock.price / netWeight) * 100) / 100 : 0;
+        item.makingCharge = stock.makingCharge || 0;
+        item.wastageAmount =
+          Math.round(stock.price * ((stock.wastage?.customer || 0) / 100) * 100) / 100;
       } else {
         const rawMaterial = await RawMaterialModel.findById(
           item.salematerialId
@@ -993,6 +1383,7 @@ module.exports.createSale = async (req, res) => {
           rawMaterial.quantity = availableQuantity - item.quantity;
         }
         await rawMaterial.save();
+        item.name = rawMaterial.name;
       }
     }
 
@@ -1003,13 +1394,47 @@ module.exports.createSale = async (req, res) => {
       { $inc: { lastInvoiceNumber: 1 } },
       { new: true }
     );
-    const invoicePrefix = (firmForInvoice?.name || "INV")
-      .replace(/[^A-Za-z0-9]/g, "")
-      .toUpperCase()
-      .slice(0, 6) || "INV";
-    const invoiceNumber = `${invoicePrefix}-${String(
-      firmForInvoice?.lastInvoiceNumber || 1
-    ).padStart(5, "0")}`;
+    const invoiceNumber = buildInvoiceNumber(firmForInvoice);
+
+    // Snapshot discount + GST. Rates fall back to the firm's own gstConfig
+    // (never hardcoded) if the caller doesn't send an explicit breakdown, so
+    // older callers that only send totalAmount still get a correct split.
+    const subtotalNum =
+      subtotal !== undefined
+        ? Number(subtotal)
+        : items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+    const discountObj = {
+      type: discount?.type === "percent" ? "percent" : "fixed",
+      value: Number(discount?.value) || 0,
+      amount: Number(discount?.amount) || 0,
+    };
+    const taxableAmountNum = Math.max(subtotalNum - discountObj.amount, 0);
+    const firmGstConfig = firmForInvoice?.gstConfig || {
+      enabled: true,
+      cgstRate: 1.5,
+      sgstRate: 1.5,
+      igstRate: 0,
+    };
+    const cgstRate = gst?.cgstRate ?? (firmGstConfig.enabled ? firmGstConfig.cgstRate : 0);
+    const sgstRate = gst?.sgstRate ?? (firmGstConfig.enabled ? firmGstConfig.sgstRate : 0);
+    const igstRate = gst?.igstRate ?? (firmGstConfig.enabled ? firmGstConfig.igstRate : 0);
+    const cgstAmount = gst?.cgstAmount ?? Math.round(taxableAmountNum * (cgstRate / 100) * 100) / 100;
+    const sgstAmount = gst?.sgstAmount ?? Math.round(taxableAmountNum * (sgstRate / 100) * 100) / 100;
+    const igstAmount = gst?.igstAmount ?? Math.round(taxableAmountNum * (igstRate / 100) * 100) / 100;
+
+    // Build the payment breakdown — a single legacy entry if the caller
+    // didn't split, otherwise one row per mode actually used.
+    const paymentsArr = hasSplitPayments
+      ? payments
+          .map((p) => ({
+            method: p.method,
+            amount: Number(p.amount) || 0,
+            reference: p.reference || "",
+          }))
+          .filter((p) => p.amount > 0)
+      : [{ method: paymentMethod, amount: Number(paymentAmount) || 0, reference: "" }];
+    const primaryPaymentMethod =
+      paymentsArr.length > 1 ? "split" : paymentsArr[0]?.method || paymentMethod;
 
     // Create Sale
     const newSale = new SaleModel({
@@ -1017,25 +1442,31 @@ module.exports.createSale = async (req, res) => {
       items,
       customer,
       firm,
+      subtotal: subtotalNum,
+      discount: discountObj,
+      taxableAmount: taxableAmountNum,
+      gst: { cgstRate, sgstRate, igstRate, cgstAmount, sgstAmount, igstAmount },
       totalAmount,
       saleDate: new Date().toISOString().slice(0, 10),
-      paymentMethod,
+      paymentMethod: primaryPaymentMethod,
+      payments: paymentsArr,
       udharAmount: UdharAmount || udharAmount || 0,
-      paymentAmount,
     });
     await newSale.save();
 
-    // Create Payment
-    const payment = new PaymentModel({
-      paymentType: paymentMethod,
-      paymentRefrence: `PAY-${newSale._id}`,
-      amount: paymentAmount,
-      paymentDate: new Date().toISOString().slice(0, 10),
-      sale: newSale._id,
-      customer,
-      firm,
-    });
-    await payment.save();
+    // Create one Payment doc per mode actually used
+    for (const p of paymentsArr) {
+      const payment = new PaymentModel({
+        paymentType: p.method,
+        paymentRefrence: p.reference || `PAY-${newSale._id}`,
+        amount: p.amount,
+        paymentDate: new Date().toISOString().slice(0, 10),
+        sale: newSale._id,
+        customer,
+        firm,
+      });
+      await payment.save();
+    }
 
     // Handle Udhar if any
     const udharAmountValue = UdharAmount || udharAmount || 0;
@@ -1050,14 +1481,15 @@ module.exports.createSale = async (req, res) => {
     }
     const customerDoc = await CustomerModel.findById(customer);
     const CustomerName = customerDoc.name;
+    const paidTotal = paymentsArr.reduce((sum, p) => sum + p.amount, 0);
     addActivity(
       req.user._id,
       "sale",
       `Sale created for Customer : ${CustomerName} Product : ${items
-        .map((item) => item.saleType.name)
+        .map((item) => item.name || item.saleType)
         .join(
           ", "
-        )} for Amount : ${totalAmount} Payment Method : ${paymentMethod} Payment Amount : ${paymentAmount} Udhar Amount : ${udharAmountValue} `
+        )} for Amount : ${totalAmount} Payment Method : ${primaryPaymentMethod} Payment Amount : ${paidTotal} Udhar Amount : ${udharAmountValue} `
     );
     // Populate refs for immediate UI rendering without refresh
     const populatedSale = await SaleModel.findById(newSale._id)
@@ -1465,6 +1897,65 @@ module.exports.getFiveMonthlySales = async (req, res) => {
     res.status(200).json(monthlySales);
   } catch (error) {
     console.error("Error fetching monthly sales:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ============ DAY BOOK — one day's full ledger, date-filterable ============
+module.exports.getDayBook = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const day = date ? new Date(date) : new Date();
+    if (isNaN(day.getTime())) {
+      return res.status(400).json({ message: "Invalid date" });
+    }
+    const startOfDay = new Date(day);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(day);
+    endOfDay.setHours(23, 59, 59, 999);
+    const range = { $gte: startOfDay, $lte: endOfDay };
+
+    const [sales, payments, newStock, udharGiven, udharSettled] = await Promise.all([
+      SaleModel.find({ saleDate: range, removeAt: null })
+        .populate("customer", "name contact")
+        .populate("firm", "name")
+        .sort({ createdAt: -1 }),
+      PaymentModel.find({ paymentDate: range, removeAt: null })
+        .populate("customer", "name")
+        .populate("firm", "name"),
+      StockModel.find({ createdAt: range })
+        .populate("category", "name")
+        .populate("firm", "name"),
+      UdharModel.find({ createdAt: range, removeAt: null }).populate("customer", "name"),
+      udharsetelmentModel.find({ createdAt: range, removeAt: null }).populate("customer", "name"),
+    ]);
+
+    const paymentsByMode = payments.reduce((acc, p) => {
+      acc[p.paymentType] = (acc[p.paymentType] || 0) + p.amount;
+      return acc;
+    }, {});
+
+    const summary = {
+      salesCount: sales.length,
+      totalSalesAmount: sales.reduce((sum, s) => sum + (s.totalAmount || 0), 0),
+      totalPaymentsReceived: payments.reduce((sum, p) => sum + (p.amount || 0), 0),
+      newStockCount: newStock.length,
+      udharGivenAmount: udharGiven.reduce((sum, u) => sum + (u.amount || 0), 0),
+      udharSettledAmount: udharSettled.reduce((sum, u) => sum + (u.amount || 0), 0),
+    };
+
+    res.status(200).json({
+      date: startOfDay,
+      sales,
+      payments,
+      paymentsByMode,
+      newStock,
+      udharGiven,
+      udharSettled,
+      summary,
+    });
+  } catch (error) {
+    console.error("Error fetching day book:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
