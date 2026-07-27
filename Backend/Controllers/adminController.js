@@ -165,6 +165,8 @@ module.exports.loginUser = async (req, res) => {
       sameSite: crossSiteCookie ? "none" : "lax",
       secure: crossSiteCookie,
     });
+    // TEMP DIAGNOSTIC — remove once the spurious-logout cause is found.
+    console.log(`[loginUser] issued token for userId=${user._id} dbName=${UserModel.db.name}`);
     res
       .status(200)
       .json({ message: "Login successful", token, role: user.role });

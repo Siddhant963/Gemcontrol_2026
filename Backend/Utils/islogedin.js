@@ -3,7 +3,12 @@ const jwt = require("jsonwebtoken");
 const UserModel = require("../Models/UserModel");
 require("dotenv").config();
 module.exports.isLoggedIn = async (req, res, next) => {
-  const token = req.cookies.token;
+  // Native mobile clients can't rely on the httpOnly cookie the way a browser
+  // does, so fall back to a Bearer header when no cookie is present. The web
+  // frontend already sends this header today; it was previously ignored here.
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = req.cookies.token || bearerToken;
 
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -22,6 +27,10 @@ module.exports.isLoggedIn = async (req, res, next) => {
     const user = await UserModel.findById(decoded.userId);
 
     if (!user || user.removeAt) {
+      // TEMP DIAGNOSTIC — remove once the spurious-logout cause is found.
+      console.log(
+        `[isLoggedIn 401] decoded.userId=${decoded.userId} found=${!!user} removeAt=${user?.removeAt} dbName=${UserModel.db.name}`
+      );
       return res.status(401).json({ message: "Unauthorized" });
     }
 

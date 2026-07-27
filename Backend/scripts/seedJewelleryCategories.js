@@ -1,4 +1,3 @@
-// Seeds the standard jewellery categories a jeweller expects to exist out of
 // the box, so item entry never blocks on "create a category first". Safe to
 // re-run — existing categories (matched by name) are left untouched.
 //
