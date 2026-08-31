@@ -1,35 +1,72 @@
-# Dependencies
-node_modules/
+# ==============================================================================
+# GemControl monorepo — root ignore rules
+# Each sub-project (Backend, Frontend-gem/GemControl, Mobile-gem/gemcontrol_app)
+# also has its own .gitignore with stack-specific rules. This file is the
+# repo-wide safety net for secrets, dependencies, build output and OS/editor junk.
+# ==============================================================================
 
-# Environment variables
+# --- Secrets / environment -----------------------------------------------------
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.development
+!.env.production
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+key.properties
+secrets*.json
+serviceAccount*.json
 
-# Logs
-logs
+# --- Dependencies ------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+.pub-cache/
+.dart_tool/
+vendor/
+
+# --- Build output ------------------------------------------------------------
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# --- Runtime data (server-generated, not source) ----------------------------
+Uploads/
+Exports/
+
+# --- Logs ------------------------------------------------------------------
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-# Build outputs
-dist/
-build/
+# --- OS files ---------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Runtime uploads
-Uploads/
-
-# Editor directories and files
+# --- Editors / IDEs -------------------------------------------------------------
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.iml
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*~
