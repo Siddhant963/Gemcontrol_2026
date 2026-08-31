@@ -8,6 +8,7 @@ import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/customer_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import 'customers_providers.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
@@ -24,7 +25,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Widget build(BuildContext context) {
     final customersAsync = ref.watch(customersProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Customers')),
+      appBar: GcAppBar(title: 'Customers'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(
           context: context,

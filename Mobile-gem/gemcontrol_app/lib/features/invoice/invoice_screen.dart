@@ -9,6 +9,7 @@ import '../../core/providers/firm_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../core/utils/number_to_words.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 
 /// GST invoice layout per the reference "Krishna Jewellers" screenshots
@@ -35,7 +36,7 @@ class InvoiceScreen extends ConsumerWidget {
     final netReceivable = sale.totalAmount - sale.udharAmount;
 
     return Scaffold(
-      appBar: AppBar(title: Text(sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice')),
+      appBar: GcAppBar(title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Card(

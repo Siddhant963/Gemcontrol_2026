@@ -6,6 +6,7 @@ import '../../core/repositories/payment_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
 
 final allPaymentsProvider = FutureProvider.autoDispose<List<Payment>>((ref) {
@@ -26,7 +27,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   Widget build(BuildContext context) {
     final paymentsAsync = ref.watch(allPaymentsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Payments Ledger')),
+      appBar: GcAppBar(title: 'Payments Ledger'),
       body: Column(
         children: [
           Padding(

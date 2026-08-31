@@ -1131,6 +1131,17 @@ const GOLD_PURITY_FACTORS = {
   "18K": 0.75,
 };
 
+// Daily rates are keyed one-per-calendar-day, but the date sent by clients
+// carries the current time of day, not midnight. Storing it un-normalized
+// meant getTodayDailrate/getDashboardData's exact-match "today" queries
+// (which compare against midnight UTC) could never find a rate created a
+// few hours after midnight -- "today's rate" would look permanently missing.
+function normalizeToUtcDate(dateInput) {
+  const d = new Date(dateInput);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 function deriveGoldPurities(gold24K) {
   const base = Number(gold24K) || 0;
   return Object.fromEntries(
@@ -1175,14 +1186,15 @@ module.exports.createDailrate = async (req, res) => {
         .status(400)
         .json({ message: "Date and 24K gold rate are required" });
     }
-    const existingRate = await DailrateModel.findOne({ date: new Date(date) });
+    const normalizedDate = normalizeToUtcDate(date);
+    const existingRate = await DailrateModel.findOne({ date: normalizedDate });
     if (existingRate) {
       return res
         .status(400)
         .json({ message: "Rate for this date already exists" });
     }
     const newDailrate = new DailrateModel({
-      date: new Date(date),
+      date: normalizedDate,
       rate: {
         ...rate,
         gold: deriveGoldPurities(rate.gold["24K"]),
@@ -1246,7 +1258,7 @@ module.exports.updateDailrate = async (req, res) => {
     const updatedDailrate = await DailrateModel.findByIdAndUpdate(
       _id,
       {
-        date: new Date(date), // Ensure date is stored as a Date object
+        date: normalizeToUtcDate(date), // Normalized to midnight UTC so "today" lookups match
 
         rate: {
           gold: deriveGoldPurities(rate.gold["24K"]),

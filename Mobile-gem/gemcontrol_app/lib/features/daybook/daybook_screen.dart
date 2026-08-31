@@ -5,6 +5,7 @@ import '../../core/repositories/dashboard_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 
 final _selectedDateProvider = StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
@@ -23,8 +24,8 @@ class DayBookScreen extends ConsumerWidget {
     final dayBookAsync = ref.watch(dayBookProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Day Book'),
+      appBar: GcAppBar(
+        title: 'Day Book',
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today_outlined),

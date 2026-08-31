@@ -6,6 +6,7 @@ import '../../core/models/user.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
 
 final allUsersProvider = FutureProvider.autoDispose<List<AppUser>>((ref) {
@@ -19,7 +20,7 @@ class UsersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(allUsersProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('User Management')),
+      appBar: GcAppBar(title: 'User Management'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(
           context: context,

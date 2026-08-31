@@ -9,6 +9,7 @@ import '../../core/repositories/stock_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import 'stock_form_sheet.dart';
 import 'stock_providers.dart';
 
@@ -44,8 +45,8 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
     final activeType = materialTypes[_tabController.index];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Stock Management'),
+      appBar: GcAppBar(
+        title: 'Stock Management',
         actions: [
           IconButton(
             icon: const Icon(Icons.category_outlined),

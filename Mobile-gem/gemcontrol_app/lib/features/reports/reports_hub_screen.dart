@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 
 class _ReportEntry {
   final String title;
@@ -31,7 +32,7 @@ class ReportsHubScreen extends ConsumerWidget {
     final visible = _entries.where((e) => !e.adminOnly || isAdmin).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
+      appBar: GcAppBar(title: 'Reports'),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: visible.length,

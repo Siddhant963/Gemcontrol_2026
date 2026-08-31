@@ -7,6 +7,7 @@ import '../../core/models/stock.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../categories/categories_providers.dart';
 import '../stock/stock_providers.dart';
 
@@ -21,7 +22,7 @@ class JewelleryPanelScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Jewellery Panel')),
+      appBar: GcAppBar(title: 'Jewellery Panel'),
       body: AsyncValueWidget<List<Stock>>(
         value: stockAsync,
         onRetry: () => ref.invalidate(stockListProvider),

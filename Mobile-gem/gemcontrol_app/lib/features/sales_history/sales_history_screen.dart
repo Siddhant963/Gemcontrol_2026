@@ -6,6 +6,7 @@ import '../../core/models/sale.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'sales_history_providers.dart';
 
@@ -23,7 +24,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(allSalesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Sales History')),
+      appBar: GcAppBar(title: 'Sales History'),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/sales/new'),
         icon: const Icon(Icons.add),

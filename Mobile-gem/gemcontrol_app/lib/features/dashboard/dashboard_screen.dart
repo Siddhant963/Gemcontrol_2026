@@ -8,6 +8,7 @@ import '../../core/repositories/dashboard_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 import 'dashboard_providers.dart';
 
@@ -22,8 +23,8 @@ class DashboardScreen extends ConsumerWidget {
     final session = ref.watch(authControllerProvider).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
+      appBar: GcAppBar(
+        title: 'Dashboard',
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

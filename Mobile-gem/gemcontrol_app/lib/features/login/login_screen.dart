@@ -63,22 +63,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   Center(
                     child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: const BoxDecoration(
+                      width: 80,
+                      height: 80,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primaryContainer,
-                            AppColors.primary,
-                          ],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.diamond_outlined,
                         color: Colors.white,
-                        size: 32,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
+                      child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
                     ),
                   ),
                   const SizedBox(height: 24),

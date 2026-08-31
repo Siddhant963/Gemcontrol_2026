@@ -10,6 +10,7 @@ import '../../core/models/stock_category.dart';
 import '../../core/repositories/stock_category_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import 'categories_providers.dart';
 
 class CategoriesScreen extends ConsumerWidget {
@@ -19,7 +20,7 @@ class CategoriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
+      appBar: GcAppBar(title: 'Categories'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddSheet(context, ref),
         child: const Icon(Icons.add),

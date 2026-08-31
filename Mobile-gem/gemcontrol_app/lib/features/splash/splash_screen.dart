@@ -19,15 +19,12 @@ class SplashScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: 96,
+              height: 96,
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.primaryContainer, AppColors.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.primary.withValues(alpha: 0.25),
@@ -36,7 +33,7 @@ class SplashScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.diamond_outlined, color: Colors.white, size: 40),
+              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
             ),
             const SizedBox(height: 20),
             Text(

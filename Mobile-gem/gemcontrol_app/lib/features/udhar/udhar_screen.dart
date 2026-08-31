@@ -7,6 +7,7 @@ import '../../core/repositories/payment_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 
 final allUdharProvider = FutureProvider.autoDispose<List<Udhar>>((ref) {
   return ref.watch(udharRepositoryProvider).getAllUdhar();
@@ -41,8 +42,8 @@ class _UdharScreenState extends ConsumerState<UdharScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Udhar Management'),
+      appBar: GcAppBar(
+        title: 'Udhar Management',
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: 'Outstanding'), Tab(text: 'Settlements')],

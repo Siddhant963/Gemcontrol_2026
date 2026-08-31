@@ -11,6 +11,7 @@ import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/raw_material_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import 'raw_materials_providers.dart';
 
 class RawMaterialsScreen extends ConsumerWidget {
@@ -20,7 +21,7 @@ class RawMaterialsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final materialsAsync = ref.watch(rawMaterialsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Raw Materials')),
+      appBar: GcAppBar(title: 'Raw Materials'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(
           context: context,

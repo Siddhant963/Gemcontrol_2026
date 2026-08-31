@@ -10,6 +10,7 @@ import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/sale_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 import '../customers/customers_providers.dart';
 import 'item_picker_sheet.dart';
@@ -75,7 +76,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     final remaining = totalAmount - _paymentsTotal - _udharAmount;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New Sale')),
+      appBar: GcAppBar(title: 'New Sale'),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [

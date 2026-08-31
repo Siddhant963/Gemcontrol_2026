@@ -7,6 +7,7 @@ import '../../core/models/girvi.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'add_girvi_sheet.dart';
 import 'girvi_detail_sheet.dart';
@@ -21,7 +22,7 @@ class GirviScreen extends ConsumerWidget {
     final summaryAsync = ref.watch(girviSummaryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Girvi Management')),
+      appBar: GcAppBar(title: 'Girvi Management'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(
           context: context,
