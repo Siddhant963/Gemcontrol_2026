@@ -1,4 +1,10 @@
-# Miscellaneous
+# ==============================================================================
+# GemControl mobile app (Flutter)
+# pubspec.lock and .metadata are committed on purpose (this is an app, not a
+# library). android/.gitignore covers the Gradle/keystore side.
+# ==============================================================================
+
+# --- Miscellaneous ------------------------------------------------------------
 *.class
 *.log
 *.pyc
@@ -12,34 +18,59 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# --- IntelliJ / Android Studio ------------------------------------------------
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# --- VS Code ----------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
 
-# Flutter/Dart/Pub related
+# --- Flutter / Dart / Pub -----------------------------------------------------
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
 /coverage/
 
-# Symbolication related
-app.*.symbols
+# --- Secrets / environment -------------------------------------------------------
+*.env
+.env
+.env.*
+!.env.example
+key.properties
+**/*.keystore
+**/*.jks
+*.p12
 
-# Obfuscation related
+# --- Symbolication / obfuscation ---------------------------------------------
+app.*.symbols
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# --- Android build artifacts -------------------------------------------------
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --- Platform tooling caches -----------------------------------------------------
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/ios/.symlinks/
