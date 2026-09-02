@@ -7,6 +7,7 @@ import '../../core/auth/auth_state.dart';
 import '../../core/repositories/daily_rate_repository.dart';
 import '../../core/repositories/export_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'daily_rate_sheet.dart';
 
@@ -19,6 +20,7 @@ class SettingsScreen extends ConsumerWidget {
     final isAdmin = session?.isAdmin ?? false;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Settings'),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),

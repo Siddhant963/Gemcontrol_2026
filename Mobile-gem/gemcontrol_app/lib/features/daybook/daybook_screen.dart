@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/repositories/dashboard_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
@@ -24,6 +25,7 @@ class DayBookScreen extends ConsumerWidget {
     final dayBookAsync = ref.watch(dayBookProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(
         title: 'Day Book',
         actions: [

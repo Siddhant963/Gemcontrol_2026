@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const UserModel = require("../Models/UserModel.js");
 const FirmModel = require("../Models/FirmModel");
 const StockCategoryModel = require("../Models/StockCetegoryModel.js");
@@ -57,34 +58,83 @@ function buildInvoiceNumber(firm, date = new Date()) {
   return `${prefix}/${counter}/${fyStart}-${fyEnd}`;
 }
 
+// Public /register (no auth): a brand-new shop owner signing up creates
+// their own Firm and becomes its admin in one step -- there is no other
+// self-service way to get a firm today.
+// Admin-panel /admin/register (isLoggedIn + isAdmin): the calling admin
+// adds a teammate to their OWN firm -- role may be admin or staff, but the
+// firm is always forced server-side, never taken from the request.
 module.exports.RegisterUser = async (req, res) => {
   const { name, email, contact, password } = req.body;
-  // Only an already-authenticated admin (isAdmin middleware on /admin/register) may pick a
-  // role other than "staff" -- the public /register endpoint (no auth) always creates staff
-  // accounts regardless of what's sent in the request body.
   const isAdminCaller = req.user && req.user.role?.toLowerCase() === "admin";
-  const role = isAdminCaller ? (req.body.role || "staff") : "staff";
+
+  if (!name || !email || !contact || !password) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
 
   try {
     const existingUser = await UserModel.findOne({ email: email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
-    if (!name || !email || !contact || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new UserModel({
-      name,
-      email,
-      contact,
-      password: hashedPassword,
-      role,
-    });
-    await newUser.save();
-    res
-      .status(201)
-      .json({ message: "User registered successfully", user: newUser });
+
+    if (isAdminCaller) {
+      if (!req.user.firm) {
+        return res
+          .status(403)
+          .json({ message: "Your account has no firm associated with it" });
+      }
+      const role = req.body.role || "staff";
+      const newUser = new UserModel({
+        name,
+        email,
+        contact,
+        password: hashedPassword,
+        role,
+        firm: req.user.firm,
+      });
+      await newUser.save();
+      return res
+        .status(201)
+        .json({ message: "User registered successfully", user: newUser });
+    }
+
+    // Public self-signup: also create the new shop (Firm) this account owns.
+    const { firmName, firmLocation, firmSize } = req.body;
+    if (!firmName || !firmLocation || !firmSize) {
+      return res.status(400).json({
+        message: "Shop name, location and size are required to sign up",
+      });
+    }
+
+    const session = await mongoose.startSession();
+    try {
+      let newUser;
+      await session.withTransaction(async () => {
+        newUser = new UserModel({
+          name,
+          email,
+          contact,
+          password: hashedPassword,
+          role: "admin",
+        });
+        const newFirm = new FirmModel({
+          name: firmName,
+          location: firmLocation,
+          size: firmSize,
+          owner: newUser._id,
+        });
+        newUser.firm = newFirm._id;
+        await newFirm.save({ session });
+        await newUser.save({ session });
+      });
+      res
+        .status(201)
+        .json({ message: "Shop registered successfully", user: newUser });
+    } finally {
+      await session.endSession();
+    }
   } catch (error) {
     console.error("Error registering user:", error);
     res.status(500).json({ message: "Somthing went wrong" });
@@ -96,7 +146,10 @@ module.exports.GetAllUsers = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const users = await UserModel.find({ removeAt: null });
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const users = await UserModel.find({ removeAt: null, firm: req.user.firm });
     res.status(200).json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -107,7 +160,10 @@ module.exports.GetAllUsers = async (req, res) => {
 module.exports.removeUser = async (req, res) => {
   const { userId } = req.params;
   try {
-    const user = await UserModel.findById(userId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const user = await UserModel.findOne({ _id: userId, firm: req.user.firm });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -127,7 +183,10 @@ module.exports.UpdateUser = async (req, res) => {
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
-    const user = await UserModel.findById(userId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const user = await UserModel.findOne({ _id: userId, firm: req.user.firm });
     if (!user || user.removeAt) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -154,7 +213,7 @@ module.exports.loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role, firm: user.firm },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -169,7 +228,7 @@ module.exports.loginUser = async (req, res) => {
     console.log(`[loginUser] issued token for userId=${user._id} dbName=${UserModel.db.name}`);
     res
       .status(200)
-      .json({ message: "Login successful", token, role: user.role });
+      .json({ message: "Login successful", token, role: user.role, firm: user.firm });
   } catch (error) {
     console.error("Error logging in user:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -186,8 +245,18 @@ module.exports.logoutUser = (req, res) => {
   res.status(200).json({ message: "Logout successful" });
 };
 
+// Bootstrap safety net only -- ordinarily a firm is created together with
+// its admin at public /register. Only usable by an admin who doesn't
+// already have a firm (e.g. an account created via the createAdmin.js seed
+// script), and it can only ever be used once per admin.
 module.exports.createFirm = async (req, res) => {
   try {
+    if (req.user.firm) {
+      return res
+        .status(400)
+        .json({ message: "Your account already has a firm" });
+    }
+
     const {
       name, location, size, gst, email, contact,
       bankName, branch, accountNo, ifscCode, proprietorName,
@@ -242,6 +311,9 @@ module.exports.createFirm = async (req, res) => {
 
     await newFirm.save();
 
+    req.user.firm = newFirm._id;
+    await req.user.save();
+
     return res.status(201).json({
       message: "Firm created successfully",
       firm: newFirm,
@@ -258,12 +330,13 @@ module.exports.createFirm = async (req, res) => {
 
 module.exports.updateFirm = async (req, res) => {
   try {
-    const { firmId } = req.body;
-    if (!firmId) {
-      return res.status(400).json({ message: "Firm ID is required for update." });
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
     }
 
-    const firm = await FirmModel.findById(firmId);
+    // Ignore any client-sent firmId -- an admin can only ever update their
+    // own firm.
+    const firm = await FirmModel.findOne({ _id: req.user.firm, removeAt: null });
     if (!firm) {
       return res.status(404).json({ message: "Firm not found." });
     }
@@ -327,12 +400,15 @@ module.exports.updateFirm = async (req, res) => {
   }
 };
 
-// Firms belong to the shop, not to whichever individual login created them —
-// every authenticated user (admin or staff) needs to see all of them, e.g.
-// staff picking a firm while creating a sale.
+// GemControl is single-firm-per-shop: a user only ever belongs to (and may
+// only ever see) their own firm.
 module.exports.getAllFirms = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const firms = await FirmModel.find({
+      _id: req.user.firm,
       removeAt: null,
     }).populate("owner", "name email");
     res.status(200).json(firms);
@@ -343,9 +419,13 @@ module.exports.getAllFirms = async (req, res) => {
 };
 
 module.exports.removeFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
-    const firm = await FirmModel.findOne({ _id: firmId, removeAt: null });
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    // Ignore any client-sent firmId -- an admin can only ever remove their
+    // own firm.
+    const firm = await FirmModel.findOne({ _id: req.user.firm, removeAt: null });
     if (!firm) {
       return res.status(404).json({ message: "Firm not found" });
     }
@@ -359,13 +439,17 @@ module.exports.removeFirm = async (req, res) => {
 };
 
 module.exports.AddCustomer = async (req, res) => {
-  const { name, email, contact, firm, address } = req.body;
+  const { name, email, contact, address } = req.body;
   try {
-    if (!name || !email || !contact || !firm || !address) {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!name || !email || !contact || !address) {
       return res.status(400).json({ message: "All fields are required" });
     }
     const existingCustomer = await CustomerModel.findOne({
       email: email,
+      firm: req.user.firm,
       removeAt: null,
     });
     if (existingCustomer) {
@@ -375,12 +459,13 @@ module.exports.AddCustomer = async (req, res) => {
       name,
       email,
       contact,
-      firm,
+      firm: req.user.firm,
       address,
     });
     await newCustomer.save();
     addActivity(
       req.user._id,
+      req.user.firm,
       "newCustomerAdded",
       `Added new Customer: ${name}`
     );
@@ -395,10 +480,13 @@ module.exports.AddCustomer = async (req, res) => {
 
 module.exports.getAllCustomers = async (req, res) => {
   try {
-    const customers = await CustomerModel.find({ removeAt: null }).populate(
-      "firm",
-      "name"
-    );
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const customers = await CustomerModel.find({
+      removeAt: null,
+      firm: req.user.firm,
+    }).populate("firm", "name");
     res.status(200).json(customers);
   } catch (error) {
     console.error("Error fetching customers:", error);
@@ -409,7 +497,10 @@ module.exports.getAllCustomers = async (req, res) => {
 module.exports.removeCustomer = async (req, res) => {
   const { customerId } = req.query;
   try {
-    const customer = await CustomerModel.findById(customerId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const customer = await CustomerModel.findOne({ _id: customerId, firm: req.user.firm });
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
     }
@@ -425,6 +516,9 @@ module.exports.removeCustomer = async (req, res) => {
 module.exports.createStockCategory = async (req, res) => {
   const { name, description } = req.body;
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
     if (!name || !description) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -438,11 +532,13 @@ module.exports.createStockCategory = async (req, res) => {
     const newCategory = new StockCategoryModel({
       name,
       description,
+      firm: req.user.firm,
       CategoryImg: imagePath,
     });
     await newCategory.save();
     addActivity(
       req.user._id,
+      req.user.firm,
       "addStockCategory",
       `Added new Stock category: ${name}`
     );
@@ -458,7 +554,13 @@ module.exports.createStockCategory = async (req, res) => {
 
 module.exports.getAllStockCategories = async (req, res) => {
   try {
-    const categories = await StockCategoryModel.find({ removeAt: null });
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const categories = await StockCategoryModel.find({
+      removeAt: null,
+      firm: req.user.firm,
+    });
     res.status(200).json(categories);
   } catch (error) {
     console.error("Error fetching stock categories:", error);
@@ -469,7 +571,10 @@ module.exports.getAllStockCategories = async (req, res) => {
 module.exports.removeStockCategory = async (req, res) => {
   const { categoryId } = req.query;
   try {
-    const category = await StockCategoryModel.findById(categoryId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const category = await StockCategoryModel.findOne({ _id: categoryId, firm: req.user.firm });
     if (!category) {
       return res.status(404).json({ message: "Stock category not found" });
     }
@@ -489,7 +594,6 @@ module.exports.Addstock = async (req, res) => {
     waight,
     karat,
     category,
-    firm,
     quantity,
     price,
     makingCharge, // legacy flat number, still accepted if makingChargeUnit isn't sent
@@ -507,6 +611,10 @@ module.exports.Addstock = async (req, res) => {
   } = req.body;
 
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+
     const grossWeightNum = grossWeight !== undefined && grossWeight !== ""
       ? Number(grossWeight)
       : Number(waight) || 0;
@@ -518,7 +626,6 @@ module.exports.Addstock = async (req, res) => {
       !materialgitType ||
       !netWeightNum ||
       !category ||
-      !firm ||
       !quantity ||
       !price
     ) {
@@ -526,6 +633,10 @@ module.exports.Addstock = async (req, res) => {
     }
     if ((materialgitType === "gold" || materialgitType === "diamond") && !karat) {
       return res.status(400).json({ message: "Karat is required for gold and diamond items" });
+    }
+    const categoryDoc = await StockCategoryModel.findOne({ _id: category, firm: req.user.firm });
+    if (!categoryDoc) {
+      return res.status(400).json({ message: "Category not found" });
     }
     const stockcode = `STOCK-${Date.now()}-${Math.random()
       .toString(10)
@@ -558,7 +669,7 @@ module.exports.Addstock = async (req, res) => {
       netWeight: netWeightNum,
       karat: materialgitType === "silver" ? "" : karat || "",
       category,
-      firm,
+      firm: req.user.firm,
       quantity,
       price: priceNum,
       wastage: { supplier: wastageSupplierNum, customer: wastageCustomerNum },
@@ -574,7 +685,7 @@ module.exports.Addstock = async (req, res) => {
 
     await newStock.save();
 
-    addActivity(req.user._id, "addStock", `Added new Stock: ${name}`);
+    addActivity(req.user._id, req.user.firm, "addStock", `Added new Stock: ${name}`);
     res
       .status(201)
       .json({ message: "Stock added successfully", stock: newStock });
@@ -592,7 +703,6 @@ module.exports.updateStock = async (req, res) => {
     waight,
     karat,
     category,
-    firm,
     quantity,
     price,
     makingCharge, // legacy flat number, still accepted if makingChargeUnit isn't sent
@@ -619,12 +729,14 @@ module.exports.updateStock = async (req, res) => {
     if (!stockId) {
       return res.status(400).json({ message: "Stock ID is required" });
     }
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
 
     // Trim and validate string fields
     const trimmedName = name ? String(name).trim() : "";
     const trimmedType = materialgitType ? String(materialgitType).trim() : "";
     const trimmedCategory = category ? String(category).trim() : "";
-    const trimmedFirm = firm ? String(firm).trim() : "";
 
     // Validate numeric fields
     const grossWeightNum = grossWeight !== undefined && grossWeight !== ""
@@ -651,7 +763,6 @@ module.exports.updateStock = async (req, res) => {
       isNaN(netWeightNum) ||
       netWeightNum <= 0 ||
       !trimmedCategory ||
-      !trimmedFirm ||
       isNaN(quantityNum) ||
       quantityNum < 0 ||
       isNaN(priceNum) ||
@@ -667,10 +778,19 @@ module.exports.updateStock = async (req, res) => {
       return res.status(400).json({ message: "Karat is required for gold and diamond items" });
     }
 
-    // Find existing stock
-    const stock = await StockModel.findById(stockId);
+    // Find existing stock -- scoped to the caller's firm so one firm can't
+    // edit another firm's stock item by ID.
+    const stock = await StockModel.findOne({ _id: stockId, firm: req.user.firm });
     if (!stock) {
       return res.status(404).json({ message: "Stock not found" });
+    }
+
+    const categoryDoc = await StockCategoryModel.findOne({
+      _id: trimmedCategory,
+      firm: req.user.firm,
+    });
+    if (!categoryDoc) {
+      return res.status(400).json({ message: "Category not found" });
     }
 
     const makingConfig = makingChargeUnit
@@ -703,7 +823,6 @@ module.exports.updateStock = async (req, res) => {
     stock.netWeight = netWeightNum;
     stock.karat = trimmedType === "silver" ? "" : karat || "";
     stock.category = trimmedCategory;
-    stock.firm = trimmedFirm;
     stock.quantity = quantityNum;
     stock.price = priceNum;
     stock.wastage = { supplier: wastageSupplierNum, customer: wastageCustomerNum };
@@ -733,7 +852,7 @@ module.exports.updateStock = async (req, res) => {
       .populate("category", "name")
       .populate("firm", "name");
 
-    addActivity(req.user._id, "updateStock", `Updated Stock: ${name}`);
+    addActivity(req.user._id, req.user.firm, "updateStock", `Updated Stock: ${name}`);
 
     res
       .status(200)
@@ -750,7 +869,10 @@ module.exports.updateStock = async (req, res) => {
 
 module.exports.getAllStocks = async (req, res) => {
   try {
-    const stocks = await StockModel.find({ removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const stocks = await StockModel.find({ removeAt: null, firm: req.user.firm })
       .populate("category", "name")
       .populate("firm", "name");
     res.status(200).json(stocks);
@@ -763,7 +885,10 @@ module.exports.getAllStocks = async (req, res) => {
 module.exports.removeStock = async (req, res) => {
   const { stockId } = req.query;
   try {
-    const stock = await StockModel.findById(stockId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const stock = await StockModel.findOne({ _id: stockId, firm: req.user.firm });
     if (!stock) {
       return res.status(404).json({ message: "Stock not found" });
     }
@@ -779,8 +904,12 @@ module.exports.removeStock = async (req, res) => {
 module.exports.getStockbyCategory = async (req, res) => {
   const { categoryId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const stocks = await StockModel.find({
       category: categoryId,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("category", "name")
@@ -792,10 +921,15 @@ module.exports.getStockbyCategory = async (req, res) => {
   }
 };
 
+// There is only ever one legitimate firm for the caller now, so this no
+// longer takes a client-supplied firmId -- it's equivalent to getAllStocks,
+// kept for backwards API compatibility with existing callers.
 module.exports.getStockbyFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
-    const stocks = await StockModel.find({ firm: firmId, removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const stocks = await StockModel.find({ firm: req.user.firm, removeAt: null })
       .populate("category", "name")
       .populate("firm", "name");
     res.status(200).json(stocks);
@@ -813,7 +947,6 @@ const STOCK_BULK_COLUMNS = [
   "materialgitType",
   "stockType",
   "category",
-  "firm",
   "grossWeight",
   "lessWeight",
   "karat",
@@ -831,16 +964,17 @@ const STOCK_BULK_COLUMNS = [
 
 module.exports.downloadStockBulkTemplate = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
     const XLSX = require("xlsx");
-    const categories = await StockCategoryModel.find({ removeAt: null });
-    const firms = await FirmModel.find({ removeAt: null });
+    const categories = await StockCategoryModel.find({ removeAt: null, firm: req.user.firm });
 
     const exampleRow = {
       name: "Gold Ring 22K",
       materialgitType: "gold",
       stockType: "wholesale",
       category: categories[0]?.name || "Ring",
-      firm: firms[0]?.name || "Your Firm Name",
       grossWeight: 10,
       lessWeight: 0.5,
       karat: "22K",
@@ -865,7 +999,6 @@ module.exports.downloadStockBulkTemplate = async (req, res) => {
       { field: "stockType", validValues: "wholesale, retail" },
       { field: "makingChargeUnit / labourChargeUnit", validValues: "fixed, per_gram, per_kg, per_mg, percent" },
       { field: "category", validValues: categories.map((c) => c.name).join(", ") || "(create a category first)" },
-      { field: "firm", validValues: firms.map((f) => f.name).join(", ") || "(create a firm first)" },
       { field: "karat", validValues: "24K, 23K, 22K, 20K, 18K (gold/diamond only, leave blank for silver)" },
     ];
     const instructionsSheet = XLSX.utils.json_to_sheet(instructions);
@@ -886,6 +1019,9 @@ module.exports.downloadStockBulkTemplate = async (req, res) => {
 
 module.exports.bulkImportStock = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
     if (!req.file) {
       return res.status(400).json({ message: "An Excel file is required" });
     }
@@ -898,14 +1034,12 @@ module.exports.bulkImportStock = async (req, res) => {
       return res.status(400).json({ message: "The uploaded sheet has no data rows" });
     }
 
-    const categories = await StockCategoryModel.find({ removeAt: null });
-    const firms = await FirmModel.find({ removeAt: null });
-    // Trim defensively — firm/category names entered via their own forms
-    // aren't trimmed on save, so stray leading/trailing whitespace ("Shri Ji
-    // Jwelleries ") would otherwise silently fail every case-insensitive
-    // match against a clean name typed into the spreadsheet.
+    const categories = await StockCategoryModel.find({ removeAt: null, firm: req.user.firm });
+    // Trim defensively — category names entered via their own form aren't
+    // trimmed on save, so stray leading/trailing whitespace ("Rings ")
+    // would otherwise silently fail every case-insensitive match against a
+    // clean name typed into the spreadsheet.
     const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
-    const firmByName = new Map(firms.map((f) => [f.name.trim().toLowerCase(), f]));
     const validMaterialTypes = ["gold", "silver", "platinum", "diamond", "other"];
     const validChargeUnits = ["fixed", "per_gram", "per_kg", "per_mg", "percent"];
 
@@ -917,7 +1051,6 @@ module.exports.bulkImportStock = async (req, res) => {
       const name = String(row.name || "").trim();
       const materialgitType = String(row.materialgitType || "").trim().toLowerCase();
       const categoryName = String(row.category || "").trim();
-      const firmName = String(row.firm || "").trim();
       const grossWeight = Number(row.grossWeight) || 0;
       const lessWeight = Number(row.lessWeight) || 0;
       const netWeight = Math.max(grossWeight - lessWeight, 0);
@@ -932,8 +1065,6 @@ module.exports.bulkImportStock = async (req, res) => {
       }
       const category = categoryByName.get(categoryName.toLowerCase());
       if (!category) rowErrors.push(`category "${categoryName}" not found`);
-      const firm = firmByName.get(firmName.toLowerCase());
-      if (!firm) rowErrors.push(`firm "${firmName}" not found`);
       if (!netWeight) rowErrors.push("grossWeight (after lessWeight) must be greater than 0");
       if (!quantity || isNaN(quantity) || quantity <= 0) rowErrors.push("quantity must be a positive number");
       if (!price || isNaN(price) || price <= 0) rowErrors.push("price must be a positive number");
@@ -970,7 +1101,7 @@ module.exports.bulkImportStock = async (req, res) => {
         netWeight,
         karat: materialgitType === "silver" ? "" : karat,
         category: category._id,
-        firm: firm._id,
+        firm: req.user.firm,
         quantity,
         price,
         wastage: { supplier: wastageSupplierNum, customer: wastageCustomerNum },
@@ -988,6 +1119,7 @@ module.exports.bulkImportStock = async (req, res) => {
       inserted = await StockModel.insertMany(toInsert);
       addActivity(
         req.user._id,
+        req.user.firm,
         "bulkAddStock",
         `Bulk-imported ${inserted.length} stock item(s) via Excel`
       );
@@ -1006,10 +1138,13 @@ module.exports.bulkImportStock = async (req, res) => {
 };
 
 module.exports.createRawMaterial = async (req, res) => {
-  const { name, materialType, quantity, firm } = req.body;
+  const { name, materialType, quantity } = req.body;
 
   try {
-    if (!name || !materialType || !quantity || !firm) {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!name || !materialType || !quantity) {
       return res.status(400).json({ message: "All fields are required" });
     }
     const RawMaterialcode = `RAW-${Date.now()}-${Math.random()
@@ -1021,11 +1156,12 @@ module.exports.createRawMaterial = async (req, res) => {
       quantity,
       rawmaterialImg: req.file ? getRelativeFilePath(req.file.path) : "",
       RawMaterialcode,
-      firm,
+      firm: req.user.firm,
     });
     await newRawMaterial.save();
     addActivity(
       req.user._id,
+      req.user.firm,
       "addRawMaterial",
       `Added new Raw material: ${name}`
     );
@@ -1041,8 +1177,12 @@ module.exports.createRawMaterial = async (req, res) => {
 
 module.exports.getAllRawMaterials = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const rawMaterials = await RawMaterialModel.find({
       removeAt: null,
+      firm: req.user.firm,
     }).populate("firm", "name");
     res.status(200).json(rawMaterials);
   } catch (error) {
@@ -1054,7 +1194,13 @@ module.exports.getAllRawMaterials = async (req, res) => {
 module.exports.removeRawMaterial = async (req, res) => {
   const { rawMaterialId } = req.query;
   try {
-    const rawMaterial = await RawMaterialModel.findById(rawMaterialId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const rawMaterial = await RawMaterialModel.findOne({
+      _id: rawMaterialId,
+      firm: req.user.firm,
+    });
     if (!rawMaterial) {
       return res.status(404).json({ message: "Raw material not found" });
     }
@@ -1066,11 +1212,16 @@ module.exports.removeRawMaterial = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+// There is only ever one legitimate firm for the caller now, so this no
+// longer takes a client-supplied firmId -- kept for backwards API
+// compatibility with existing callers.
 module.exports.getRawMaterialbyFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const rawMaterials = await RawMaterialModel.find({
-      firm: firmId,
+      firm: req.user.firm,
       removeAt: null,
     }).populate("firm", "name");
     res.status(200).json(rawMaterials);
@@ -1083,8 +1234,12 @@ module.exports.getRawMaterialbyFirm = async (req, res) => {
 module.exports.getRawMaterialbyType = async (req, res) => {
   const { materialType } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const rawMaterials = await RawMaterialModel.find({
       materialType,
+      firm: req.user.firm,
       removeAt: null,
     }).populate("firm", "name");
     res.status(200).json(rawMaterials);
@@ -1097,8 +1252,14 @@ module.exports.getRawMaterialbyType = async (req, res) => {
 module.exports.AddRawMaterialStock = async (req, res) => {
   const { rawMaterialId, quantity } = req.body;
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
     if (rawMaterialId && quantity) {
-      const rawMaterial = await RawMaterialModel.findById(rawMaterialId);
+      const rawMaterial = await RawMaterialModel.findOne({
+        _id: rawMaterialId,
+        firm: req.user.firm,
+      });
       if (!rawMaterial) {
         return res.status(404).json({ message: "Raw material not found" });
       }
@@ -1107,6 +1268,7 @@ module.exports.AddRawMaterialStock = async (req, res) => {
       await rawMaterial.save();
       addActivity(
         req.user._id,
+        req.user.firm,
         "addRawMaterialStock",
         `Added raw material stock for ${rawMaterial.name} for quantity ${quantity}`
       );
@@ -1201,7 +1363,7 @@ module.exports.createDailrate = async (req, res) => {
       },
     });
     await newDailrate.save();
-    addActivity(req.user._id, "todaysRateAdded", ` todays rate Added.`);
+    addActivity(req.user._id, req.user.firm, "todaysRateAdded", ` todays rate Added.`);
     res.status(201).json({
       message: "Daily rate created successfully",
       dailrate: newDailrate,
@@ -1282,7 +1444,7 @@ module.exports.updateDailrate = async (req, res) => {
         .json({ message: "Daily rate record not found for update." });
     }
 
-    addActivity(req.user._id, "updateDailrate", `Updated daily rate for date.`);
+    addActivity(req.user._id, req.user.firm, "updateDailrate", `Updated daily rate for date.`);
 
     res.status(200).json({
       message: "Daily rate updated successfully",
@@ -1307,7 +1469,6 @@ module.exports.createSale = async (req, res) => {
   const {
     items,
     customer,
-    firm,
     totalAmount,
     paymentMethod,
     paymentAmount,
@@ -1321,15 +1482,23 @@ module.exports.createSale = async (req, res) => {
   console.log("Received sale data:", req.body); // Debug log
 
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const firm = req.user.firm;
     const hasSplitPayments = Array.isArray(payments) && payments.length > 0;
     if (
       !items ||
       !customer ||
-      !firm ||
       !totalAmount ||
       (!hasSplitPayments && (!paymentMethod || paymentAmount === undefined))
     ) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const customerDocForFirmCheck = await CustomerModel.findOne({ _id: customer, firm });
+    if (!customerDocForFirmCheck) {
+      return res.status(404).json({ message: "Customer not found" });
     }
 
     // Subtract value of stock and raw material, and snapshot the details
@@ -1337,7 +1506,7 @@ module.exports.createSale = async (req, res) => {
     // rate or making charge changes afterwards.
     for (const item of items) {
       if (item.saleType === "stock") {
-        const stock = await StockModel.findById(item.salematerialId);
+        const stock = await StockModel.findOne({ _id: item.salematerialId, firm });
         if (!stock) {
           return res.status(404).json({ message: "Stock not found" });
         }
@@ -1377,9 +1546,10 @@ module.exports.createSale = async (req, res) => {
         item.wastageAmount =
           Math.round(stock.price * ((stock.wastage?.customer || 0) / 100) * 100) / 100;
       } else {
-        const rawMaterial = await RawMaterialModel.findById(
-          item.salematerialId
-        );
+        const rawMaterial = await RawMaterialModel.findOne({
+          _id: item.salematerialId,
+          firm,
+        });
         if (!rawMaterial) {
           return res.status(404).json({ message: "Raw material not found" });
         }
@@ -1493,11 +1663,11 @@ module.exports.createSale = async (req, res) => {
       });
       await udhar.save();
     }
-    const customerDoc = await CustomerModel.findById(customer);
-    const CustomerName = customerDoc.name;
+    const CustomerName = customerDocForFirmCheck.name;
     const paidTotal = paymentsArr.reduce((sum, p) => sum + p.amount, 0);
     addActivity(
       req.user._id,
+      req.user.firm,
       "sale",
       `Sale created for Customer : ${CustomerName} Product : ${items
         .map((item) => item.name || item.saleType)
@@ -1524,7 +1694,10 @@ module.exports.createSale = async (req, res) => {
 
 module.exports.getAllSales = async (req, res) => {
   try {
-    const sales = await SaleModel.find({ removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const sales = await SaleModel.find({ removeAt: null, firm: req.user.firm })
       .populate("customer")
       .populate({ path: "firm", populate: { path: "owner", select: "name email" } })
       .populate("items.saleType", "name");
@@ -1538,7 +1711,10 @@ module.exports.getAllSales = async (req, res) => {
 module.exports.removeSale = async (req, res) => {
   const { saleId } = req.query;
   try {
-    const sale = await SaleModel.findById(saleId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const sale = await SaleModel.findOne({ _id: saleId, firm: req.user.firm });
     if (!sale) {
       return res.status(404).json({ message: "Sale not found" });
     }
@@ -1554,7 +1730,14 @@ module.exports.removeSale = async (req, res) => {
 module.exports.getSaleByCustomer = async (req, res) => {
   const { customerId } = req.query;
   try {
-    const sales = await SaleModel.find({ customer: customerId, removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const sales = await SaleModel.find({
+      customer: customerId,
+      firm: req.user.firm,
+      removeAt: null,
+    })
       .populate("customer")
       .populate({ path: "firm", populate: { path: "owner", select: "name email" } })
       .populate("items.saleType", "name");
@@ -1565,10 +1748,15 @@ module.exports.getSaleByCustomer = async (req, res) => {
   }
 };
 
+// There is only ever one legitimate firm for the caller now, so this no
+// longer takes a client-supplied firmId -- kept for backwards API
+// compatibility with existing callers.
 module.exports.getSaleByFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
-    const sales = await SaleModel.find({ firm: firmId, removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const sales = await SaleModel.find({ firm: req.user.firm, removeAt: null })
       .populate("customer")
       .populate({ path: "firm", populate: { path: "owner", select: "name email" } })
       .populate("items.saleType", "name");
@@ -1582,8 +1770,12 @@ module.exports.getSaleByFirm = async (req, res) => {
 module.exports.getSaleByDate = async (req, res) => {
   const { date } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const sales = await SaleModel.find({
       saleDate: new Date(date),
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("customer")
@@ -1599,8 +1791,12 @@ module.exports.getSaleByDate = async (req, res) => {
 module.exports.getSaleByPaymentMethod = async (req, res) => {
   const { paymentMethod } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const sales = await SaleModel.find({
       paymentMethod,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("customer")
@@ -1615,7 +1811,10 @@ module.exports.getSaleByPaymentMethod = async (req, res) => {
 
 module.exports.getAllPayments = async (req, res) => {
   try {
-    const payments = await PaymentModel.find({ removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const payments = await PaymentModel.find({ removeAt: null, firm: req.user.firm })
       .populate("sale", "items totalAmount")
       .populate("customer", "name email")
       .populate("firm", "name");
@@ -1629,8 +1828,12 @@ module.exports.getAllPayments = async (req, res) => {
 module.exports.getPaymentByCustomer = async (req, res) => {
   const { customerId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const payments = await PaymentModel.find({
       customer: customerId,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("sale", "items totalAmount")
@@ -1643,11 +1846,16 @@ module.exports.getPaymentByCustomer = async (req, res) => {
   }
 };
 
+// There is only ever one legitimate firm for the caller now, so this no
+// longer takes a client-supplied firmId -- kept for backwards API
+// compatibility with existing callers.
 module.exports.getPaymentByFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const payments = await PaymentModel.find({
-      firm: firmId,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("sale", "items totalAmount")
@@ -1663,8 +1871,12 @@ module.exports.getPaymentByFirm = async (req, res) => {
 module.exports.getPaymentBydate = async (req, res) => {
   const { date } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const payments = await PaymentModel.find({
       paymentDate: new Date(date),
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("sale", "items totalAmount")
@@ -1680,8 +1892,12 @@ module.exports.getPaymentBydate = async (req, res) => {
 module.exports.getPaymentByPaymentMethod = async (req, res) => {
   const { paymentMethod } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const payments = await PaymentModel.find({
       paymentType: paymentMethod,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("sale", "items totalAmount")
@@ -1696,9 +1912,13 @@ module.exports.getPaymentByPaymentMethod = async (req, res) => {
 
 module.exports.getAllUdhar = async (req, res) => {
   try {
-    const udhar = await UdharModel.find({ removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const udhar = await UdharModel.find({ removeAt: null, firm: req.user.firm })
       .populate("customer", "name email")
-      .populate("firm", "name");
+      .populate("firm", "name")
+      .populate("sale", "invoiceNumber");
     res.status(200).json(udhar);
   } catch (error) {
     console.error("Error fetching udhar:", error);
@@ -1709,8 +1929,12 @@ module.exports.getAllUdhar = async (req, res) => {
 module.exports.getUdharByCustomer = async (req, res) => {
   const { customerId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udhar = await UdharModel.find({
       customer: customerId,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("customer", "name email")
@@ -1722,11 +1946,16 @@ module.exports.getUdharByCustomer = async (req, res) => {
   }
 };
 
+// There is only ever one legitimate firm for the caller now, so this no
+// longer takes a client-supplied firmId -- kept for backwards API
+// compatibility with existing callers.
 module.exports.getUdharByFirm = async (req, res) => {
-  const { firmId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udhar = await UdharModel.find({
-      firm: firmId,
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("customer", "name email")
@@ -1741,8 +1970,12 @@ module.exports.getUdharByFirm = async (req, res) => {
 module.exports.getUdharByDate = async (req, res) => {
   const { date } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udhar = await UdharModel.find({
       createdAt: new Date(date),
+      firm: req.user.firm,
       removeAt: null,
     })
       .populate("customer", "name email")
@@ -1760,7 +1993,10 @@ module.exports.setelUdhar = async (req, res) => {
     if (!udharId || !amount) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const udhar = await UdharModel.findById(udharId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const udhar = await UdharModel.findOne({ _id: udharId, firm: req.user.firm });
     if (!udhar) {
       return res.status(404).json({ message: "Udhar not found" });
     }
@@ -1801,6 +2037,7 @@ module.exports.setelUdhar = async (req, res) => {
 
     addActivity(
       req.user._id,
+      req.user.firm,
       "udharSettlement",
       `Settled udhar for Customer : ${CustomerName} Amount : ${amount}`
     );
@@ -1817,11 +2054,15 @@ module.exports.setelUdhar = async (req, res) => {
 
 module.exports.getAllUdharSetelment = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udharSetelments = await udharsetelmentModel
-      .find({ removeAt: null })
+      .find({ removeAt: null, firm: req.user.firm })
       .populate("udhar", "amount")
       .populate("customer", "name email")
-      .populate("firm", "name");
+      .populate("firm", "name")
+      .populate("sale", "invoiceNumber");
     res.status(200).json(udharSetelments);
   } catch (error) {
     console.error("Error fetching udhar setelments:", error);
@@ -1832,9 +2073,13 @@ module.exports.getAllUdharSetelment = async (req, res) => {
 module.exports.getUdharSetelmentByCustomer = async (req, res) => {
   const { customerId } = req.query;
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udharSetelments = await udharsetelmentModel
       .find({
         customer: customerId,
+        firm: req.user.firm,
         removeAt: null,
       })
       .populate("udhar", "amount")
@@ -1853,9 +2098,13 @@ module.exports.getUdharsetelmentBydate = async (req, res) => {
     return res.status(400).json({ message: "Date is required" });
   }
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const udharSetelments = await udharsetelmentModel
       .find({
         paymentDate: date,
+        firm: req.user.firm,
         removeAt: null,
       })
       .populate("udhar", "amount")
@@ -1871,6 +2120,9 @@ module.exports.getUdharsetelmentBydate = async (req, res) => {
 
 module.exports.getFiveMonthlySales = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const today = new Date();
     const lastFiveMonths = [];
     for (let i = 0; i < 5; i++) {
@@ -1891,6 +2143,7 @@ module.exports.getFiveMonthlySales = async (req, res) => {
             $match: {
               saleDate: { $gte: startOfMonth, $lte: endOfMonth },
               removeAt: null,
+              firm: req.user.firm,
             },
           },
           {
@@ -1918,6 +2171,10 @@ module.exports.getFiveMonthlySales = async (req, res) => {
 // ============ DAY BOOK — one day's full ledger, date-filterable ============
 module.exports.getDayBook = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const firm = req.user.firm;
     const { date } = req.query;
     const day = date ? new Date(date) : new Date();
     if (isNaN(day.getTime())) {
@@ -1930,18 +2187,20 @@ module.exports.getDayBook = async (req, res) => {
     const range = { $gte: startOfDay, $lte: endOfDay };
 
     const [sales, payments, newStock, udharGiven, udharSettled] = await Promise.all([
-      SaleModel.find({ saleDate: range, removeAt: null })
+      SaleModel.find({ saleDate: range, removeAt: null, firm })
         .populate("customer", "name contact")
         .populate("firm", "name")
         .sort({ createdAt: -1 }),
-      PaymentModel.find({ paymentDate: range, removeAt: null })
+      PaymentModel.find({ paymentDate: range, removeAt: null, firm })
         .populate("customer", "name")
         .populate("firm", "name"),
-      StockModel.find({ createdAt: range })
+      StockModel.find({ createdAt: range, firm })
         .populate("category", "name")
         .populate("firm", "name"),
-      UdharModel.find({ createdAt: range, removeAt: null }).populate("customer", "name"),
-      udharsetelmentModel.find({ createdAt: range, removeAt: null }).populate("customer", "name"),
+      UdharModel.find({ createdAt: range, removeAt: null, firm }).populate("customer", "name"),
+      udharsetelmentModel
+        .find({ createdAt: range, removeAt: null, firm })
+        .populate("customer", "name"),
     ]);
 
     const paymentsByMode = payments.reduce((acc, p) => {
@@ -1984,7 +2243,6 @@ module.exports.AddGierviItem = async (req, res) => {
     itemDescription,
     interestRate,
     Customer,
-    firm,
     lastDateToTake,
   } = req.body;
 
@@ -2001,13 +2259,19 @@ module.exports.AddGierviItem = async (req, res) => {
     !itemDescription ||
     !interestRate ||
     !Customer ||
-    !firm ||
     !lastDateToTake ||
     !itemImage
   ) {
     return res.status(400).json({ message: "All fields (including item image) are required" });
   }
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const customerDoc = await CustomerModel.findOne({ _id: Customer, firm: req.user.firm });
+    if (!customerDoc) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
     const newGierviItem = new GirviModel({
       itemName,
       itemType,
@@ -2020,7 +2284,7 @@ module.exports.AddGierviItem = async (req, res) => {
       itemDescription,
       interestRate,
       Customer,
-      firm,
+      firm: req.user.firm,
       lastDateToTake,
       itemImage: itemImage,
       status: 'active',
@@ -2032,6 +2296,7 @@ module.exports.AddGierviItem = async (req, res) => {
     await newGierviItem.save();
     addActivity(
       req.user._id,
+      req.user.firm,
       "addGierviItem",
       `Added new Girvi item: ${itemName} for ₹${principal} at ${interestRate}% interest`
     );
@@ -2054,7 +2319,6 @@ module.exports.updateGirviItem = async (req, res) => {
     itemValue,
     itemDescription,
     Customer,
-    firm,
     lastDateToTake,
   } = req.body;
 
@@ -2065,22 +2329,32 @@ module.exports.updateGirviItem = async (req, res) => {
   }
 
   try {
-    const gierviItem = await GirviModel.findById(_id);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const gierviItem = await GirviModel.findOne({ _id, firm: req.user.firm });
 
     if (!gierviItem) {
       return res.status(404).json({ message: "Girvi item not found." });
     }
 
-    // principalAmount and interestRate are fixed at creation time and are
-    // intentionally not editable here — changing them after money has
-    // changed hands would invalidate the loan's interest history.
+    if (Customer) {
+      const customerDoc = await CustomerModel.findOne({ _id: Customer, firm: req.user.firm });
+      if (!customerDoc) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+    }
+
+    // principalAmount, interestRate, and firm are fixed at creation time and
+    // are intentionally not editable here — changing them after money has
+    // changed hands would invalidate the loan's interest history (and a
+    // firm's items must always stay theirs).
     gierviItem.itemName = itemName;
     gierviItem.itemType = itemType;
     gierviItem.itemWeight = itemWeight;
     gierviItem.itemValue = itemValue;
     gierviItem.itemDescription = itemDescription;
     gierviItem.Customer = Customer;
-    gierviItem.firm = firm;
     gierviItem.lastDateToTake = lastDateToTake;
 
     if (req.file) {
@@ -2108,7 +2382,10 @@ module.exports.updateGirviItem = async (req, res) => {
 
 module.exports.getAllGierviItems = async (req, res) => {
   try {
-    const gierviItems = await GirviModel.find({ removeAt: null })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const gierviItems = await GirviModel.find({ removeAt: null, firm: req.user.firm })
       .populate("Customer", "name email")
       .populate("firm", "name");
     res.status(200).json(gierviItems);
@@ -2128,7 +2405,10 @@ module.exports.removeGierviItem = async (req, res) => {
   }
 
   try {
-    const gierviItem = await GirviModel.findById(girviItemId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const gierviItem = await GirviModel.findOne({ _id: girviItemId, firm: req.user.firm });
 
     if (!gierviItem) {
       return res.status(404).json({ message: "Girvi item not found." });
@@ -2169,7 +2449,10 @@ module.exports.changelastdatetoTake = async (req, res) => {
         .status(400)
         .json({ message: "Giervi item ID and new last date are required" });
     }
-    const gierviItem = await GirviModel.findById(gierviItemId);
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const gierviItem = await GirviModel.findOne({ _id: gierviItemId, firm: req.user.firm });
     if (!gierviItem) {
       return res.status(404).json({ message: "Giervi item not found" });
     }
@@ -2187,28 +2470,35 @@ module.exports.changelastdatetoTake = async (req, res) => {
 // deshbord api to show all total customers , total sales   total stock value  todays rate of gold  sliver and daimond
 module.exports.getDashboardData = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const firm = req.user.firm;
+
     const totalCustomers = await CustomerModel.countDocuments({
       removeAt: null,
+      firm,
     });
-    
+
     // Fix: Calculate total sales revenue instead of count
     const totalSalesData = await SaleModel.aggregate([
-      { $match: { removeAt: null } },
+      { $match: { removeAt: null, firm } },
       { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" } } },
     ]);
     const totalSalesRevenue = totalSalesData.length > 0 ? totalSalesData[0].totalRevenue : 0;
-    
+
     // Also get the count of sales for reference
-    const totalSalesCount = await SaleModel.countDocuments({ removeAt: null });
-    
+    const totalSalesCount = await SaleModel.countDocuments({ removeAt: null, firm });
+
     const totalStocks = await StockModel.aggregate([
-      { $match: { removeAt: null } },
+      { $match: { removeAt: null, firm } },
       { $group: { _id: null, totalValue: { $sum: "$totalValue" } } },
     ]);
     const totalRawMaterials = await RawMaterialModel.aggregate([
-      { $match: { removeAt: null } },
+      { $match: { removeAt: null, firm } },
       { $group: { _id: null, totalWeight: { $sum: "$weight" } } },
     ]);
+    // Daily rates are intentionally global/shared across all firms.
     const todayRate = await DailrateModel.findOne({
       date: new Date().toISOString().slice(0, 10),
     });
@@ -2231,6 +2521,9 @@ module.exports.getDashboardData = async (req, res) => {
 //api to show total sales monthly for the last 5 months
 module.exports.getMonthlySalesData = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
     const today = new Date();
     const lastFiveMonths = [];
     for (let i = 0; i < 5; i++) {
@@ -2251,6 +2544,7 @@ module.exports.getMonthlySalesData = async (req, res) => {
             $match: {
               saleDate: { $gte: startOfMonth, $lte: endOfMonth },
               removeAt: null,
+              firm: req.user.firm,
             },
           },
           {
@@ -2276,10 +2570,11 @@ module.exports.getMonthlySalesData = async (req, res) => {
 };
 
 //write a funxtion to add activites
-const addActivity = async (userId, activityType, description) => {
+const addActivity = async (userId, firm, activityType, description) => {
   try {
     const newActivity = new ActivityModel({
       userId,
+      firm,
       activityType,
       description,
       timestamp: new Date(),
@@ -2294,10 +2589,16 @@ const addActivity = async (userId, activityType, description) => {
 };
 
 //api to get recent 10 activities ONLY SHOW THE DESC AND TYPE AND TIMESTAMP
-//admins see everyone's activity; staff only ever see their own
+//admins see their whole firm's activity; staff only ever see their own
 module.exports.getRecentActivities = async (req, res) => {
   try {
-    const filter = req.user.role?.toLowerCase() === "admin" ? {} : { userId: req.user._id };
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const filter =
+      req.user.role?.toLowerCase() === "admin"
+        ? { firm: req.user.firm }
+        : { firm: req.user.firm, userId: req.user._id };
     const activities = await ActivityModel.find(filter)
       .select("description activityType timestamp")
       .sort({ timestamp: -1 })
@@ -2310,10 +2611,16 @@ module.exports.getRecentActivities = async (req, res) => {
 };
 
 //api to get all activities only show description and activityType
-//admins see everyone's activity; staff only ever see their own
+//admins see their whole firm's activity; staff only ever see their own
 module.exports.getAllActivities = async (req, res) => {
   try {
-    const filter = req.user.role?.toLowerCase() === "admin" ? {} : { userId: req.user._id };
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const filter =
+      req.user.role?.toLowerCase() === "admin"
+        ? { firm: req.user.firm }
+        : { firm: req.user.firm, userId: req.user._id };
     const activities = await ActivityModel.find(filter).select(
       "description activityType"
     );
@@ -2331,7 +2638,10 @@ module.exports.calculateGirviInterest = async (req, res) => {
   const { girviId } = req.params;
 
   try {
-    const girviItem = await GirviModel.findById(girviId)
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const girviItem = await GirviModel.findOne({ _id: girviId, firm: req.user.firm })
       .populate('Customer', 'name email')
       .populate('firm', 'name');
 
@@ -2363,12 +2673,17 @@ module.exports.calculateGirviInterest = async (req, res) => {
   }
 };
 
-// Update Girvi with calculated interest (monthly cron job function)
+// Manually trigger the monthly interest accrual for the caller's own firm
+// (the same accrual also runs system-wide on a schedule -- see cronJobs.js).
 module.exports.updateGirviInterestMonthly = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
     const activeGirviItems = await GirviModel.find({
       status: 'active',
-      removeAt: null
+      removeAt: null,
+      firm: req.user.firm,
     });
 
     const updatedItems = [];
@@ -2398,6 +2713,7 @@ module.exports.updateGirviInterestMonthly = async (req, res) => {
 
         addActivity(
           req.user?._id || 'system',
+          girviItem.firm,
           'girviInterestCalculated',
           `Monthly interest calculated for ${girviItem.itemName}: ₹${preview.interestAmount}`
         );
@@ -2422,8 +2738,14 @@ module.exports.addGirviPayment = async (req, res) => {
     if (!girviId || !amount || !paymentMethod) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
 
-    const girviItem = await GirviModel.findById(girviId).populate('Customer', 'name email');
+    const girviItem = await GirviModel.findOne({ _id: girviId, firm: req.user.firm }).populate(
+      'Customer',
+      'name email'
+    );
     if (!girviItem) {
       return res.status(404).json({ message: "Girvi item not found" });
     }
@@ -2458,6 +2780,7 @@ module.exports.addGirviPayment = async (req, res) => {
 
     addActivity(
       req.user._id,
+      req.user.firm,
       girviItem.status === 'redeemed' ? 'girviRedeemed' : 'girviPayment',
       girviItem.status === 'redeemed'
         ? `${girviItem.itemName} fully redeemed by ${girviItem.Customer.name} with a final payment of ₹${paymentEntry.amount}`
@@ -2478,13 +2801,19 @@ module.exports.addGirviPayment = async (req, res) => {
 // Get all interest records for a Girvi item
 module.exports.getGirviInterestHistory = async (req, res) => {
   const { girviId } = req.params;
-  
+
   try {
-    const interestHistory = await GirviInterestModel.find({ girvi: girviId })
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const interestHistory = await GirviInterestModel.find({
+      girvi: girviId,
+      firm: req.user.firm,
+    })
       .populate('customer', 'name email')
       .populate('firm', 'name')
       .sort({ calculationDate: -1 });
-    
+
     res.status(200).json(interestHistory);
   } catch (error) {
     console.error("Error fetching Girvi interest history:", error);
@@ -2495,9 +2824,13 @@ module.exports.getGirviInterestHistory = async (req, res) => {
 // Get all pending interest payments
 module.exports.getAllPendingInterests = async (req, res) => {
   try {
-    const pendingInterests = await GirviInterestModel.find({ 
+    if (!req.user.firm) {
+      return res.status(200).json([]);
+    }
+    const pendingInterests = await GirviInterestModel.find({
       status: 'pending',
-      removeAt: null 
+      removeAt: null,
+      firm: req.user.firm,
     })
     .populate({
       path: 'girvi',
@@ -2525,8 +2858,11 @@ module.exports.redeemGirviItem = async (req, res) => {
     if (!girviId || !paymentMethod) {
       return res.status(400).json({ message: "Girvi ID and payment method are required" });
     }
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
 
-    const girviItem = await GirviModel.findById(girviId)
+    const girviItem = await GirviModel.findOne({ _id: girviId, firm: req.user.firm })
       .populate('Customer', 'name email');
 
     if (!girviItem) {
@@ -2561,6 +2897,7 @@ module.exports.redeemGirviItem = async (req, res) => {
 
     addActivity(
       req.user._id,
+      req.user.firm,
       'girviRedeemed',
       `${girviItem.itemName} redeemed by ${girviItem.Customer.name} for ₹${finalAmount}`
     );
@@ -2584,8 +2921,11 @@ module.exports.redeemGirviItem = async (req, res) => {
 // Get Girvi summary for dashboard
 module.exports.getGirviSummary = async (req, res) => {
   try {
+    if (!req.user.firm) {
+      return res.status(200).json({ summary: [], pendingInterestRecords: 0 });
+    }
     const summary = await GirviModel.aggregate([
-      { $match: { removeAt: null } },
+      { $match: { removeAt: null, firm: req.user.firm } },
       {
         $group: {
           _id: '$status',
@@ -2600,7 +2940,8 @@ module.exports.getGirviSummary = async (req, res) => {
 
     const pendingInterests = await GirviInterestModel.countDocuments({
       status: 'pending',
-      removeAt: null
+      removeAt: null,
+      firm: req.user.firm,
     });
 
     res.status(200).json({
@@ -2617,49 +2958,60 @@ module.exports.getGirviSummary = async (req, res) => {
 // Builds the full-data export workbook and returns it as a Buffer. Shared by the
 // manual "Export All Data to Excel" HTTP handler below and the weekly automatic
 // export cron job (Backend/Utils/cronJobs.js), so both stay in sync.
-async function buildFullExportWorkbook() {
+// firmFilter: pass {} (the default) for a full, unscoped, system-wide backup
+// -- only ever used internally (the weekly cron export in cronJobs.js), never
+// reachable via any per-tenant HTTP route. Pass { firm: <id> } to scope the
+// export to one firm, which is what the HTTP route below always does.
+async function buildFullExportWorkbook(firmFilter = {}) {
     console.log('Starting Excel export...');
     const XLSX = require('xlsx');
+    // Firms are identified by _id, not a `firm` field, so build their own
+    // filter from the same firmFilter.firm value.
+    const firmIdFilter = firmFilter.firm ? { _id: firmFilter.firm } : {};
 
     console.log('Fetching data from database...');
     // Fetch all data from database with simpler queries
-    const customers = await CustomerModel.find({ removeAt: null }).lean();
+    const customers = await CustomerModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${customers.length} customers`);
-    
-    const sales = await SaleModel.find({ removeAt: null }).lean();
+
+    const sales = await SaleModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${sales.length} sales`);
-    
-    const stocks = await StockModel.find({ removeAt: null }).lean();
+
+    const stocks = await StockModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${stocks.length} stocks`);
-    
-    const rawMaterials = await RawMaterialModel.find({ removeAt: null }).lean();
+
+    const rawMaterials = await RawMaterialModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${rawMaterials.length} raw materials`);
-    
-    const payments = await PaymentModel.find({ removeAt: null }).lean();
+
+    const payments = await PaymentModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${payments.length} payments`);
-    
-    const udhar = await UdharModel.find({ removeAt: null }).lean();
+
+    const udhar = await UdharModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${udhar.length} udhar records`);
-    
-    const girvi = await GirviModel.find({ removeAt: null }).lean();
+
+    const girvi = await GirviModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${girvi.length} girvi records`);
-    
-    const girviInterest = await GirviInterestModel.find().lean();
+
+    const girviInterest = await GirviInterestModel.find(firmFilter).lean();
     console.log(`Fetched ${girviInterest.length} girvi interest records`);
-    
-    const firms = await FirmModel.find({ removeAt: null }).lean();
+
+    const firms = await FirmModel.find({ removeAt: null, ...firmIdFilter }).lean();
     console.log(`Fetched ${firms.length} firms`);
-    
-    const users = await UserModel.find({ removeAt: null }).select('-password').lean();
+
+    const users = await UserModel.find({ removeAt: null, ...firmFilter }).select('-password').lean();
     console.log(`Fetched ${users.length} users`);
-    
-    const categories = await StockCategoryModel.find({ removeAt: null }).lean();
+
+    const categories = await StockCategoryModel.find({ removeAt: null, ...firmFilter }).lean();
     console.log(`Fetched ${categories.length} categories`);
-    
+
+    // Daily rates are intentionally global/shared across all firms -- never
+    // filtered, even in a per-firm export.
     const dailRates = await DailrateModel.find().lean();
     console.log(`Fetched ${dailRates.length} daily rates`);
-    
-    const udharSettlements = await udharsetelmentModel.find({ removeAt: null }).lean();
+
+    const udharSettlements = await udharsetelmentModel
+      .find({ removeAt: null, ...firmFilter })
+      .lean();
     console.log(`Fetched ${udharSettlements.length} udhar settlements`);
 
     console.log('Creating workbook...');
@@ -2783,7 +3135,10 @@ async function buildFullExportWorkbook() {
 module.exports.buildFullExportWorkbook = buildFullExportWorkbook;
 module.exports.exportAllDataToExcel = async (req, res) => {
   try {
-    const excelBuffer = await buildFullExportWorkbook();
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const excelBuffer = await buildFullExportWorkbook({ firm: req.user.firm });
 
     console.log('Sending file to client...');
     const fileName = `GemControl_Export_${new Date().toISOString().split('T')[0]}.xlsx`;

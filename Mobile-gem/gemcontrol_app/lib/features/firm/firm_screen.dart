@@ -9,6 +9,7 @@ import '../../core/models/firm.dart';
 import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/firm_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 
@@ -19,6 +20,7 @@ class FirmScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final firmsAsync = ref.watch(firmsProvider);
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Firm Management'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(

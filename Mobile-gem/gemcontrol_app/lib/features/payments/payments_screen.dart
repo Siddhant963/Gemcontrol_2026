@@ -5,6 +5,7 @@ import '../../core/models/payment.dart';
 import '../../core/repositories/payment_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
@@ -27,6 +28,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   Widget build(BuildContext context) {
     final paymentsAsync = ref.watch(allPaymentsProvider);
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Payments Ledger'),
       body: Column(
         children: [

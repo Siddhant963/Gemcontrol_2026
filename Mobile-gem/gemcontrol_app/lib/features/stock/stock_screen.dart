@@ -8,6 +8,7 @@ import '../../core/models/stock.dart';
 import '../../core/repositories/stock_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'stock_form_sheet.dart';
@@ -45,8 +46,10 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
     final activeType = materialTypes[_tabController.index];
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(
         title: 'Stock Management',
+        showAppActions: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.category_outlined),
@@ -62,6 +65,9 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          padding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           tabs: [for (final t in materialTypes) Tab(text: materialTypeLabel(t))],
         ),
       ),
@@ -150,77 +156,83 @@ class _StockCard extends ConsumerWidget {
           builder: (_) => StockFormSheet(existing: stock),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm + 4),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                child: SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: stock.stockImg.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: resolveUploadUrl(stock.stockImg),
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const ColoredBox(
-                            color: AppColors.surfaceContainerHigh,
-                            child: Icon(Icons.diamond_outlined, color: AppColors.outline),
-                          ),
-                        )
-                      : const ColoredBox(
-                          color: AppColors.surfaceContainerHigh,
-                          child: Icon(Icons.diamond_outlined, color: AppColors.outline),
-                        ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm + 4),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                flex: 2,
+                child: Row(
                   children: [
-                    Text(
-                      stock.name,
-                      style: Theme.of(context).textTheme.titleLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadii.sm),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: stock.stockImg.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: resolveUploadUrl(stock.stockImg),
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => const ColoredBox(
+                                  color: AppColors.surfaceContainerHigh,
+                                  child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                                ),
+                              )
+                            : const ColoredBox(
+                                color: AppColors.surfaceContainerHigh,
+                                child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                              ),
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${stock.stockCode} · ${stock.netWeight.toStringAsFixed(2)}g'
-                      '${stock.karat.isNotEmpty ? " · ${stock.karat}" : ""}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            stock.name,
+                            style: Theme.of(context).textTheme.titleLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${stock.netWeight.toStringAsFixed(2)}g',
+                            style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text('Qty ${stock.quantity.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(formatInr(stock.price, decimals: false), style: AppTheme.numericData(context)),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Delete stock item?'),
-                          content: Text('Remove "${stock.name}"?'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        await ref.read(stockRepositoryProvider).removeStock(stock.id);
-                        ref.invalidate(stockListProvider);
-                      }
-                    },
-                  ),
-                ],
+              Expanded(
+                child: Text(
+                  formatInr(stock.price, decimals: false),
+                  textAlign: TextAlign.center,
+                  style: AppTheme.numericData(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete stock item?'),
+                      content: Text('Remove "${stock.name}"?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref.read(stockRepositoryProvider).removeStock(stock.id);
+                    ref.invalidate(stockListProvider);
+                  }
+                },
               ),
             ],
           ),

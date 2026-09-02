@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/sale.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
@@ -24,7 +25,8 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(allSalesProvider);
     return Scaffold(
-      appBar: GcAppBar(title: 'Sales History'),
+      drawer: const AppDrawer(),
+      appBar: GcAppBar(title: 'Sales History', showAppActions: true),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/sales/new'),
         icon: const Icon(Icons.add),
@@ -72,23 +74,55 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                   itemBuilder: (context, i) {
                     final sale = filtered[i];
                     return Card(
-                      child: ListTile(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadii.card),
                         onTap: () => context.push('/sales/${sale.id}', extra: sale),
-                        title: Text(
-                          sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Sale',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          '${sale.customerName ?? "-"} · ${formatDate(sale.saleDate)}',
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(formatInr(sale.totalAmount, decimals: false), style: AppTheme.numericData(context)),
-                            const SizedBox(height: 4),
-                            StatusChip(label: sale.paymentMethod),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Sale',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${sale.customerName ?? "-"} · ${formatDate(sale.saleDate)}',
+                                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    StatusChip(label: sale.paymentMethod),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  formatInr(sale.totalAmount, decimals: false),
+                                  textAlign: TextAlign.center,
+                                  style: AppTheme.numericData(context),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
+                                onPressed: () => context.push('/sales/${sale.id}', extra: sale),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

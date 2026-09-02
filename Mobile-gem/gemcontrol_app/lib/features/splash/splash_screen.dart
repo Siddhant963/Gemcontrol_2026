@@ -38,7 +38,7 @@ class SplashScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             Text(
               'GemControl',
-              style: GoogleFonts.bodoniModa(
+              style: GoogleFonts.openSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
                 color: AppColors.onBackground,

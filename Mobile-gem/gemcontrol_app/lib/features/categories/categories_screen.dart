@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/stock_category.dart';
 import '../../core/repositories/stock_category_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'categories_providers.dart';
@@ -20,6 +21,7 @@ class CategoriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Categories'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddSheet(context, ref),
@@ -33,15 +35,10 @@ class CategoriesScreen extends ConsumerWidget {
           icon: Icons.category_outlined,
           message: 'No categories yet.\nTap + to add one.',
         ),
-        data: (categories) => GridView.builder(
+        data: (categories) => ListView.separated(
           padding: const EdgeInsets.all(AppSpacing.md),
           itemCount: categories.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: AppSpacing.sm,
-            crossAxisSpacing: AppSpacing.sm,
-            childAspectRatio: 1.1,
-          ),
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
           itemBuilder: (context, i) {
             final c = categories[i];
             return _CategoryCard(
@@ -79,13 +76,15 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm + 4),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: SizedBox(
+                width: 48,
+                height: 48,
                 child: category.categoryImg.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: resolveUploadUrl(category.categoryImg),
@@ -94,22 +93,30 @@ class _CategoryCard extends StatelessWidget {
                       )
                     : const _CategoryPlaceholder(),
               ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Text(
-                  category.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (category.description.isNotEmpty)
+                    Text(
+                      category.description,
+                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
-            ],
-          ),
-          Positioned(
-            right: 2,
-            top: 2,
-            child: IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
               onPressed: () => showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -131,8 +138,8 @@ class _CategoryCard extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -3,8 +3,12 @@ const StockCategorySchema = mongoose.Schema({
           name: {
           type: String,
           required: true,
-          unique: true,
           trim: true
+          },
+          firm: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Firm',
+          required: true
           },
           description: {
           type: String,
@@ -23,4 +27,6 @@ const StockCategorySchema = mongoose.Schema({
           default: null
           }
           });
+// Categories are per-firm — two shops can both have a "Rings" category.
+StockCategorySchema.index({ firm: 1, name: 1 }, { unique: true });
 module.exports = mongoose.model('StockCategory', StockCategorySchema);
