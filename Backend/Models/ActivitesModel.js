@@ -6,6 +6,11 @@ const ActivitesShecma = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    firm: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Firm",
+      default: null,
+    },
     activityType: {
       type: String,
       required: true,

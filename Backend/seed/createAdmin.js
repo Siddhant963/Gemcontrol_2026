@@ -1,7 +1,8 @@
-// One-time bootstrap for the first admin account. Public self-registration has
-// been removed (only a logged-in admin can create accounts from the app), so
-// this script is the only way to create the very first admin directly in the
-// database.
+// Emergency bootstrap only. Ordinarily a new shop signs up via the public
+// POST /register endpoint, which creates the Firm and its admin together.
+// This script creates a bare admin with NO firm attached -- it must be
+// followed by seed/migrateFirmIsolation.js (or a manual firm assignment)
+// before the account is usable.
 //
 // Usage:
 //   node seed/createAdmin.js "Admin Name" admin@example.com 9999999999 yourPassword

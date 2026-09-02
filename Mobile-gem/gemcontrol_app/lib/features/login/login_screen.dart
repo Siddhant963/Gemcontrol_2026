@@ -84,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Center(
                     child: Text(
                       'GemControl',
-                      style: GoogleFonts.bodoniModa(
+                      style: GoogleFonts.openSans(
                         fontSize: 30,
                         fontWeight: FontWeight.w700,
                       ),

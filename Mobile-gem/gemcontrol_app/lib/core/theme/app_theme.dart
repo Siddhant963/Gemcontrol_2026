@@ -3,8 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Colors and type scale lifted from the Stitch "GemControl ERP UI" design
 /// system (project 7189669442381491281) — "Boutique Banking": champagne gold
-/// + charcoal, Bodoni Moda serif for headings/currency, Hanken Grotesk sans
-/// for UI/data.
+/// + charcoal, Open Sans throughout for headings, UI, and currency/data.
 class AppColors {
   AppColors._();
 
@@ -70,26 +69,25 @@ class AppTheme {
   AppTheme._();
 
   static TextTheme _textTheme(TextTheme base) {
-    final serif = GoogleFonts.bodoniModaTextTheme(base);
-    final sans = GoogleFonts.hankenGroteskTextTheme(base);
+    final sans = GoogleFonts.openSansTextTheme(base);
     return sans.copyWith(
-      displayLarge: serif.displayLarge?.copyWith(
+      displayLarge: sans.displayLarge?.copyWith(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         height: 40 / 32,
         letterSpacing: -0.02 * 32,
       ),
-      headlineMedium: serif.headlineMedium?.copyWith(
+      headlineMedium: sans.headlineMedium?.copyWith(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         height: 32 / 24,
       ),
-      headlineSmall: serif.headlineSmall?.copyWith(
+      headlineSmall: sans.headlineSmall?.copyWith(
         fontSize: 20,
         fontWeight: FontWeight.w500,
         height: 28 / 20,
       ),
-      titleLarge: serif.titleLarge?.copyWith(
+      titleLarge: sans.titleLarge?.copyWith(
         fontSize: 18,
         fontWeight: FontWeight.w600,
       ),
@@ -103,10 +101,9 @@ class AppTheme {
     );
   }
 
-  /// Text style for currency / gram-weight / SKU figures — always the serif
-  /// "numeric-data" style so financial figures read as substantial.
+  /// Text style for currency / gram-weight / SKU figures.
   static TextStyle numericData(BuildContext context) =>
-      GoogleFonts.bodoniModa(fontSize: 18, fontWeight: FontWeight.w600);
+      GoogleFonts.openSans(fontSize: 18, fontWeight: FontWeight.w600);
 
   static ThemeData light() {
     final colorScheme = const ColorScheme.light(
@@ -148,7 +145,7 @@ class AppTheme {
         foregroundColor: AppColors.onBackground,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.bodoniModa(
+        titleTextStyle: GoogleFonts.openSans(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.onBackground,

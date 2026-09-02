@@ -1,15 +1,14 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/repositories/dashboard_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
-import '../../shared/widgets/gold_divider.dart';
 import 'dashboard_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -19,24 +18,15 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(dashboardDataProvider);
     final monthlyAsync = ref.watch(monthlySalesProvider);
-    final activitiesAsync = ref.watch(recentActivitiesProvider);
     final session = ref.watch(authControllerProvider).valueOrNull;
 
     return Scaffold(
-      appBar: GcAppBar(
-        title: 'Dashboard',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
+      drawer: const AppDrawer(),
+      appBar: GcAppBar(title: 'Dashboard', showAppActions: true),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(dashboardDataProvider);
           ref.invalidate(monthlySalesProvider);
-          ref.invalidate(recentActivitiesProvider);
         },
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -54,49 +44,29 @@ class DashboardScreen extends ConsumerWidget {
             AsyncValueWidget<DashboardData>(
               value: dataAsync,
               onRetry: () => ref.invalidate(dashboardDataProvider),
-              data: (d) => _StatsGrid(data: d),
+              data: (d) => _StatsRow(data: d),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text('Monthly Revenue', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: 220,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 20, 20, 12),
-                  child: AsyncValueWidget<List<MonthlySales>>(
-                    value: monthlyAsync,
-                    onRetry: () => ref.invalidate(monthlySalesProvider),
-                    data: (months) => _RevenueChart(months: months),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Recent Activity', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: AppSpacing.sm),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: AsyncValueWidget(
-                  value: activitiesAsync,
-                  onRetry: () => ref.invalidate(recentActivitiesProvider),
-                  isEmpty: (data) => data.isEmpty,
-                  emptyWidget: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'No recent activity',
-                      style: TextStyle(color: AppColors.onSurfaceVariant),
+            AsyncValueWidget<List<MonthlySales>>(
+              value: monthlyAsync,
+              onRetry: () => ref.invalidate(monthlySalesProvider),
+              data: (months) => IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _ChartCard(label: 'By Month', child: _RevenueChart(months: months)),
                     ),
-                  ),
-                  data: (activities) => Column(
-                    children: [
-                      for (var i = 0; i < activities.length; i++) ...[
-                        if (i > 0) const GoldDivider(),
-                        _ActivityRow(activity: activities[i]),
-                      ],
-                    ],
-                  ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _ChartCard(
+                        label: 'Share of Total',
+                        child: _RevenuePieChart(months: months),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -108,16 +78,19 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _StatsGrid extends StatelessWidget {
+/// The 4 headline numbers in a single row, per the simplified dashboard —
+/// no more 2x2 grid. Each tile shrinks its value to fit so large rupee
+/// figures never wrap or overflow.
+class _StatsRow extends StatelessWidget {
   final DashboardData data;
-  const _StatsGrid({required this.data});
+  const _StatsRow({required this.data});
 
   @override
   Widget build(BuildContext context) {
     final tiles = [
       _StatTile(
         label: 'Total Revenue',
-        value: formatInr(data.totalSales, decimals: false),
+        value: formatInrCompact(data.totalSales),
         icon: Icons.payments_outlined,
       ),
       _StatTile(
@@ -132,18 +105,19 @@ class _StatsGrid extends StatelessWidget {
       ),
       _StatTile(
         label: 'Stock Value',
-        value: formatInr(data.totalStockValue, decimals: false),
+        value: formatInrCompact(data.totalStockValue),
         icon: Icons.inventory_2_outlined,
       ),
     ];
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AppSpacing.sm,
-      crossAxisSpacing: AppSpacing.sm,
-      childAspectRatio: 1.5,
-      children: tiles,
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          for (var i = 0; i < tiles.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.xs),
+            Expanded(child: tiles[i]),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -158,23 +132,53 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: AppColors.primary, size: 22),
-            Text(
-              value,
-              style: AppTheme.numericData(context),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Icon(icon, color: AppColors.primary, size: 18),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value, style: AppTheme.numericData(context)),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fixed-height card wrapper shared by the two charts so they line up in
+/// the same row.
+class _ChartCard extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _ChartCard({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 220,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+          child: Column(
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+              const SizedBox(height: 4),
+              Expanded(child: child),
+            ],
+          ),
         ),
       ),
     );
@@ -238,24 +242,81 @@ class _RevenueChart extends StatelessWidget {
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  final dynamic activity;
-  const _ActivityRow({required this.activity});
+/// Each month's share of the total revenue across the period shown in
+/// [_RevenueChart], as a pie chart — same underlying data, proportion view
+/// instead of trend view.
+class _RevenuePieChart extends StatelessWidget {
+  final List<MonthlySales> months;
+  const _RevenuePieChart({required this.months});
+
+  static const _palette = [
+    AppColors.primary,
+    AppColors.primaryContainer,
+    AppColors.secondary,
+    AppColors.tertiary,
+    AppColors.success,
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.circle, size: 6, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(activity.description, style: Theme.of(context).textTheme.bodyMedium),
+    final total = months.fold<double>(0, (a, m) => a + m.totalRevenue);
+    if (months.isEmpty || total <= 0) {
+      return const Center(
+        child: Text('No sales data yet', style: TextStyle(color: AppColors.onSurfaceVariant)),
+      );
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 22,
+              sections: [
+                for (var i = 0; i < months.length; i++)
+                  PieChartSectionData(
+                    value: months[i].totalRevenue,
+                    color: _palette[i % _palette.length],
+                    title: '${(months[i].totalRevenue / total * 100).round()}%',
+                    radius: 36,
+                    titleStyle: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onPrimary,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 2,
+          alignment: WrapAlignment.center,
+          children: [
+            for (var i = 0; i < months.length; i++)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: _palette[i % _palette.length],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    months[i].month.substring(0, 3),
+                    style: const TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

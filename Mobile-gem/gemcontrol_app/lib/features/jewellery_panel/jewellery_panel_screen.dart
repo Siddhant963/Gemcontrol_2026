@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/stock.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../categories/categories_providers.dart';
@@ -22,6 +23,7 @@ class JewelleryPanelScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Jewellery Panel'),
       body: AsyncValueWidget<List<Stock>>(
         value: stockAsync,
@@ -56,43 +58,52 @@ class JewelleryPanelScreen extends ConsumerWidget {
                   children: [
                     Text(entry.key, style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: AppSpacing.sm),
-                    GridView.builder(
+                    ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: entry.value.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: AppSpacing.sm,
-                        crossAxisSpacing: AppSpacing.sm,
-                        childAspectRatio: 0.85,
-                      ),
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                       itemBuilder: (context, j) {
                         final s = entry.value[j];
                         return Card(
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: s.stockImg.isNotEmpty
-                                    ? CachedNetworkImage(imageUrl: resolveUploadUrl(s.stockImg), fit: BoxFit.cover)
-                                    : const ColoredBox(
-                                        color: AppColors.surfaceContainerHigh,
-                                        child: Icon(Icons.diamond_outlined, color: AppColors.outline, size: 32),
-                                      ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                    Text('${s.netWeight.toStringAsFixed(2)}g', style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
-                                    Text(formatInr(s.price, decimals: false), style: AppTheme.numericData(context).copyWith(fontSize: 14)),
-                                  ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm + 4),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                                  child: SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: s.stockImg.isNotEmpty
+                                        ? CachedNetworkImage(imageUrl: resolveUploadUrl(s.stockImg), fit: BoxFit.cover)
+                                        : const ColoredBox(
+                                            color: AppColors.surfaceContainerHigh,
+                                            child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                                          ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        s.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context).textTheme.titleLarge,
+                                      ),
+                                      Text(
+                                        '${s.netWeight.toStringAsFixed(2)}g',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(formatInr(s.price, decimals: false), style: AppTheme.numericData(context)),
+                              ],
+                            ),
                           ),
                         );
                       },

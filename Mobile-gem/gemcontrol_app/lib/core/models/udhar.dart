@@ -8,6 +8,7 @@ class Udhar {
   final double amount;
   final DateTime? udharDate;
   final String saleId;
+  final String? invoiceNumber;
 
   Udhar({
     required this.id,
@@ -19,6 +20,7 @@ class Udhar {
     required this.amount,
     required this.udharDate,
     required this.saleId,
+    this.invoiceNumber,
   });
 
   factory Udhar.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,7 @@ class Udhar {
           ? DateTime.tryParse(json['udharDate'])
           : null,
       saleId: sale is Map ? (sale['_id'] ?? '') : (sale ?? ''),
+      invoiceNumber: sale is Map ? sale['invoiceNumber'] : null,
     );
   }
 }
@@ -51,6 +54,7 @@ class UdharSettlement {
   final String? firmName;
   final double amount;
   final DateTime? paymentDate;
+  final String? invoiceNumber;
 
   UdharSettlement({
     required this.id,
@@ -62,12 +66,14 @@ class UdharSettlement {
     this.firmName,
     required this.amount,
     required this.paymentDate,
+    this.invoiceNumber,
   });
 
   factory UdharSettlement.fromJson(Map<String, dynamic> json) {
     final udhar = json['udhar'];
     final customer = json['customer'];
     final firm = json['firm'];
+    final sale = json['sale'];
     return UdharSettlement(
       id: json['_id'] ?? '',
       udharId: udhar is Map ? (udhar['_id'] ?? '') : (udhar ?? ''),
@@ -82,6 +88,7 @@ class UdharSettlement {
       paymentDate: json['paymentDate'] != null
           ? DateTime.tryParse(json['paymentDate'])
           : null,
+      invoiceNumber: sale is Map ? sale['invoiceNumber'] : null,
     );
   }
 }
