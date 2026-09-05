@@ -18,12 +18,18 @@ const String uploadsBaseUrl = String.fromEnvironment(
   defaultValue: 'https://gemcontrol-2026.onrender.com',
 );
 
-/// Prefixes a relative upload path (e.g. "stock/17012-abc.jpg") returned by
-/// the API with the server's uploads root. Already-absolute URLs pass through.
+/// Prefixes a relative upload path returned by the API with the server's
+/// uploads root. Already-absolute URLs pass through. The backend actually
+/// returns paths already including the "Uploads/" segment (e.g.
+/// "/Uploads/stock/17012-abc.jpg"), so that's stripped first to avoid
+/// doubling it up into ".../Uploads/Uploads/stock/..." (a 404).
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final cleaned = path.startsWith('/') ? path.substring(1) : path;
+  var cleaned = path.startsWith('/') ? path.substring(1) : path;
+  if (cleaned.toLowerCase().startsWith('uploads/')) {
+    cleaned = cleaned.substring('uploads/'.length);
+  }
   return '$uploadsBaseUrl/Uploads/$cleaned';
 }
 

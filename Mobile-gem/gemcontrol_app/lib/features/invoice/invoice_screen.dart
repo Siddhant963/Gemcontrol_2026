@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/firm.dart';
@@ -11,6 +12,7 @@ import '../../core/utils/currency.dart';
 import '../../core/utils/number_to_words.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
+import 'invoice_pdf.dart';
 
 /// GST invoice layout per the reference "Krishna Jewellers" screenshots
 /// (invoice-format-spec memory): header / bill-to / line items / payment +
@@ -36,7 +38,25 @@ class InvoiceScreen extends ConsumerWidget {
     final netReceivable = sale.totalAmount - sale.udharAmount;
 
     return Scaffold(
-      appBar: GcAppBar(title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice'),
+      appBar: GcAppBar(
+        title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice',
+        actions: [
+          IconButton(
+            tooltip: 'Print',
+            icon: const Icon(Icons.print_outlined),
+            onPressed: () => Printing.layoutPdf(onLayout: (_) => buildInvoicePdf(sale, firm)),
+          ),
+          IconButton(
+            tooltip: 'Download / Share',
+            icon: const Icon(Icons.download_outlined),
+            onPressed: () async {
+              final bytes = await buildInvoicePdf(sale, firm);
+              final name = sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'invoice';
+              await Printing.sharePdf(bytes: bytes, filename: '$name.pdf');
+            },
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Card(
@@ -85,9 +105,11 @@ class InvoiceScreen extends ConsumerWidget {
                       children: [
                         if (firm != null && firm.ownerSignature.isNotEmpty)
                           SizedBox(
+                            width: 120,
                             height: 40,
                             child: CachedNetworkImage(
                               imageUrl: resolveUploadUrl(firm.ownerSignature),
+                              fit: BoxFit.contain,
                               errorWidget: (_, __, ___) => const SizedBox(),
                             ),
                           )
@@ -128,6 +150,7 @@ class _Header extends StatelessWidget {
             height: 48,
             child: CachedNetworkImage(
               imageUrl: resolveUploadUrl(logo),
+              fit: BoxFit.contain,
               errorWidget: (_, __, ___) => const SizedBox(),
             ),
           )
