@@ -1,34 +1,52 @@
-# Dependencies
-node_modules/
+# ==============================================================================
+# GemControl web console (Vite / React)
+# ==============================================================================
 
-# Environment variables
+# --- Dependencies ------------------------------------------------------------
+node_modules/
+.npm
+*.tgz
+
+# --- Environment --------------------------------------------------------------
+# .env.development / .env.production hold only public API URLs and ARE committed
+# on purpose (Vite inlines them into the client bundle). Local overrides are not.
 .env
 .env.local
 .env.*.local
-
-# Keep example files
 !.env.example
 
-# Logs
-logs
+# --- Build output ------------------------------------------------------------
+dist/
+dist-ssr/
+build/
+*.local
+
+# --- Vite / tooling cache ------------------------------------------------------
+.vite/
+node_modules/.vite/
+.eslintcache
+
+# --- Tests / coverage --------------------------------------------------------
+coverage/
+
+# --- Logs ------------------------------------------------------------------
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-# Build outputs
-dist/
-build/
-
-# Editor directories and files
+# --- OS / editor -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*~

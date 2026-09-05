@@ -2,21 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/token_storage.dart';
-
-/// Points at the hosted backend (same Render deployment + MongoDB the web
-/// app's production build uses, see Frontend-gem/GemControl/.env.production).
-/// Override at build/run time to hit a local backend instead, e.g.:
-///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api/admin
-///   flutter run --dart-define=UPLOADS_BASE_URL=http://10.0.2.2:5000
-const String apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'https://gemcontrol-2026.onrender.com/api/admin',
-);
-
-const String uploadsBaseUrl = String.fromEnvironment(
-  'UPLOADS_BASE_URL',
-  defaultValue: 'https://gemcontrol-2026.onrender.com',
-);
+import '../config/api_config.dart';
 
 /// Prefixes a relative upload path returned by the API with the server's
 /// uploads root. Already-absolute URLs pass through. The backend actually
@@ -26,10 +12,7 @@ const String uploadsBaseUrl = String.fromEnvironment(
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  var cleaned = path.startsWith('/') ? path.substring(1) : path;
-  if (cleaned.toLowerCase().startsWith('uploads/')) {
-    cleaned = cleaned.substring('uploads/'.length);
-  }
+  final cleaned = path.startsWith('/') ? path.substring(1) : path;
   return '$uploadsBaseUrl/Uploads/$cleaned';
 }
 
@@ -51,7 +34,7 @@ class ApiClient {
   ApiClient(this.tokenStorage)
     : dio = Dio(
         BaseOptions(
-          baseUrl: apiBaseUrl,
+          baseUrl: ApiConfig.apiBaseUrl,
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 30),
         ),
