@@ -318,7 +318,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     );
     try {
       final sale = await ref.read(saleRepositoryProvider).createSale(request);
-      if (mounted) context.pushReplacement('/sales/${sale.id}');
+      if (mounted) context.pushReplacement('/sales/${sale.id}', extra: sale);
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

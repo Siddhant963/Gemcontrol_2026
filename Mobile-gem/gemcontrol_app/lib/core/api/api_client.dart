@@ -4,14 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/token_storage.dart';
 import '../config/api_config.dart';
 
-/// Prefixes a relative upload path (e.g. "stock/17012-abc.jpg") returned by
-/// the API with the server's uploads root. Already-absolute URLs pass through.
-/// Which backend that root points at is decided in [ApiConfig].
+/// Prefixes a relative upload path returned by the API with the server's
+/// uploads root. Already-absolute URLs pass through. The backend actually
+/// returns paths already including the "Uploads/" segment (e.g.
+/// "/Uploads/stock/17012-abc.jpg"), so that's stripped first to avoid
+/// doubling it up into ".../Uploads/Uploads/stock/..." (a 404).
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   final cleaned = path.startsWith('/') ? path.substring(1) : path;
-  return '${ApiConfig.uploadsBaseUrl}/Uploads/$cleaned';
+  return '$uploadsBaseUrl/Uploads/$cleaned';
 }
 
 class UnauthorizedException implements Exception {}

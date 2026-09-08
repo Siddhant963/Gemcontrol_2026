@@ -1,5 +1,5 @@
 # ==============================================================================
-# GemControl mobile app (Flutter)
+# RatnSetu mobile app (Flutter)
 # pubspec.lock and .metadata are committed on purpose (this is an app, not a
 # library). android/.gitignore covers the Gradle/keystore side.
 # ==============================================================================

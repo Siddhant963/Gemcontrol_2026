@@ -377,7 +377,7 @@ function Dashboard() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `GemControl_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
 
@@ -957,80 +957,81 @@ function Dashboard() {
         </Box>
       ) : (
         <>
-          {/* Stats Grid */}
-          <Grid
-            container
-            spacing={theme.spacing(2)}
+          {/* Stats Grid — plain CSS grid (not MUI's Grid item breakpoint
+              props) so the 4 cards reliably sit in a single row on
+              desktop instead of wrapping 3+1. */}
+          <Box
             sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+              gap: theme.spacing(2),
               width: "100%",
               mt: { xs: theme.spacing(2), sm: theme.spacing(4) },
               px: { xs: theme.spacing(1), sm: theme.spacing(2) },
             }}
           >
             {statsDisplay.map((stat, index) => (
-              <Grid item xs={12} sm={6} md={3} key={stat.title}>
-                <motion.div
-                  custom={index}
-                  variants={cardVariants}
-                  initial="hidden"
-                  animate="visible"
+              <motion.div
+                key={stat.title}
+                custom={index}
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <Paper
+                  sx={{
+                    p: { xs: theme.spacing(2), sm: theme.spacing(3) },
+                    textAlign: "center",
+                    bgcolor: theme.palette.background.paper,
+                    color: theme.palette.text.primary,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: theme.shape.borderRadius * 2,
+                    transition: "all 0.3s ease",
+                    "&:hover": { boxShadow: theme.shadows[8] },
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
                 >
-                  <Paper
-                    sx={{
-                      p: { xs: theme.spacing(2), sm: theme.spacing(3) },
-                      textAlign: "center",
-                      bgcolor: theme.palette.background.paper,
-                      color: theme.palette.text.primary,
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: theme.shape.borderRadius * 2,
-                      transition: "all 0.3s ease",
-                      "&:hover": { boxShadow: theme.shadows[8] },
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Box>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          mb: theme.spacing(1),
-                          width: { xs: "200px" },
-                          fontSize: { xs: "0.9rem", sm: "1rem" },
-                        }}
-                      >
-                        {stat.title}
-                      </Typography>
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          color: theme.palette.primary.main,
-                          mb: theme.spacing(1),
-                          fontSize: { xs: "1.2rem", sm: "1.5rem" },
-                        }}
-                      >
-                        {stat.value}
-                      </Typography>
-                    </Box>
+                  <Box>
                     <Typography
-                      variant="body2"
+                      variant="h6"
                       sx={{
-                        color: stat.change.includes("-")
-                          ? theme.palette.error.main
-                          : theme.palette.text.secondary,
-                        fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                        mt: "auto",
+                        color: theme.palette.text.secondary,
+                        mb: theme.spacing(1),
+                        fontSize: { xs: "0.9rem", sm: "1rem" },
                       }}
                     >
-                      {stat.change}
+                      {stat.title}
                     </Typography>
-                  </Paper>
-                </motion.div>
-              </Grid>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        color: theme.palette.primary.main,
+                        mb: theme.spacing(1),
+                        fontSize: { xs: "1.2rem", sm: "1.5rem" },
+                      }}
+                    >
+                      {stat.value}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: stat.change.includes("-")
+                        ? theme.palette.error.main
+                        : theme.palette.text.secondary,
+                      fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                      mt: "auto",
+                    }}
+                  >
+                    {stat.change}
+                  </Typography>
+                </Paper>
+              </motion.div>
             ))}
-          </Grid>
+          </Box>
 
           {/* Rate Management Section (merged in from the former standalone page, shown before the charts) */}
           <Box
@@ -1082,10 +1083,18 @@ function Dashboard() {
               )}
             </Box>
 
-            <Grid container spacing={{ xs: 1, sm: 2, md: 3 }} sx={{ mb: { xs: 2, sm: 3 } }}>
+            {/* Plain CSS grid (not MUI's Grid item breakpoint props) so
+                the 3 rate cards reliably sit in a single row on desktop. */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
+                gap: { xs: 1, sm: 2, md: 3 },
+                mb: { xs: 2, sm: 3 },
+              }}
+            >
               {/* Gold Rates Card */}
-              <Grid item xs={12} sm={6} md={4}>
-                <motion.div custom={0} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
+              <motion.div custom={0} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
                     <MonetizationOn sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
@@ -1128,11 +1137,9 @@ function Dashboard() {
                     )}
                   </Paper>
                 </motion.div>
-              </Grid>
 
               {/* Silver Rate Card */}
-              <Grid item xs={12} sm={6} md={4}>
-                <motion.div custom={1} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
+              <motion.div custom={1} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
                     <Grain sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
@@ -1173,11 +1180,9 @@ function Dashboard() {
                     )}
                   </Paper>
                 </motion.div>
-              </Grid>
 
               {/* Diamond Rates Card */}
-              <Grid item xs={12} sm={6} md={4}>
-                <motion.div custom={2} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
+              <motion.div custom={2} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
                     <Diamond sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
@@ -1220,8 +1225,7 @@ function Dashboard() {
                     )}
                   </Paper>
                 </motion.div>
-              </Grid>
-            </Grid>
+            </Box>
 
             {/* Rate history table */}
             <Typography variant="h6" sx={{ color: theme.palette.text.primary, mb: 1.5, fontWeight: "bold" }}>

@@ -142,7 +142,7 @@ class _OutstandingTab extends ConsumerWidget {
                     ),
                     Expanded(
                       child: Text(
-                        formatInr(c.totalOutstanding, decimals: false),
+                        formatInrRounded(c.totalOutstanding),
                         textAlign: TextAlign.center,
                         style: AppTheme.numericData(context).copyWith(color: AppColors.error),
                         maxLines: 1,
@@ -263,7 +263,7 @@ class _CustomerUdharSheet extends ConsumerWidget {
                                 ),
                                 subtitle: Text(formatDateTime(history[i].paymentDate)),
                                 trailing: Text(
-                                  formatInr(history[i].amount, decimals: false),
+                                  formatInrRounded(history[i].amount),
                                   style: AppTheme.numericData(
                                     context,
                                   ).copyWith(color: AppColors.success, fontSize: 15),
@@ -399,7 +399,7 @@ class _AmountStat extends StatelessWidget {
         children: [
           Text(label, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
           Text(
-            formatInr(value, decimals: false),
+            formatInrRounded(value),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
           ),
         ],

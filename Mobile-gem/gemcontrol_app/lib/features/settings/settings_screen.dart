@@ -32,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: Icon(Icons.person_outline, color: AppColors.primary),
               ),
               title: Text(isAdmin ? 'Admin' : 'Staff'),
-              subtitle: const Text('Signed in to GemControl'),
+              subtitle: const Text('Signed in to RatnSetu'),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -105,7 +105,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           const Center(
             child: Text(
-              'GemControl v1.0.0',
+              'RatnSetu v1.0.0',
               style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 12),
             ),
           ),

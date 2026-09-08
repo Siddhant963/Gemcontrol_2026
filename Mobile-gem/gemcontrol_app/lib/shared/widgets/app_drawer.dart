@@ -72,7 +72,7 @@ class AppDrawer extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   const Text(
-                    'Gem Control',
+                    'RatnSetu',
                     style: TextStyle(
                       color: AppColors.onPrimary,
                       fontSize: 20,

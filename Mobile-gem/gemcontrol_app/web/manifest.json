@@ -1,11 +1,11 @@
 {
-    "name": "gemcontrol_app",
-    "short_name": "gemcontrol_app",
+    "name": "RatnSetu",
+    "short_name": "RatnSetu",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "RatnSetu jewelry management app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -400,7 +400,7 @@ module.exports.updateFirm = async (req, res) => {
   }
 };
 
-// GemControl is single-firm-per-shop: a user only ever belongs to (and may
+// RatnSetu is single-firm-per-shop: a user only ever belongs to (and may
 // only ever see) their own firm.
 module.exports.getAllFirms = async (req, res) => {
   try {
@@ -513,6 +513,52 @@ module.exports.removeCustomer = async (req, res) => {
   }
 };
 
+module.exports.updateCustomer = async (req, res) => {
+  const customerId = req.query.customerId || req.body.customerId || req.body._id;
+  const { name, email, contact, address } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!customerId) {
+      return res.status(400).json({ message: "Customer ID is required" });
+    }
+    if (!name || !email || !contact || !address) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    const customer = await CustomerModel.findOne({ _id: customerId, firm: req.user.firm });
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+    const duplicate = await CustomerModel.findOne({
+      _id: { $ne: customerId },
+      firm: req.user.firm,
+      removeAt: null,
+      $or: [{ email }, { contact }],
+    });
+    if (duplicate) {
+      return res.status(400).json({
+        message: "Another customer with this email or contact already exists",
+      });
+    }
+    customer.name = name;
+    customer.email = email;
+    customer.contact = contact;
+    customer.address = address;
+    await customer.save();
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "updateCustomer",
+      `Updated Customer: ${name}`
+    );
+    res.status(200).json({ message: "Customer updated successfully", customer });
+  } catch (error) {
+    console.error("Error updating customer:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports.createStockCategory = async (req, res) => {
   const { name, description } = req.body;
   try {
@@ -564,6 +610,57 @@ module.exports.getAllStockCategories = async (req, res) => {
     res.status(200).json(categories);
   } catch (error) {
     console.error("Error fetching stock categories:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports.updateStockCategory = async (req, res) => {
+  const categoryId = req.query.categoryId || req.body.categoryId;
+  const { name, description } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!categoryId) {
+      return res.status(400).json({ message: "Category ID is required" });
+    }
+    if (!name || !description) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    const category = await StockCategoryModel.findOne({ _id: categoryId, firm: req.user.firm });
+    if (!category) {
+      return res.status(404).json({ message: "Stock category not found" });
+    }
+    const duplicate = await StockCategoryModel.findOne({
+      _id: { $ne: categoryId },
+      firm: req.user.firm,
+      removeAt: null,
+      name: name.trim(),
+    });
+    if (duplicate) {
+      return res.status(400).json({ message: "Category with this name already exists" });
+    }
+    category.name = name.trim();
+    category.description = description;
+    if (req.file) {
+      if (category.CategoryImg) {
+        const oldImagePath = path.join(__dirname, "../../", category.CategoryImg);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      category.CategoryImg = getRelativeFilePath(req.file.path);
+    }
+    await category.save();
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "updateStockCategory",
+      `Updated Stock category: ${category.name}`
+    );
+    res.status(200).json({ message: "Stock category updated successfully", category });
+  } catch (error) {
+    console.error("Error updating stock category:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -620,6 +717,8 @@ module.exports.Addstock = async (req, res) => {
       : Number(waight) || 0;
     const lessWeightNum = Number(lessWeight) || 0;
     const netWeightNum = Math.max(grossWeightNum - lessWeightNum, 0) || Number(waight) || 0;
+    const labourChargeValueNum = Number(labourChargeValue) || 0;
+    const stoneChargeNumForValidation = Number(stoneCharge) || 0;
 
     if (
       !name ||
@@ -631,8 +730,23 @@ module.exports.Addstock = async (req, res) => {
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (lessWeightNum < 0) {
+      return res.status(400).json({ message: "Less weight cannot be negative" });
+    }
+    if (lessWeightNum > grossWeightNum) {
+      return res.status(400).json({ message: "Less weight cannot exceed gross weight" });
+    }
+    if (labourChargeValueNum < 0) {
+      return res.status(400).json({ message: "Labour/Polishing charge cannot be negative" });
+    }
+    if (stoneChargeNumForValidation < 0) {
+      return res.status(400).json({ message: "Stone charge cannot be negative" });
+    }
     if ((materialgitType === "gold" || materialgitType === "diamond") && !karat) {
       return res.status(400).json({ message: "Karat is required for gold and diamond items" });
+    }
+    if ((materialgitType === "gold" || materialgitType === "diamond") && !isValidKarat(materialgitType, karat)) {
+      return res.status(400).json({ message: `Invalid karat "${karat}" for ${materialgitType}` });
     }
     const categoryDoc = await StockCategoryModel.findOne({ _id: category, firm: req.user.firm });
     if (!categoryDoc) {
@@ -746,13 +860,14 @@ module.exports.updateStock = async (req, res) => {
     const netWeightNum = Math.max(grossWeightNum - lessWeightNum, 0) || parseFloat(waight) || 0;
     const quantityNum = parseFloat(quantity);
     const priceNum = parseFloat(price);
+    const labourChargeValueNum = labourChargeValue !== undefined ? Number(labourChargeValue) || 0 : 0;
+    const stoneChargeNumForValidation = stoneCharge !== undefined ? Number(stoneCharge) || 0 : 0;
 
     console.log("Parsed values:", {
       trimmedName,
       trimmedType,
       netWeightNum,
       trimmedCategory,
-      trimmedFirm,
       quantityNum,
       priceNum,
     });
@@ -773,9 +888,24 @@ module.exports.updateStock = async (req, res) => {
         message: "All fields are required and must have valid values",
       });
     }
+    if (lessWeightNum < 0) {
+      return res.status(400).json({ message: "Less weight cannot be negative" });
+    }
+    if (lessWeightNum > grossWeightNum) {
+      return res.status(400).json({ message: "Less weight cannot exceed gross weight" });
+    }
+    if (labourChargeValueNum < 0) {
+      return res.status(400).json({ message: "Labour/Polishing charge cannot be negative" });
+    }
+    if (stoneChargeNumForValidation < 0) {
+      return res.status(400).json({ message: "Stone charge cannot be negative" });
+    }
 
     if ((trimmedType === "gold" || trimmedType === "diamond") && !karat) {
       return res.status(400).json({ message: "Karat is required for gold and diamond items" });
+    }
+    if ((trimmedType === "gold" || trimmedType === "diamond") && !isValidKarat(trimmedType, karat)) {
+      return res.status(400).json({ message: `Invalid karat "${karat}" for ${trimmedType}` });
     }
 
     // Find existing stock -- scoped to the caller's firm so one firm can't
@@ -1066,10 +1196,19 @@ module.exports.bulkImportStock = async (req, res) => {
       const category = categoryByName.get(categoryName.toLowerCase());
       if (!category) rowErrors.push(`category "${categoryName}" not found`);
       if (!netWeight) rowErrors.push("grossWeight (after lessWeight) must be greater than 0");
+      if (lessWeight < 0) rowErrors.push("lessWeight cannot be negative");
+      if (lessWeight > grossWeight) rowErrors.push("lessWeight cannot exceed grossWeight");
       if (!quantity || isNaN(quantity) || quantity <= 0) rowErrors.push("quantity must be a positive number");
       if (!price || isNaN(price) || price <= 0) rowErrors.push("price must be a positive number");
+      const labourChargeValueNum = Number(row.labourChargeValue) || 0;
+      const stoneChargeRowNum = Number(row.stoneCharge) || 0;
+      if (labourChargeValueNum < 0) rowErrors.push("labourChargeValue cannot be negative");
+      if (stoneChargeRowNum < 0) rowErrors.push("stoneCharge cannot be negative");
       if ((materialgitType === "gold" || materialgitType === "diamond") && !karat) {
         rowErrors.push("karat is required for gold and diamond items");
+      }
+      if ((materialgitType === "gold" || materialgitType === "diamond") && karat && !isValidKarat(materialgitType, karat)) {
+        rowErrors.push(`karat "${karat}" is not a valid option for ${materialgitType}`);
       }
       const makingChargeUnit = validChargeUnits.includes(row.makingChargeUnit) ? row.makingChargeUnit : "fixed";
       const labourChargeUnit = validChargeUnits.includes(row.labourChargeUnit) ? row.labourChargeUnit : "fixed";
@@ -1171,6 +1310,65 @@ module.exports.createRawMaterial = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating raw material:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports.updateRawMaterial = async (req, res) => {
+  const { rawMaterialId } = req.params;
+  const { name, materialType, quantity } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!rawMaterialId) {
+      return res.status(400).json({ message: "Raw material ID is required" });
+    }
+    if (!name || !materialType || quantity === undefined || quantity === "") {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    const rawMaterial = await RawMaterialModel.findOne({
+      _id: rawMaterialId,
+      firm: req.user.firm,
+    });
+    if (!rawMaterial) {
+      return res.status(404).json({ message: "Raw material not found" });
+    }
+    const duplicate = await RawMaterialModel.findOne({
+      _id: { $ne: rawMaterialId },
+      firm: req.user.firm,
+      removeAt: null,
+      name: name.trim(),
+      materialType,
+    });
+    if (duplicate) {
+      return res.status(400).json({ message: "Material with this name already exists" });
+    }
+    rawMaterial.name = name.trim();
+    rawMaterial.materialType = materialType;
+    rawMaterial.quantity = quantity;
+    if (req.file) {
+      if (rawMaterial.rawmaterialImg) {
+        const oldImagePath = path.join(__dirname, "../../", rawMaterial.rawmaterialImg);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      rawMaterial.rawmaterialImg = getRelativeFilePath(req.file.path);
+    }
+    await rawMaterial.save();
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "updateRawMaterial",
+      `Updated Raw material: ${rawMaterial.name}`
+    );
+    res.status(200).json({
+      message: "Raw material updated successfully",
+      rawMaterial,
+    });
+  } catch (error) {
+    console.error("Error updating raw material:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -1292,6 +1490,17 @@ const GOLD_PURITY_FACTORS = {
   "20K": 0.8333,
   "18K": 0.75,
 };
+
+// Mirrors the fixed dropdown options on the Item Management form -- kept in
+// sync manually since gold uses karat and diamond uses carat weight, and
+// neither list is derived from the other.
+const VALID_GOLD_KARATS = Object.keys(GOLD_PURITY_FACTORS);
+const VALID_DIAMOND_CARATS = ["0.5 Carat", "1 Carat", "1.5 Carat", "2 Carat", "2.5 Carat", "3 Carat"];
+function isValidKarat(materialgitType, karat) {
+  if (materialgitType === "gold") return VALID_GOLD_KARATS.includes(karat);
+  if (materialgitType === "diamond") return VALID_DIAMOND_CARATS.includes(karat);
+  return true;
+}
 
 // Daily rates are keyed one-per-calendar-day, but the date sent by clients
 // carries the current time of day, not midnight. Storing it un-normalized
@@ -1495,6 +1704,17 @@ module.exports.createSale = async (req, res) => {
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    // A negative row/paymentAmount must be rejected outright rather than
+    // silently dropped later -- silently dropping it would understate the
+    // amount actually collected while still marking the sale fully settled.
+    if (hasSplitPayments) {
+      const negativeRow = payments.find((p) => Number(p.amount) < 0);
+      if (negativeRow) {
+        return res.status(400).json({ message: "Payment amount cannot be negative" });
+      }
+    } else if (Number(paymentAmount) < 0) {
+      return res.status(400).json({ message: "Payment amount cannot be negative" });
+    }
 
     const customerDocForFirmCheck = await CustomerModel.findOne({ _id: customer, firm });
     if (!customerDocForFirmCheck) {
@@ -1545,6 +1765,14 @@ module.exports.createSale = async (req, res) => {
         item.makingCharge = stock.makingCharge || 0;
         item.wastageAmount =
           Math.round(stock.price * ((stock.wastage?.customer || 0) / 100) * 100) / 100;
+        // Line amount is derived from the stock's own price, never trusted
+        // from the client -- otherwise the invoice total could be doctored
+        // by simply sending a smaller "amount" for the same item/quantity.
+        const stockUnitAmount =
+          typeof stock.totalValue === "number"
+            ? stock.totalValue
+            : (stock.price || 0) + (stock.makingCharge || 0);
+        item.amount = Math.round(stockUnitAmount * (Number(item.quantity) || 0) * 100) / 100;
       } else {
         const rawMaterial = await RawMaterialModel.findOne({
           _id: item.salematerialId,
@@ -1568,6 +1796,7 @@ module.exports.createSale = async (req, res) => {
         }
         await rawMaterial.save();
         item.name = rawMaterial.name;
+        item.amount = Math.round((Number(rawMaterial.price) || 0) * (Number(item.quantity) || 0) * 100) / 100;
       }
     }
 
@@ -1580,17 +1809,23 @@ module.exports.createSale = async (req, res) => {
     );
     const invoiceNumber = buildInvoiceNumber(firmForInvoice);
 
-    // Snapshot discount + GST. Rates fall back to the firm's own gstConfig
-    // (never hardcoded) if the caller doesn't send an explicit breakdown, so
-    // older callers that only send totalAmount still get a correct split.
-    const subtotalNum =
-      subtotal !== undefined
-        ? Number(subtotal)
-        : items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+    // Subtotal is always the sum of the just-recomputed, server-trusted item
+    // amounts -- never the client's own "subtotal" figure, which would let a
+    // caller under-report the bill total while items/quantities stay genuine.
+    const subtotalNum = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+    // Discount amount is derived from its own type/value against the
+    // server-trusted subtotal, not taken from the client -- otherwise a
+    // caller could send a token discount.value but an inflated discount.amount.
+    const discountType = discount?.type === "percent" ? "percent" : "fixed";
+    const discountValue = Math.max(Number(discount?.value) || 0, 0);
+    const discountAmountNum =
+      discountType === "percent"
+        ? Math.round(subtotalNum * (discountValue / 100) * 100) / 100
+        : Math.min(discountValue, subtotalNum);
     const discountObj = {
-      type: discount?.type === "percent" ? "percent" : "fixed",
-      value: Number(discount?.value) || 0,
-      amount: Number(discount?.amount) || 0,
+      type: discountType,
+      value: discountValue,
+      amount: discountAmountNum,
     };
     const taxableAmountNum = Math.max(subtotalNum - discountObj.amount, 0);
     const firmGstConfig = firmForInvoice?.gstConfig || {
@@ -1605,6 +1840,11 @@ module.exports.createSale = async (req, res) => {
     const cgstAmount = gst?.cgstAmount ?? Math.round(taxableAmountNum * (cgstRate / 100) * 100) / 100;
     const sgstAmount = gst?.sgstAmount ?? Math.round(taxableAmountNum * (sgstRate / 100) * 100) / 100;
     const igstAmount = gst?.igstAmount ?? Math.round(taxableAmountNum * (igstRate / 100) * 100) / 100;
+    // Grand total is derived from the server-trusted subtotal/discount/GST
+    // above, never the client's raw totalAmount -- otherwise a caller could
+    // send genuine items but a fabricated (lower) total.
+    const grandTotalNum =
+      Math.round((taxableAmountNum + cgstAmount + sgstAmount + igstAmount) * 100) / 100;
 
     // Build the payment breakdown — a single legacy entry if the caller
     // didn't split, otherwise one row per mode actually used.
@@ -1620,6 +1860,21 @@ module.exports.createSale = async (req, res) => {
     const primaryPaymentMethod =
       paymentsArr.length > 1 ? "split" : paymentsArr[0]?.method || paymentMethod;
 
+    const paidTotal = paymentsArr.reduce((sum, p) => sum + p.amount, 0);
+    const udharAmountValue = Number(UdharAmount || udharAmount || 0);
+    if (udharAmountValue < 0) {
+      return res.status(400).json({ message: "Udhar amount cannot be negative" });
+    }
+    // Every rupee of the sale must land as either payment or Udhar (credit) --
+    // there's no third bucket, so the two must reconcile with the grand
+    // total. A small paisa tolerance absorbs rounding, not a real shortfall.
+    const accountedFor = Math.round((paidTotal + udharAmountValue) * 100) / 100;
+    if (Math.abs(accountedFor - grandTotalNum) > 1) {
+      return res.status(400).json({
+        message: `Payment amount and Udhar amount (₹${accountedFor}) must add up to the Grand Total (₹${grandTotalNum})`,
+      });
+    }
+
     // Create Sale
     const newSale = new SaleModel({
       invoiceNumber,
@@ -1630,11 +1885,11 @@ module.exports.createSale = async (req, res) => {
       discount: discountObj,
       taxableAmount: taxableAmountNum,
       gst: { cgstRate, sgstRate, igstRate, cgstAmount, sgstAmount, igstAmount },
-      totalAmount,
+      totalAmount: grandTotalNum,
       saleDate: new Date().toISOString().slice(0, 10),
       paymentMethod: primaryPaymentMethod,
       payments: paymentsArr,
-      udharAmount: UdharAmount || udharAmount || 0,
+      udharAmount: udharAmountValue,
     });
     await newSale.save();
 
@@ -1653,7 +1908,6 @@ module.exports.createSale = async (req, res) => {
     }
 
     // Handle Udhar if any
-    const udharAmountValue = UdharAmount || udharAmount || 0;
     if (udharAmountValue > 0) {
       const udhar = new UdharModel({
         customer,
@@ -1664,7 +1918,6 @@ module.exports.createSale = async (req, res) => {
       await udhar.save();
     }
     const CustomerName = customerDocForFirmCheck.name;
-    const paidTotal = paymentsArr.reduce((sum, p) => sum + p.amount, 0);
     addActivity(
       req.user._id,
       req.user.firm,
@@ -1673,7 +1926,7 @@ module.exports.createSale = async (req, res) => {
         .map((item) => item.name || item.saleType)
         .join(
           ", "
-        )} for Amount : ${totalAmount} Payment Method : ${primaryPaymentMethod} Payment Amount : ${paidTotal} Udhar Amount : ${udharAmountValue} `
+        )} for Amount : ${grandTotalNum} Payment Method : ${primaryPaymentMethod} Payment Amount : ${paidTotal} Udhar Amount : ${udharAmountValue} `
     );
     // Populate refs for immediate UI rendering without refresh
     const populatedSale = await SaleModel.findById(newSale._id)
@@ -3141,7 +3394,7 @@ module.exports.exportAllDataToExcel = async (req, res) => {
     const excelBuffer = await buildFullExportWorkbook({ firm: req.user.firm });
 
     console.log('Sending file to client...');
-    const fileName = `GemControl_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Length', excelBuffer.length);

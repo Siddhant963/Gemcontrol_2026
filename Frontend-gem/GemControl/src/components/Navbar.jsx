@@ -78,7 +78,7 @@ function Navbar() {
             color: theme.palette.text.primary, 
           }}
         >
-          Gem Control
+          RatnSetu
         </Typography>
         {isAuthenticated && (
           <Box

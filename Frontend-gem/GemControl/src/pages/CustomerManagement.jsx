@@ -339,13 +339,12 @@ function CustomerManagement() {
   const filteredCustomers = useMemo(
     () =>
       customers.filter((customer) => {
+        const query = searchQuery.toLowerCase();
         const matchesSearch =
-          (customer.firm.name || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          (customer.address || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase());
+          (customer.name || "").toLowerCase().includes(query) ||
+          (customer.contact || "").toLowerCase().includes(query) ||
+          (customer.email || "").toLowerCase().includes(query) ||
+          (customer.address || "").toLowerCase().includes(query);
         return matchesSearch;
       }),
     [customers, searchQuery]

@@ -37,7 +37,7 @@ class SplashScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'GemControl',
+              'RatnSetu',
               style: GoogleFonts.openSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
