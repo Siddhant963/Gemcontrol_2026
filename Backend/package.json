@@ -1,7 +1,7 @@
 {
   "name": "gem-control",
   "version": "1.0.0",
-  "description": "A backend for the gem control application",
+  "description": "A backend for the RatnSetu application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -28,9 +28,11 @@ const {
   getAllFirms,
   removeFirm,
   AddCustomer,
+  updateCustomer,
   removeCustomer,
   getAllCustomers,
   createStockCategory,
+  updateStockCategory,
   getAllStockCategories,
   removeStockCategory,
   Addstock,
@@ -40,6 +42,7 @@ const {
   getStockbyCategory,
   getStockbyFirm,
   createRawMaterial,
+  updateRawMaterial,
   getAllRawMaterials,
   getRawMaterialbyFirm,
   getRawMaterialbyType,
@@ -115,6 +118,7 @@ router.put("/updateFirm", isLoggedIn, isAdmin, firmUploads, updateFirm);
 router.get("/getAllFirms", isLoggedIn, getAllFirms);
 router.get("/removeFirm", isLoggedIn, isAdmin, removeFirm);
 router.post("/AddCustomer", isLoggedIn, AddCustomer);
+router.post("/UpdateCustomer", isLoggedIn, updateCustomer);
 router.get("/getAllCustomers", isLoggedIn, getAllCustomers);
 router.get("/removeCustomer", isLoggedIn, isAdmin, removeCustomer);
 // Categories are shared reference data every user needs while adding items
@@ -125,6 +129,12 @@ router.post(
   isLoggedIn,
   upload.single("CategoryImg"),
   createStockCategory
+);
+router.post(
+  "/updateStockCategory",
+  isLoggedIn,
+  upload.single("CategoryImg"),
+  updateStockCategory
 );
 router.get("/getAllStockCategories", isLoggedIn, getAllStockCategories);
 router.get("/removeStockCategory", isLoggedIn, isAdmin, removeStockCategory);
@@ -151,6 +161,12 @@ router.post(
   isLoggedIn,
   upload.single("rawMaterial"),
   createRawMaterial
+);
+router.put(
+  "/updateRawMaterial/:rawMaterialId",
+  isLoggedIn,
+  upload.single("rawMaterial"),
+  updateRawMaterial
 );
 router.get("/getAllRawMaterials", isLoggedIn, getAllRawMaterials);
 router.get("/removeRawMaterial", isLoggedIn, isAdmin, removeRawMaterial);

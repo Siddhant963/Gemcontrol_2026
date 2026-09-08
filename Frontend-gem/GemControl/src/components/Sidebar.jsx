@@ -30,7 +30,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSelector } from "react-redux";
 import { ROUTES } from "../utils/routes";
 
-const gemControlLogo = "/logofinal.png";
+const ratnSetuLogo = "/ratnsetu-logo.png";
 
 const menuItems = [
   { text: "Dashboard", icon: <Dashboard />, path: ROUTES.DASHBOARD },
@@ -142,8 +142,8 @@ function Sidebar() {
           }}
         >
           <img
-            src={gemControlLogo}
-            alt="GemControl Logo"
+            src={ratnSetuLogo}
+            alt="RatnSetu Logo"
             style={{
               width: { xs: "50px", sm: "80px", md: "100px" },
               height: "auto",
@@ -169,7 +169,7 @@ function Sidebar() {
               textAlign: "center",
             }}
           >
-            GemControl
+            RatnSetu
           </Typography>
         </Box>
         <List>

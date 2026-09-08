@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Colors and type scale lifted from the Stitch "GemControl ERP UI" design
+/// Colors and type scale lifted from the Stitch "RatnSetu ERP UI" design
 /// system (project 7189669442381491281) — "Boutique Banking": champagne gold
 /// + charcoal, Open Sans throughout for headings, UI, and currency/data.
 class AppColors {

@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/notifications/notifications_providers.dart';
 
-/// Standard top app bar for every authenticated screen: the GemControl
+/// Standard top app bar for every authenticated screen: the RatnSetu
 /// logo mark next to the screen title, so the brand stays visible
 /// throughout the app the way it does on the website's sidebar.
 ///

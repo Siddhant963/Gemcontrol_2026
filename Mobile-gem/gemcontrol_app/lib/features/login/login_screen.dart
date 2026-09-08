@@ -83,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 24),
                   Center(
                     child: Text(
-                      'GemControl',
+                      'RatnSetu',
                       style: GoogleFonts.openSans(
                         fontSize: 30,
                         fontWeight: FontWeight.w700,

@@ -563,19 +563,15 @@ function RawMaterials() {
 
   const filteredMaterials = useMemo(
     () =>
-      materials.filter(
-        (material) =>
-          (material.firm.name || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          (material.materialType || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          ((material.RawMaterialcode || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) &&
-            (firmFilter === "all" || material.firm?._id === firmFilter))
-      ),
+      materials.filter((material) => {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          (material.name || "").toLowerCase().includes(query) ||
+          (material.materialType || "").toLowerCase().includes(query) ||
+          (material.RawMaterialcode || "").toLowerCase().includes(query);
+        const matchesFirm = firmFilter === "all" || material.firm?._id === firmFilter;
+        return matchesSearch && matchesFirm;
+      }),
     [materials, searchQuery, firmFilter]
   );
   console.log(materials, "fg");

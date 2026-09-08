@@ -1,4 +1,4 @@
-/// Central API endpoint configuration for the GemControl mobile app.
+/// Central API endpoint configuration for the RatnSetu mobile app.
 ///
 /// Pick the backend in one of two ways:
 ///

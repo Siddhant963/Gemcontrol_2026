@@ -232,6 +232,12 @@ function ItemManagement() {
       !newItem.karat
     )
       errors.karat = "Karat is required for gold and diamond items";
+    if (newItem.lessWeight !== "" && newItem.lessWeight !== undefined) {
+      if (isNaN(newItem.lessWeight) || Number(newItem.lessWeight) < 0)
+        errors.lessWeight = "Less weight cannot be negative";
+      else if (Number(newItem.lessWeight) > (Number(newItem.waight) || 0))
+        errors.lessWeight = "Less weight cannot exceed gross weight";
+    }
     if (!newItem.category) errors.category = "Category is required";
     if (!newItem.firm) errors.firm = "Firm is required";
     if (!newItem.quantity || isNaN(newItem.quantity) || newItem.quantity <= 0)
@@ -244,6 +250,14 @@ function ItemManagement() {
       newItem.makingCharge < 0
     )
       errors.makingCharge = "Valid making charge is required";
+    if (newItem.labourChargeValue !== "" && newItem.labourChargeValue !== undefined) {
+      if (isNaN(newItem.labourChargeValue) || Number(newItem.labourChargeValue) < 0)
+        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
+    }
+    if (newItem.stoneCharge !== "" && newItem.stoneCharge !== undefined) {
+      if (isNaN(newItem.stoneCharge) || Number(newItem.stoneCharge) < 0)
+        errors.stoneCharge = "Stone charge cannot be negative";
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [newItem]);
@@ -673,6 +687,12 @@ function ItemManagement() {
       !editItem.karat
     )
       errors.karat = "Karat is required for gold and diamond items";
+    if (editItem.lessWeight !== "" && editItem.lessWeight !== undefined) {
+      if (isNaN(editItem.lessWeight) || Number(editItem.lessWeight) < 0)
+        errors.lessWeight = "Less weight cannot be negative";
+      else if (Number(editItem.lessWeight) > (Number(editItem.waight) || 0))
+        errors.lessWeight = "Less weight cannot exceed gross weight";
+    }
     if (!editItem.category) errors.category = "Category is required";
     if (!editItem.firm) errors.firm = "Firm is required";
     if (
@@ -689,6 +709,14 @@ function ItemManagement() {
       editItem.makingCharge < 0
     )
       errors.makingCharge = "Valid making charge is required";
+    if (editItem.labourChargeValue !== "" && editItem.labourChargeValue !== undefined) {
+      if (isNaN(editItem.labourChargeValue) || Number(editItem.labourChargeValue) < 0)
+        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
+    }
+    if (editItem.stoneCharge !== "" && editItem.stoneCharge !== undefined) {
+      if (isNaN(editItem.stoneCharge) || Number(editItem.stoneCharge) < 0)
+        errors.stoneCharge = "Stone charge cannot be negative";
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [editItem]);
@@ -827,6 +855,9 @@ function ItemManagement() {
     () =>
       stocks.filter((item) => {
         const matchesGlobalSearch =
+          (item.name || "")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
           (item.category.name || "")
             .toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
@@ -2016,6 +2047,9 @@ function ItemManagement() {
             fullWidth
             value={newItem.lessWeight}
             onChange={handleInputChange}
+            error={!!formErrors.lessWeight}
+            helperText={formErrors.lessWeight}
+            InputProps={{ inputProps: { min: 0 } }}
             sx={{
               mb: { xs: 1, sm: 2 },
               "& .MuiInputBase-input": {
@@ -2139,6 +2173,9 @@ function ItemManagement() {
               fullWidth
               value={newItem.labourChargeValue}
               onChange={handleInputChange}
+              error={!!formErrors.labourChargeValue}
+              helperText={formErrors.labourChargeValue}
+              InputProps={{ inputProps: { min: 0 } }}
             />
             <Select
               name="labourChargeUnit"
@@ -2161,6 +2198,9 @@ function ItemManagement() {
             fullWidth
             value={newItem.stoneCharge}
             onChange={handleInputChange}
+            error={!!formErrors.stoneCharge}
+            helperText={formErrors.stoneCharge}
+            InputProps={{ inputProps: { min: 0 } }}
             sx={{ mb: { xs: 1, sm: 2 } }}
           />
           <Box sx={{ mb: { xs: 1, sm: 2 } }}>
@@ -2403,6 +2443,9 @@ function ItemManagement() {
               type="number"
               value={editItem.lessWeight}
               onChange={handleEditInputChange}
+              error={!!formErrors.lessWeight}
+              helperText={formErrors.lessWeight}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
               sx={{ mb: 1 }}
             />
@@ -2561,6 +2604,9 @@ function ItemManagement() {
               type="number"
               value={editItem.labourChargeValue}
               onChange={handleEditInputChange}
+              error={!!formErrors.labourChargeValue}
+              helperText={formErrors.labourChargeValue}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
             />
             <Select
@@ -2586,6 +2632,9 @@ function ItemManagement() {
               type="number"
               value={editItem.stoneCharge}
               onChange={handleEditInputChange}
+              error={!!formErrors.stoneCharge}
+              helperText={formErrors.stoneCharge}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
             />
           </Box>

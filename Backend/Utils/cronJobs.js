@@ -164,7 +164,7 @@ const runWeeklyExport = async () => {
       fs.mkdirSync(EXPORTS_DIR, { recursive: true });
     }
 
-    const fileName = `GemControl_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
     const filePath = path.join(EXPORTS_DIR, fileName);
     fs.writeFileSync(filePath, excelBuffer);
 

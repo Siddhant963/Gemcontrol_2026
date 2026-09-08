@@ -248,9 +248,10 @@ function SalesManagement() {
     [newSale.totalAmount, discountType, discountValue, selectedFirm]
   );
 
-  // Keep paymentAmount (the non-split path) in sync with the grand total
-  // (after discount + GST) rather than the raw items subtotal, without
-  // touching the existing per-keystroke item/udhar auto-calc logic above.
+  // Single source of truth for paymentAmount (non-split path): always the
+  // grand total (after discount + GST) minus Udhar, unless the user has
+  // typed into Payment Amount directly. Nothing else in this component sets
+  // paymentAmount, so it can't drift out of sync with a second calculation.
   useEffect(() => {
     if (manualPaymentEdit || useSplitPayment) return;
     const udhar = parseFloat(newSale.udharAmount) || 0;
@@ -516,90 +517,49 @@ function SalesManagement() {
             }
           }
 
-          // Recalculate total amount from item amounts
+          // Recalculate total amount from item amounts. paymentAmount is
+          // NOT recalculated here -- the useEffect below is the single
+          // source of truth for it, driven off billBreakdown.grandTotal
+          // (post discount/GST), so it can't drift out of sync with a
+          // second calculation based on this raw pre-tax total.
           const itemsTotal = updatedSale.items.reduce(
             (sum, it) => sum + (parseFloat(it.amount) || 0),
             0
           );
           updatedSale.totalAmount = itemsTotal ? itemsTotal.toString() : "";
 
-          // Recalculate payment amount when items total changes
-          if (!manualPaymentEdit) {
-            const total = itemsTotal || 0;
-            const udhar = parseFloat(updatedSale.udharAmount) || 0;
-            updatedSale.paymentAmount = Math.max(total - udhar, 0).toString();
-          }
-        } else {
-          updatedSale = { ...prev, [name]: value };
-        }
-
-        // Auto-calculate paymentAmount when totalAmount or udharAmount changes
-        if (name === "totalAmount" || name === "udharAmount") {
-          const total =
-            parseFloat(name === "totalAmount" ? value : prev.totalAmount) || 0;
-          const udhar =
-            parseFloat(name === "udharAmount" ? value : prev.udharAmount) || 0;
-
-          // Always calculate payment amount from total - udhar (unless manually edited)
-          if (!manualPaymentEdit) {
-            const payment = Math.max(total - udhar, 0);
-            updatedSale = {
-              ...updatedSale,
-              paymentAmount: payment.toString(),
-            };
-          }
-
-          // Auto-set udhar amount when total changes and customer is selected
-          if (
-            name === "totalAmount" &&
-            value &&
-            prev.customer &&
-            !manualUdharEdit
-          ) {
+          // Auto-set udhar amount when the items total changes and a
+          // customer with existing credit is selected. Items Subtotal is
+          // now read-only (derived from item amounts), so this must live
+          // here rather than behind a "totalAmount" field change.
+          if (itemsTotal && prev.customer && !manualUdharEdit) {
             const customerUdhar = udharData.find(
               (udhar) => udhar.customer === prev.customer
             );
             const availableUdharAmount = customerUdhar
               ? parseFloat(customerUdhar.amount) || 0
               : 0;
-            updatedSale.udharAmount = Math.min(
-              availableUdharAmount,
-              total
-            ).toString();
-            // Recalculate payment after udhar update
-            if (!manualPaymentEdit) {
-              const newUdhar = parseFloat(updatedSale.udharAmount) || 0;
-              updatedSale.paymentAmount = Math.max(
-                total - newUdhar,
-                0
-              ).toString();
-            }
+            updatedSale.udharAmount = Math.min(availableUdharAmount, itemsTotal).toString();
           }
+        } else {
+          updatedSale = { ...prev, [name]: value };
+        }
 
-          // Track manual udhar editing
-          if (name === "udharAmount") {
-            setManualUdharEdit(true);
-            // Recalculate payment when udhar is manually changed
-            if (!manualPaymentEdit) {
-              const payment = Math.max(total - udhar, 0);
-              updatedSale.paymentAmount = payment.toString();
-            }
-          }
+        // Track manual udhar editing. Editing Udhar is a strong signal the
+        // user wants Payment Amount recalculated to match it, so this also
+        // releases any earlier manual override on Payment Amount -- without
+        // this, once a user ever typed into Payment Amount, changing Udhar
+        // back to 0 would leave Payment Amount stuck at its old value.
+        if (name === "udharAmount") {
+          setManualUdharEdit(true);
+          setManualPaymentEdit(false);
         }
 
         return updatedSale;
       });
       setTouchedSaleFields((prev) => ({ ...prev, [name]: true }));
     },
-    [
-      udharData,
-      stocks,
-      materials,
-      manualPaymentEdit,
-      manualUdharEdit,
-      setNotificationDialog,
-      getMaterialUnitPrice,
-    ]
+    [udharData, stocks, materials, manualUdharEdit, setNotificationDialog, getMaterialUnitPrice]
   );
 
   // Customer management handlers
@@ -770,6 +730,21 @@ function SalesManagement() {
       let paymentAmount;
 
       if (useSplitPayment) {
+        // A negative row must block the save, not be silently dropped --
+        // dropping it would understate what was actually collected while
+        // still letting the sale save as if that row never happened.
+        const negativeRow = splitPayments.find(
+          (p) => p.amount !== "" && parseFloat(p.amount) < 0
+        );
+        if (negativeRow) {
+          setNotificationDialog({
+            open: true,
+            message: "Payment amount cannot be negative",
+            type: "error",
+            title: "Validation Error",
+          });
+          return;
+        }
         paymentsPayload = splitPayments
           .filter((p) => parseFloat(p.amount) > 0)
           .map((p) => ({ method: p.method, amount: parseFloat(p.amount) || 0 }));
@@ -780,6 +755,15 @@ function SalesManagement() {
         udharAmount = Math.max(Math.round((grandTotal - paidSum) * 100) / 100, 0);
         paymentAmount = paidSum;
       } else {
+        if (parseFloat(newSale.paymentAmount) < 0) {
+          setNotificationDialog({
+            open: true,
+            message: "Payment amount cannot be negative",
+            type: "error",
+            title: "Validation Error",
+          });
+          return;
+        }
         udharAmount = parseFloat(newSale.udharAmount) || 0;
         if (udharAmount > grandTotal) {
           setNotificationDialog({
@@ -795,6 +779,20 @@ function SalesManagement() {
           newSale.paymentAmount && parseFloat(newSale.paymentAmount) >= 0
             ? parseFloat(newSale.paymentAmount)
             : amountToBePaid;
+      }
+
+      // Every rupee of the sale must be accounted as either payment or
+      // Udhar (credit) — reject a sale that would otherwise leave money
+      // unaccounted for (e.g. both Payment Amount and Udhar left at 0).
+      const accountedFor = Math.round((paymentAmount + udharAmount) * 100) / 100;
+      if (Math.abs(accountedFor - grandTotal) > 1) {
+        setNotificationDialog({
+          open: true,
+          message: `Payment amount and Udhar amount (₹${accountedFor.toFixed(2)}) must add up to the Grand Total (₹${grandTotal.toFixed(2)})`,
+          type: "error",
+          title: "Validation Error",
+        });
+        return;
       }
 
       const saleData = {
@@ -920,13 +918,6 @@ function SalesManagement() {
     setSaveAttemptedSale(false);
     setManualPaymentEdit(false);
     setManualUdharEdit(false);
-  }, []);
-
-  const handleSaleFieldBlur = useCallback((fieldName, index = null) => {
-    setTouchedSaleFields((prev) => ({
-      ...prev,
-      [index !== null ? `items[${index}].${fieldName}` : fieldName]: true,
-    }));
   }, []);
 
   const handleNotificationClose = useCallback(() => {
@@ -1545,9 +1536,9 @@ function SalesManagement() {
                     label="Amount"
                     type="number"
                     value={item.amount}
-                    onChange={(e) => handleInputChange(e, index)}
                     fullWidth
-                    InputProps={{ inputProps: { min: 0 } }}
+                    InputProps={{ readOnly: true }}
+                    helperText="Auto-calculated from price × quantity"
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -1581,10 +1572,8 @@ function SalesManagement() {
                 label="Items Subtotal (before discount & GST)"
                 type="number"
                 value={newSale.totalAmount}
-                onChange={handleInputChange}
-                onBlur={() => handleSaleFieldBlur("totalAmount")}
                 fullWidth
-                InputProps={{ inputProps: { min: 0 } }}
+                InputProps={{ readOnly: true }}
                 error={
                   (touchedSaleFields.totalAmount || saveAttemptedSale) &&
                   (!newSale.totalAmount || parseFloat(newSale.totalAmount) <= 0)
@@ -1592,7 +1581,7 @@ function SalesManagement() {
                 helperText={
                   (touchedSaleFields.totalAmount || saveAttemptedSale) &&
                   (!newSale.totalAmount
-                    ? "Total amount is required"
+                    ? "Add at least one item to the sale"
                     : parseFloat(newSale.totalAmount) <= 0
                     ? "Total amount must be greater than 0"
                     : "")

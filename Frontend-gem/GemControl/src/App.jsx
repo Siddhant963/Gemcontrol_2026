@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Provider } from "react-redux";
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
@@ -27,7 +28,10 @@ import GirviManagement from "./pages/GirviManagement.jsx";
 import JewelleryPanel from "./pages/JewelleryPanel.jsx";
 import DayBook from "./pages/DayBook.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
+import SplashScreen from "./components/SplashScreen.jsx";
 import {useTheme} from "@mui/material/styles";
+
+const SPLASH_DURATION_MS = 2000;
 
 function App() {
   return (
@@ -45,9 +49,17 @@ function MainApp() {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const muiTheme = useTheme();
 
+  // Splash shows once per full page load (not on in-app navigation).
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), SPLASH_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <SplashScreen visible={showSplash} />
       <BrowserRouter>
         <Routes>
           <Route
