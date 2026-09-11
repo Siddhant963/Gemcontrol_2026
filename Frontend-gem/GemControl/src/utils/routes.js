@@ -1,6 +1,8 @@
 export const ROUTES = {
+  LANDING: "/",
   LOGIN: "/login",
   REGISTER: "/register",
+  SUBSCRIBE: "/subscribe",
   DASHBOARD: "/dashboard",
   USER_MANAGEMENT: "/users",
   FIRM_MANAGEMENT: "/firms",

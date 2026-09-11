@@ -13,6 +13,9 @@ const udharsetelmentModel = require("../Models/udharSetalmentModel.js");
 const GirviModel = require("../Models/GirviModel.js");
 const GirviInterestModel = require("../Models/GirviInterestModel.js");
 const ActivityModel = require("../Models/ActivitesModel.js");
+const SubscriptionModel = require("../Models/SubscriptionModel.js");
+const SubscriptionPlanModel = require("../Models/SubscriptionPlanModel.js");
+const { ensureTrialSubscription, isSubscriptionCurrentlyActive } = require("../Utils/subscription.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -129,6 +132,15 @@ module.exports.RegisterUser = async (req, res) => {
         await newFirm.save({ session });
         await newUser.save({ session });
       });
+      // Outside the transaction: the firm/user are already committed, so a
+      // hiccup here (e.g. plans not seeded yet) shouldn't block signup --
+      // the firm just shows as unsubscribed until this is retried/fixed,
+      // same as any other firm whose trial has lapsed.
+      try {
+        await ensureTrialSubscription(newUser.firm);
+      } catch (trialError) {
+        console.error("Error creating trial subscription:", trialError);
+      }
       res
         .status(201)
         .json({ message: "Shop registered successfully", user: newUser });
@@ -3207,6 +3219,101 @@ module.exports.getGirviSummary = async (req, res) => {
   }
 };
 
+// ============ SUBSCRIPTION ============
+// One Subscription per Firm (never per-user) -- see Utils/subscription.js
+// for the requireActiveSubscription gate applied to every other route.
+
+module.exports.getSubscriptionPlans = async (req, res) => {
+  try {
+    const plans = await SubscriptionPlanModel.find({ isActive: true }).sort({ price: 1 });
+    res.status(200).json(plans);
+  } catch (error) {
+    console.error("Error fetching subscription plans:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports.getMySubscription = async (req, res) => {
+  try {
+    if (!req.user.firm) {
+      return res.status(200).json({ subscription: null, isActive: false });
+    }
+    const subscription = await SubscriptionModel.findOne({ firm: req.user.firm }).populate(
+      "plan"
+    );
+    res.status(200).json({
+      subscription,
+      isActive: isSubscriptionCurrentlyActive(subscription),
+    });
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Dev/test-only activation: no payment gateway involved yet. Lets the whole
+// subscribe -> gated-app flow be tested end-to-end before Razorpay (or
+// whichever gateway) is wired in -- see the TODO below for exactly where
+// that plugs in later.
+module.exports.activateTestSubscription = async (req, res) => {
+  const { planKey } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!planKey) {
+      return res.status(400).json({ message: "planKey is required" });
+    }
+    const plan = await SubscriptionPlanModel.findOne({ key: planKey, isActive: true });
+    if (!plan) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    if (plan.billingInterval === "year") {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    // TODO(production): replace this whole handler with two steps once a
+    // real gateway is wired in --
+    //   1. POST /createSubscriptionOrder: create a gateway order/intent for
+    //      plan.price and return its id to the client for checkout.
+    //   2. POST /verifySubscriptionPayment (gateway webhook or client
+    //      callback): verify the payment, THEN run this same
+    //      findOneAndUpdate with paymentProvider set to the gateway's key
+    //      and paymentReference/amountPaid filled in from the real payment.
+    // The Subscription document shape doesn't need to change either way.
+    const subscription = await SubscriptionModel.findOneAndUpdate(
+      { firm: req.user.firm },
+      {
+        firm: req.user.firm,
+        plan: plan._id,
+        status: "active",
+        startDate,
+        endDate,
+        paymentProvider: "manual",
+        paymentReference: "",
+        amountPaid: 0,
+      },
+      { new: true, upsert: true }
+    ).populate("plan");
+
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "subscriptionActivated",
+      `Activated ${plan.name} plan (test/manual, no payment)`
+    );
+
+    res.status(200).json({ message: "Subscription activated", subscription });
+  } catch (error) {
+    console.error("Error activating subscription:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 // Builds the full-data export workbook and returns it as a Buffer. Shared by the
 // manual "Export All Data to Excel" HTTP handler below and the weekly automatic

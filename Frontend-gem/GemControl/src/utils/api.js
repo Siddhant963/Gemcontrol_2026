@@ -65,6 +65,18 @@ api.interceptors.response.use(
       window.location.href = ROUTES.LOGIN;
     }
 
+    // Backend gates every business route behind an active firm subscription
+    // (see Backend/Utils/subscription.js) and reports it as 402 with this
+    // code, distinct from 401 (not logged in) -- send the user to subscribe
+    // rather than logging them out, since their session is still valid.
+    if (
+      error.response?.status === 402 &&
+      error.response?.data?.code === "SUBSCRIPTION_REQUIRED" &&
+      window.location.pathname !== ROUTES.SUBSCRIBE
+    ) {
+      window.location.href = ROUTES.SUBSCRIBE;
+    }
+
     return Promise.reject(error);
   }
 );

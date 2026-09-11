@@ -21,6 +21,8 @@ import PaymentManagement from "./pages/PaymentManagement";
 import UdharManagement from "./pages/UdharManagement";
 import Login from "./pages/Login";
 import Register from "./components/Register";
+import LandingPage from "./pages/LandingPage.jsx";
+import SubscribePage from "./pages/SubscribePage.jsx";
 import NotFound from "./pages/NotFound";
 import { ROUTES } from "./utils/routes";
 import ErrorBoundary from "./ErrorBoundary.jsx";
@@ -62,12 +64,10 @@ function MainApp() {
       <SplashScreen visible={showSplash} />
       <BrowserRouter>
         <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Navigate to={ROUTES.LOGIN} />
-            }
-          />
+          {/* Public marketing landing page — shown regardless of auth state,
+              same as any SaaS homepage. Login/Register handle their own
+              already-authenticated redirect below. */}
+          <Route path={ROUTES.LANDING} element={<LandingPage />} />
 
           {/* Public Routes */}
           <Route
@@ -80,6 +80,16 @@ function MainApp() {
             path={ROUTES.REGISTER}
             element={
               isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Register />
+            }
+          />
+
+          {/* Requires auth but deliberately NOT wrapped in ProtectedRoute --
+              this is the page ProtectedRoute redirects to when the firm's
+              subscription isn't active, so it can't itself require one. */}
+          <Route
+            path={ROUTES.SUBSCRIBE}
+            element={
+              isAuthenticated ? <SubscribePage /> : <Navigate to={ROUTES.LOGIN} />
             }
           />
           {/* Protected Routes with Layout */}

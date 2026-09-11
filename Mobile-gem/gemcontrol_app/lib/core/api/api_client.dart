@@ -12,8 +12,11 @@ import '../config/api_config.dart';
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final cleaned = path.startsWith('/') ? path.substring(1) : path;
-  return '$uploadsBaseUrl/Uploads/$cleaned';
+  var cleaned = path.startsWith('/') ? path.substring(1) : path;
+  if (cleaned.startsWith('Uploads/')) {
+    cleaned = cleaned.substring('Uploads/'.length);
+  }
+  return '${ApiConfig.uploadsBaseUrl}/Uploads/$cleaned';
 }
 
 class UnauthorizedException implements Exception {}

@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const { upload } = require("../Utils/UploadFile.js");
 const { isLoggedIn, isAdmin, isStaff } = require("../Utils/islogedin");
+const { requireActiveSubscription } = require("../Utils/subscription");
 
 // Bulk stock Excel uploads are parsed in memory (not saved to disk like
 // product images) since they're read once and discarded.
@@ -95,18 +96,43 @@ const {
   getGirviSummary,
   // Export function
   exportAllDataToExcel,
+  // Subscription functions
+  getSubscriptionPlans,
+  getMySubscription,
+  activateTestSubscription,
 } = require("../Controllers/adminController");
 
 // Public self-signup: no auth required, but the controller forces role="staff"
 // regardless of what's sent, so this can't be used to mint an admin account.
+// (Self-signup with a new firm, which does mint an admin, is the other
+// branch of RegisterUser -- see the controller.)
 router.post("/register", RegisterUser);
+router.post("/login", loginUser);
+// Always reachable even with an expired subscription -- a locked-out admin
+// must still be able to log out.
+router.get("/logout", logoutUser);
+
+// Subscription routes must stay reachable without an active subscription --
+// otherwise a firm whose trial expired could never see plans or resubscribe.
+router.get("/getSubscriptionPlans", isLoggedIn, getSubscriptionPlans);
+router.get("/getMySubscription", isLoggedIn, getMySubscription);
+router.post("/activateTestSubscription", isLoggedIn, isAdmin, activateTestSubscription);
+
+// Every route below requires the caller to be logged in AND their firm to
+// have a non-expired subscription (trial or paid) -- see Utils/subscription.js.
+// isLoggedIn must run here too (not just inline per-route below) since this
+// blanket middleware runs before any of those, so req.user wouldn't be set
+// yet otherwise -- requireActiveSubscription would then see no req.user and
+// misreport an unauthenticated request as "no firm" (403) instead of the
+// correct 401. isLoggedIn running again per-route below is harmless (an
+// already-decoded token, no extra DB round trip avoided either way).
+router.use(isLoggedIn, requireActiveSubscription);
+
 // Admin-panel user creation: requires an authenticated admin, who may choose any role.
 router.post("/admin/register", isLoggedIn, isAdmin, RegisterUser);
 router.get("/GetallUsers", isLoggedIn, isAdmin, GetAllUsers);
 router.get("/remove/:userId", isLoggedIn, isAdmin, removeUser);
 router.post("/UpdateUser", isLoggedIn, isAdmin, UpdateUser);
-router.post("/login", loginUser);
-router.get("/logout", logoutUser);
 const firmUploads = upload.fields([
   { name: "logo", maxCount: 1 },
   { name: "firmStamp", maxCount: 1 },
