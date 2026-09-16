@@ -140,7 +140,7 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
         color: 'black',
         p: 4,
         fontFamily: 'Arial, sans-serif',
-        border: '2px solid #1a3d7c',
+        border: '2px solid #0a2540',
         '@media print': { p: 3 },
       }}
     >
@@ -158,10 +158,10 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
           )}
         </Grid>
         <Grid item xs={8} sx={{ textAlign: 'center' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#b02a2a' }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0a2540' }}>
             {firm?.shopName || 'SHUBH LABH'}
           </Typography>
-          <Typography sx={{ fontSize: '28px', fontWeight: 900, letterSpacing: 1, color: '#b02a2a' }}>
+          <Typography sx={{ fontSize: '28px', fontWeight: 900, letterSpacing: 1, color: '#0a2540' }}>
             {(firm?.name || '').toUpperCase()}
           </Typography>
           <Typography sx={{ fontSize: '13px', fontWeight: 700 }}>
@@ -200,8 +200,8 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
       </Grid>
 
       {/* Bill-to / invoice meta */}
-      <Grid container sx={{ border: '1px solid #1a3d7c', mb: 1.5 }}>
-        <Grid item xs={7} sx={{ p: 1.5, borderRight: '1px solid #1a3d7c' }}>
+      <Grid container sx={{ border: '1px solid #0a2540', mb: 1.5 }}>
+        <Grid item xs={7} sx={{ p: 1.5, borderRight: '1px solid #0a2540' }}>
           <Typography sx={{ fontSize: '12px', fontWeight: 700, mb: 0.5 }}>
             Details Of Receiver (Bill To):
           </Typography>
@@ -238,7 +238,7 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
       </Grid>
 
       <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-        <Typography sx={{ fontSize: '14px', fontWeight: 900, color: '#1a3d7c' }}>
+        <Typography sx={{ fontSize: '14px', fontWeight: 900, color: '#0a2540' }}>
           GST INVOICE
         </Typography>
         <Typography sx={{ fontSize: '13px', fontWeight: 700 }}>
@@ -250,13 +250,13 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
       <Table
         size="small"
         sx={{
-          border: '1px solid #1a3d7c',
+          border: '1px solid #0a2540',
           mb: 1,
-          '& td, & th': { border: '1px solid #1a3d7c', padding: '6px 8px', fontSize: '11px' },
+          '& td, & th': { border: '1px solid #0a2540', padding: '6px 8px', fontSize: '11px' },
         }}
       >
         <TableHead>
-          <TableRow sx={{ bgcolor: '#eef2fa' }}>
+          <TableRow sx={{ bgcolor: '#eaedff' }}>
             <TableCell sx={{ fontWeight: 700 }}>PROD ID</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>DESIGN</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>PROD DESC</TableCell>
@@ -323,8 +323,8 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
               ))}
               {(sale?.udharAmount || 0) > 0 && (
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, color: '#b02a2a' }}>UDHAR (CREDIT) :</TableCell>
-                  <TableCell sx={{ textAlign: 'right', color: '#b02a2a' }}>
+                  <TableCell sx={{ fontWeight: 700, color: '#ba1a1a' }}>UDHAR (CREDIT) :</TableCell>
+                  <TableCell sx={{ textAlign: 'right', color: '#ba1a1a' }}>
                     {rupee(sale.udharAmount)}
                   </TableCell>
                 </TableRow>
@@ -336,8 +336,8 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
           <Table
             size="small"
             sx={{
-              border: '1px solid #1a3d7c',
-              '& td': { border: '1px solid #1a3d7c', padding: '4px 10px', fontSize: '12px' },
+              border: '1px solid #0a2540',
+              '& td': { border: '1px solid #0a2540', padding: '4px 10px', fontSize: '12px' },
             }}
           >
             <TableBody>
@@ -363,7 +363,7 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
                   <TableCell sx={{ textAlign: 'right' }}>{rupee(igstAmount)}</TableCell>
                 </TableRow>
               )}
-              <TableRow sx={{ bgcolor: '#eef2fa' }}>
+              <TableRow sx={{ bgcolor: '#eaedff' }}>
                 <TableCell sx={{ fontWeight: 900 }}>TOTAL AMOUNT :</TableCell>
                 <TableCell sx={{ textAlign: 'right', fontWeight: 900 }}>{rupee(totalAmount)}</TableCell>
               </TableRow>
@@ -373,7 +373,7 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 900 }}>AMT BALANCE:</TableCell>
-                <TableCell sx={{ textAlign: 'right', fontWeight: 900, color: balance > 0 ? 'red' : 'inherit' }}>
+                <TableCell sx={{ textAlign: 'right', fontWeight: 900, color: balance > 0 ? '#ba1a1a' : 'inherit' }}>
                   {rupee(balance)}{balance > 0 ? ' DR' : ''}
                 </TableCell>
               </TableRow>

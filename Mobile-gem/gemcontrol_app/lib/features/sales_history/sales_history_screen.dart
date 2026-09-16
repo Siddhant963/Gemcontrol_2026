@@ -72,6 +72,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, i) {
+                    final scheme = Theme.of(context).colorScheme;
                     final sale = filtered[i];
                     return Card(
                       child: InkWell(
@@ -99,7 +100,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       '${sale.customerName ?? "-"} · ${formatDate(sale.saleDate)}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -118,7 +119,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
+                                icon: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
                                 onPressed: () => context.push('/sales/${sale.id}', extra: sale),
                               ),
                             ],

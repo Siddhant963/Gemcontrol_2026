@@ -11,6 +11,7 @@ import '../../features/girvi/girvi_screen.dart';
 import '../../features/invoice/invoice_screen.dart';
 import '../../features/jewellery_panel/jewellery_panel_screen.dart';
 import '../../features/login/login_screen.dart';
+import '../../features/login/register_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/payments/payments_screen.dart';
 import '../../features/raw_materials/raw_materials_screen.dart';
@@ -19,6 +20,8 @@ import '../../features/sales_pos/new_sale_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/stock/stock_screen.dart';
+import '../../features/subscription/subscription_providers.dart';
+import '../../features/subscription/subscription_screen.dart';
 import '../../features/udhar/udhar_screen.dart';
 import '../../features/users/users_screen.dart';
 import '../models/sale.dart';
@@ -29,6 +32,7 @@ const _adminOnlyPaths = ['/reports/girvi', '/settings/firm', '/settings/users'];
 class _RouterRefreshNotifier extends ChangeNotifier {
   _RouterRefreshNotifier(Ref ref) {
     ref.listen(authControllerProvider, (_, __) => notifyListeners());
+    ref.listen(subscriptionControllerProvider, (_, __) => notifyListeners());
   }
 }
 
@@ -48,15 +52,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       final session = authAsync.valueOrNull ?? AuthSession.loggedOut;
 
       if (!session.isLoggedIn) {
-        return loc == '/login' ? null : '/login';
+        return (loc == '/login' || loc == '/register') ? null : '/login';
       }
       if (loc == '/' || loc == '/login') return '/home';
+
+      // Force to /subscribe only when inactive -- deliberately no reverse
+      // redirect for an active subscription. /subscribe must stay reachable
+      // voluntarily at any time (trialing, active, or expired) so a user can
+      // check status, renew early, or change plans from the drawer/Settings.
+      final subAsync = ref.read(subscriptionControllerProvider);
+      if (!subAsync.isLoading) {
+        final sub = subAsync.valueOrNull ?? SubscriptionSession.inactive;
+        if (!sub.isActive && loc != '/subscribe') return '/subscribe';
+      }
+
       if (_adminOnlyPaths.contains(loc) && !session.isAdmin) return '/home';
       return null;
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/home', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/inventory', builder: (context, state) => const StockScreen()),
       GoRoute(
@@ -89,6 +105,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const JewelleryPanelScreen(),
       ),
       GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+      GoRoute(path: '/subscribe', builder: (context, state) => const SubscriptionScreen()),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/settings/firm', builder: (context, state) => const FirmScreen()),
       GoRoute(path: '/settings/users', builder: (context, state) => const UsersScreen()),

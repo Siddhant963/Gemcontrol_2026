@@ -25,6 +25,7 @@ const _entries = [
   _DrawerEntry('Day Book', Icons.menu_book_outlined, '/reports/daybook'),
   _DrawerEntry('Payments Ledger', Icons.payments_outlined, '/reports/payments'),
   _DrawerEntry('Udhar Management', Icons.credit_score_outlined, '/reports/udhar'),
+  _DrawerEntry('Subscription', Icons.workspace_premium_outlined, '/subscribe', adminOnly: true),
   _DrawerEntry('Firm Management', Icons.storefront_outlined, '/settings/firm', adminOnly: true),
   _DrawerEntry(
     'User Management',
@@ -45,14 +46,16 @@ class AppDrawer extends ConsumerWidget {
     final isAdmin = ref.watch(authControllerProvider).valueOrNull?.isAdmin ?? false;
     final currentPath = GoRouterState.of(context).matchedLocation;
     final visible = _entries.where((e) => !e.adminOnly || isAdmin).toList();
+    final scheme = Theme.of(context).colorScheme;
 
     return Drawer(
+      backgroundColor: scheme.surface,
       child: SafeArea(
         child: Column(
           children: [
             Container(
               width: double.infinity,
-              color: AppColors.primary,
+              color: scheme.surfaceContainerHigh,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 AppSpacing.lg,
@@ -71,10 +74,10 @@ class AppDrawer extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     'RatnSetu',
                     style: TextStyle(
-                      color: AppColors.onPrimary,
+                      color: scheme.primary,
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
@@ -90,7 +93,7 @@ class AppDrawer extends ConsumerWidget {
                     ListTile(
                       leading: Icon(
                         e.icon,
-                        color: e.path == currentPath ? AppColors.primary : AppColors.onSurfaceVariant,
+                        color: e.path == currentPath ? scheme.primary : scheme.onSurfaceVariant,
                       ),
                       title: Text(
                         e.label,
@@ -99,7 +102,7 @@ class AppDrawer extends ConsumerWidget {
                         ),
                       ),
                       selected: e.path == currentPath,
-                      selectedTileColor: AppColors.primaryContainer.withValues(alpha: 0.2),
+                      selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.2),
                       onTap: () {
                         Navigator.pop(context);
                         if (e.path != currentPath) context.go(e.path);
@@ -108,9 +111,9 @@ class AppDrawer extends ConsumerWidget {
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: Theme.of(context).extension<AppColorsExtension>()!.hairline),
             ListTile(
-              leading: const Icon(Icons.settings_outlined, color: AppColors.onSurfaceVariant),
+              leading: Icon(Icons.settings_outlined, color: scheme.onSurfaceVariant),
               title: const Text('Settings'),
               selected: currentPath == '/settings',
               onTap: () {

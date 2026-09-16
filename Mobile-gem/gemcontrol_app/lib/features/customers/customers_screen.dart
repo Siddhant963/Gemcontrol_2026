@@ -95,14 +95,15 @@ class _CustomerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
         leading: CircleAvatar(
-          backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.3),
+          backgroundColor: scheme.primaryContainer.withValues(alpha: 0.3),
           child: Text(
             customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+            style: TextStyle(color: scheme.primary, fontWeight: FontWeight.bold),
           ),
         ),
         title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -112,11 +113,11 @@ class _CustomerCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.call_outlined, color: AppColors.primary, size: 20),
+              icon: Icon(Icons.call_outlined, color: scheme.primary, size: 20),
               onPressed: () => launchUrl(Uri.parse('tel:${customer.contact}')),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+              icon: Icon(Icons.delete_outline, color: scheme.error, size: 20),
               onPressed: () async {
                 await ref.read(customerRepositoryProvider).removeCustomer(customer.id);
                 ref.invalidate(customersProvider);

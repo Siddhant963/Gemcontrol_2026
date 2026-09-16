@@ -21,6 +21,7 @@ class GirviScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(girviItemsProvider);
     final summaryAsync = ref.watch(girviSummaryProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -62,7 +63,7 @@ class GirviScreen extends ConsumerWidget {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   StatusChip(label: r.status),
-                                  Text('${r.count} items', style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+                                  Text('${r.count} items', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
                                   Text(formatInr(r.totalOutstanding, decimals: false), style: AppTheme.numericData(context)),
                                 ],
                               ),
@@ -105,6 +106,7 @@ class _GirviCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.card),
@@ -125,9 +127,9 @@ class _GirviCard extends StatelessWidget {
                   height: 56,
                   child: girvi.itemImage.isNotEmpty
                       ? CachedNetworkImage(imageUrl: resolveUploadUrl(girvi.itemImage), fit: BoxFit.cover)
-                      : const ColoredBox(
-                          color: AppColors.surfaceContainerHigh,
-                          child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                      : ColoredBox(
+                          color: scheme.surfaceContainerHigh,
+                          child: Icon(Icons.diamond_outlined, color: scheme.outline),
                         ),
                 ),
               ),
@@ -139,11 +141,11 @@ class _GirviCard extends StatelessWidget {
                     Text(girvi.itemName, style: Theme.of(context).textTheme.titleLarge),
                     Text(
                       girvi.customerName ?? '-',
-                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                     ),
                     Text(
                       'Due ${formatDate(girvi.lastDateToTake)}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),

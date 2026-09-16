@@ -33,12 +33,12 @@ class ApiConfig {
   // Environments
   // ---------------------------------------------------------------------------
 
-  /// Hosted backend — same Render deployment + MongoDB the web app's
+  /// Hosted backend — same production API + MongoDB the web app's
   /// production build uses (see Frontend-gem/GemControl/.env.production).
   static const String _prodApiBaseUrl =
-      'https://gemcontrol-2026.onrender.com/api/admin';
+      'https://api.ratnsetu.com/api/admin';
   static const String _prodUploadsBaseUrl =
-      'https://gemcontrol-2026.onrender.com';
+      'https://api.ratnsetu.com';
 
   /// Local backend. `10.0.2.2` is the Android emulator's alias for the host
   /// machine's `localhost`. On a physical device, override with your machine's

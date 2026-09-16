@@ -85,6 +85,7 @@ class _DailyRateSheetState extends ConsumerState<DailyRateSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -97,9 +98,9 @@ class _DailyRateSheetState extends ConsumerState<DailyRateSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text("Today's Rate", style: Theme.of(context).textTheme.headlineSmall),
-          const Text(
+          Text(
             'Enter 24K gold + silver — other karats are auto-derived.',
-            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.md),
           Row(

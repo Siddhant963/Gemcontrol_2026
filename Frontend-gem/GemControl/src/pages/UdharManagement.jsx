@@ -29,7 +29,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Search, Delete, ExpandMore } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import api from "../utils/api";
 import NotificationModal from "../components/NotificationModal";
 
@@ -373,7 +373,8 @@ function UdharManagement() {
             }}
           >
             <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-              <Search
+              <SymbolIcon
+                name="search"
                 sx={{
                   color: theme.palette.text.secondary,
                   fontSize: { xs: "1.2rem", sm: "1.5rem" },
@@ -784,7 +785,8 @@ function UdharManagement() {
                               onClick={() => handleRemoveUdhar(item._id)}
                               sx={{ p: 0.5 }}
                             >
-                              <Delete
+                              <SymbolIcon
+                                name="delete"
                                 sx={{
                                   color: theme.palette.error.main,
                                   fontSize: { xs: "1rem", sm: "1.2rem" },
@@ -801,7 +803,8 @@ function UdharManagement() {
                                 transition: "transform 0.3s",
                               }}
                             >
-                              <ExpandMore
+                              <SymbolIcon
+                                name="expand_more"
                                 sx={{
                                   fontSize: { xs: "1.2rem", sm: "1.5rem" },
                                 }}
@@ -820,7 +823,8 @@ function UdharManagement() {
                               transition: "transform 0.3s",
                             }}
                           >
-                            <ExpandMore
+                            <SymbolIcon
+                              name="expand_more"
                               sx={{ fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
                             />
                           </ExpandIconButton>

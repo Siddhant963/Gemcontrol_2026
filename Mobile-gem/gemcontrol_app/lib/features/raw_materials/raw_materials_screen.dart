@@ -60,6 +60,7 @@ class _RawMaterialCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.sm + 4),
@@ -75,9 +76,9 @@ class _RawMaterialCard extends ConsumerWidget {
                         imageUrl: resolveUploadUrl(material.rawMaterialImg),
                         fit: BoxFit.cover,
                       )
-                    : const ColoredBox(
-                        color: AppColors.surfaceContainerHigh,
-                        child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                    : ColoredBox(
+                        color: scheme.surfaceContainerHigh,
+                        child: Icon(Icons.diamond_outlined, color: scheme.outline),
                       ),
               ),
             ),
@@ -89,18 +90,18 @@ class _RawMaterialCard extends ConsumerWidget {
                   Text(material.name, style: Theme.of(context).textTheme.titleLarge),
                   Text(
                     '${material.rawMaterialCode} · ${material.materialType}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
             Text('${material.quantity.toStringAsFixed(2)}g', style: AppTheme.numericData(context)),
             IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+              icon: Icon(Icons.add_circle_outline, color: scheme.primary),
               onPressed: () => _showAddStockDialog(context, ref, material),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              icon: Icon(Icons.delete_outline, color: scheme.error),
               onPressed: () async {
                 await ref.read(rawMaterialRepositoryProvider).removeRawMaterial(material.id);
                 ref.invalidate(rawMaterialsProvider);
@@ -185,6 +186,7 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -203,14 +205,14 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
             child: Container(
               height: 100,
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
+                color: scheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(AppRadii.sm),
                 image: _image != null
                     ? DecorationImage(image: FileImage(File(_image!.path)), fit: BoxFit.cover)
                     : null,
               ),
               child: _image == null
-                  ? const Center(child: Icon(Icons.add_photo_alternate_outlined, color: AppColors.outline))
+                  ? Center(child: Icon(Icons.add_photo_alternate_outlined, color: scheme.outline))
                   : null,
             ),
           ),

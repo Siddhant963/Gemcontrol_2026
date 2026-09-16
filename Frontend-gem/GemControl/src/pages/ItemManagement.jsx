@@ -30,13 +30,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Search,
-  Add,
-  Delete,
-  Print as PrintIcon,
-  Close,
-} from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { OptimizedImage } from "../utils/imageUtils";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -1133,7 +1127,7 @@ function ItemManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddItem}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -1163,7 +1157,7 @@ function ItemManagement() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -1527,7 +1521,7 @@ function ItemManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete fontSize="small" />}
+                          startIcon={<SymbolIcon name="delete" size={18} />}
                           onClick={() => handleRemoveItem(item._id)}
                           sx={{
                             fontSize: "0.75rem",
@@ -1541,7 +1535,7 @@ function ItemManagement() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<PrintIcon fontSize="small" />}
+                        startIcon={<SymbolIcon name="print" size={18} />}
                         onClick={() => handlePrintBarcode(item)}
                         disabled={!item.stockcode}
                         sx={{
@@ -1754,7 +1748,7 @@ function ItemManagement() {
                               variant="outlined"
                               size="small"
                               color="error"
-                              startIcon={<Delete fontSize="small" />}
+                              startIcon={<SymbolIcon name="delete" size={18} />}
                               onClick={() => handleRemoveItem(item._id)}
                               sx={{
                                 fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1768,7 +1762,7 @@ function ItemManagement() {
                           <Button
                             variant="contained"
                             size="small"
-                            startIcon={<PrintIcon fontSize="small" />}
+                            startIcon={<SymbolIcon name="print" size={18} />}
                             onClick={() => handlePrintBarcode(item)}
                             disabled={!item.stockcode}
                             sx={{
@@ -1839,7 +1833,7 @@ function ItemManagement() {
               p: 0.5,
             }}
           >
-            <Close sx={{ fontSize: "1rem" }} />
+            <SymbolIcon name="close" sx={{ fontSize: "1rem" }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -2328,7 +2322,7 @@ function ItemManagement() {
               color: theme.palette.getContrastText(theme.palette.primary.main),
             }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>

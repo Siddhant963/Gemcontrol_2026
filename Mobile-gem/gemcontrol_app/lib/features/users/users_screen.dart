@@ -20,6 +20,7 @@ class UsersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(allUsersProvider);
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'User Management'),
@@ -52,7 +53,7 @@ class UsersScreen extends ConsumerWidget {
                   children: [
                     StatusChip(label: u.role),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                      icon: Icon(Icons.delete_outline, color: scheme.error),
                       onPressed: () async {
                         await ref.read(authRepositoryProvider).removeUser(u.id);
                         ref.invalidate(allUsersProvider);

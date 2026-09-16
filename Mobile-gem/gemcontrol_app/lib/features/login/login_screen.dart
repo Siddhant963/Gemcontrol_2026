@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/auth/auth_state.dart';
-import '../../core/theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -49,8 +48,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -71,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.2),
+                            color: scheme.primary.withValues(alpha: 0.2),
                             blurRadius: 16,
                             spreadRadius: 1,
                           ),
@@ -91,10 +92,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Center(
+                  Center(
                     child: Text(
                       'Sign in to your showroom',
-                      style: TextStyle(color: AppColors.onSurfaceVariant),
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                   ),
                   const SizedBox(height: 36),
@@ -132,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: const TextStyle(color: AppColors.error, fontSize: 13),
+                      style: TextStyle(color: scheme.error, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -149,6 +150,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           )
                         : const Text('Sign In'),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('New shop? Sign up'),
+                    ),
                   ),
                 ],
               ),

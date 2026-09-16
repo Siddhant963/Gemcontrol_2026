@@ -53,6 +53,38 @@ class AuthRepository {
     );
   }
 
+  /// Public self-signup: creates a brand-new Firm (shop) and its admin
+  /// account together in one step, via the same `/register` endpoint the
+  /// web app's "Set Up Your Shop" page uses. No auth required to call this
+  /// -- unlike [register] above, which needs an already-logged-in admin.
+  /// The backend doesn't return a session token for this path, so the
+  /// caller logs in separately afterwards.
+  Future<AppUser> registerShop({
+    required String name,
+    required String email,
+    required String contact,
+    required String password,
+    required String firmName,
+    required String firmLocation,
+    required String firmSize,
+  }) {
+    return _client.request(
+      (dio) => dio.post(
+        '/register',
+        data: {
+          'name': name,
+          'email': email,
+          'contact': contact,
+          'password': password,
+          'firmName': firmName,
+          'firmLocation': firmLocation,
+          'firmSize': firmSize,
+        },
+      ),
+      (data) => AppUser.fromJson(data['user']),
+    );
+  }
+
   Future<void> updateUser({
     required String userId,
     required String name,

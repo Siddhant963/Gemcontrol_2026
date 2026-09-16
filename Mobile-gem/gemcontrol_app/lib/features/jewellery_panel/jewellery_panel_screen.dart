@@ -19,6 +19,7 @@ class JewelleryPanelScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     final stockAsync = ref.watch(stockListProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
 
@@ -77,9 +78,9 @@ class JewelleryPanelScreen extends ConsumerWidget {
                                     height: 48,
                                     child: s.stockImg.isNotEmpty
                                         ? CachedNetworkImage(imageUrl: resolveUploadUrl(s.stockImg), fit: BoxFit.cover)
-                                        : const ColoredBox(
-                                            color: AppColors.surfaceContainerHigh,
-                                            child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                                        : ColoredBox(
+                                            color: scheme.surfaceContainerHigh,
+                                            child: Icon(Icons.diamond_outlined, color: scheme.outline),
                                           ),
                                   ),
                                 ),
@@ -96,7 +97,7 @@ class JewelleryPanelScreen extends ConsumerWidget {
                                       ),
                                       Text(
                                         '${s.netWeight.toStringAsFixed(2)}g',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                                       ),
                                     ],
                                   ),

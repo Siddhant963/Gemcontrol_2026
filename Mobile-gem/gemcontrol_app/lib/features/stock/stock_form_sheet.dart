@@ -154,6 +154,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
+    final scheme = Theme.of(context).colorScheme;
     return DraggableScrollableSheet(
       initialChildSize: 0.92,
       maxChildSize: 0.95,
@@ -179,15 +180,15 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
               child: Container(
                 height: 110,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
+                  color: scheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(AppRadii.sm),
                   image: _image != null
                       ? DecorationImage(image: FileImage(File(_image!.path)), fit: BoxFit.cover)
                       : null,
                 ),
                 child: _image == null
-                    ? const Center(
-                        child: Icon(Icons.add_photo_alternate_outlined, color: AppColors.outline),
+                    ? Center(
+                        child: Icon(Icons.add_photo_alternate_outlined, color: scheme.outline),
                       )
                     : null,
               ),

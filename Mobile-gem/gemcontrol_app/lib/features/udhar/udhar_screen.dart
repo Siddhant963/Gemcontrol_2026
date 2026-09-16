@@ -114,6 +114,7 @@ class _OutstandingTab extends ConsumerWidget {
           separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
           itemBuilder: (context, i) {
             final c = customers[i];
+            final scheme = Theme.of(context).colorScheme;
             return Card(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -135,7 +136,7 @@ class _OutstandingTab extends ConsumerWidget {
                           ),
                           Text(
                             c.entries.length == 1 ? '1 invoice' : '${c.entries.length} invoices',
-                            style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -144,7 +145,7 @@ class _OutstandingTab extends ConsumerWidget {
                       child: Text(
                         formatInrRounded(c.totalOutstanding),
                         textAlign: TextAlign.center,
-                        style: AppTheme.numericData(context).copyWith(color: AppColors.error),
+                        style: AppTheme.numericData(context).copyWith(color: scheme.error),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -187,6 +188,8 @@ class _CustomerUdharSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final udharAsync = ref.watch(allUdharProvider);
     final settlementsAsync = ref.watch(allUdharSettlementsProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<AppColorsExtension>()!;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -214,11 +217,11 @@ class _CustomerUdharSheet extends ConsumerWidget {
                             .toList()
                           ..sort((a, b) => (b.udharDate ?? DateTime(0)).compareTo(a.udharDate ?? DateTime(0)));
                         if (entries.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Text(
                               'No outstanding invoices — fully settled.',
-                              style: TextStyle(color: AppColors.onSurfaceVariant),
+                              style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
                           );
                         }
@@ -242,11 +245,11 @@ class _CustomerUdharSheet extends ConsumerWidget {
                         final history = all.where((s) => s.customerId == customerId).toList()
                           ..sort((a, b) => (b.paymentDate ?? DateTime(0)).compareTo(a.paymentDate ?? DateTime(0)));
                         if (history.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Text(
                               'No payments recorded yet.',
-                              style: TextStyle(color: AppColors.onSurfaceVariant),
+                              style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
                           );
                         }
@@ -266,7 +269,7 @@ class _CustomerUdharSheet extends ConsumerWidget {
                                   formatInrRounded(history[i].amount),
                                   style: AppTheme.numericData(
                                     context,
-                                  ).copyWith(color: AppColors.success, fontSize: 15),
+                                  ).copyWith(color: extra.onSuccessContainer, fontSize: 15),
                                 ),
                               ),
                             ],
@@ -302,6 +305,8 @@ class _UdharEntryTile extends ConsumerWidget {
             .fold<double>(0, (a, s) => a + s.amount) ??
         0;
     final original = udhar.amount + paidSoFar;
+    final scheme = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<AppColorsExtension>()!;
 
     return Card(
       child: Padding(
@@ -321,16 +326,16 @@ class _UdharEntryTile extends ConsumerWidget {
                 ),
                 Text(
                   'Taken ${formatDate(udhar.udharDate)}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                _AmountStat(label: 'Taken', value: original, color: AppColors.onSurfaceVariant),
-                _AmountStat(label: 'Paid', value: paidSoFar, color: AppColors.success),
-                _AmountStat(label: 'Remaining', value: udhar.amount, color: AppColors.error),
+                _AmountStat(label: 'Taken', value: original, color: scheme.onSurfaceVariant),
+                _AmountStat(label: 'Paid', value: paidSoFar, color: extra.onSuccessContainer),
+                _AmountStat(label: 'Remaining', value: udhar.amount, color: scheme.error),
               ],
             ),
             const SizedBox(height: 8),
@@ -393,11 +398,12 @@ class _AmountStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+          Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
           Text(
             formatInrRounded(value),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
@@ -428,6 +434,7 @@ class _SettlementsTab extends ConsumerWidget {
           separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
           itemBuilder: (context, i) {
             final s = sorted[i];
+            final extra = Theme.of(context).extension<AppColorsExtension>()!;
             return Card(
               child: ListTile(
                 title: Text(s.customerName ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -438,7 +445,7 @@ class _SettlementsTab extends ConsumerWidget {
                 ),
                 trailing: Text(
                   formatInr(s.amount),
-                  style: AppTheme.numericData(context).copyWith(color: AppColors.success),
+                  style: AppTheme.numericData(context).copyWith(color: extra.onSuccessContainer),
                 ),
               ),
             );

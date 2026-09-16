@@ -26,7 +26,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Add, Delete, Close, Edit } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { OptimizedImage } from "../utils/imageUtils";
@@ -384,7 +384,7 @@ function Categories() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddCategory}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -414,7 +414,7 @@ function Categories() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -514,7 +514,7 @@ function Categories() {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<Edit fontSize="small" />}
+                        startIcon={<SymbolIcon name="edit" size={18} />}
                         onClick={() => handleEditCategory(category)}
                         sx={{
                           fontSize: "0.75rem",
@@ -528,7 +528,7 @@ function Categories() {
                         variant="outlined"
                         size="small"
                         color="error"
-                        startIcon={<Delete fontSize="small" />}
+                        startIcon={<SymbolIcon name="delete" size={18} />}
                         onClick={() => handleRemoveCategory(category._id)}
                         sx={{
                           fontSize: '0.75rem',
@@ -639,7 +639,7 @@ function Categories() {
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={<Edit fontSize="small" />}
+                            startIcon={<SymbolIcon name="edit" size={18} />}
                             onClick={() => handleEditCategory(category)}
                             sx={{
                               fontSize: "0.75rem",
@@ -653,7 +653,7 @@ function Categories() {
                             variant="outlined"
                             size="small"
                             color="error"
-                            startIcon={<Delete fontSize="small" />}
+                            startIcon={<SymbolIcon name="delete" size={18} />}
                             onClick={() => handleRemoveCategory(category._id)}
                             sx={{ fontSize: '0.75rem', px: 1, textTransform: 'none' }}
                           >
@@ -732,7 +732,7 @@ function Categories() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>

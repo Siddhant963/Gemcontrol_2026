@@ -30,21 +30,13 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import {
-  Search,
-  Notifications,
-  Close,
-  MonetizationOn,
-  Grain,
-  Diamond,
-  Update,
-} from "@mui/icons-material";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
 import { ROUTES } from "../utils/routes";
 import api from "../utils/api";
 import NotificationModal from "../components/NotificationModal";
+import SymbolIcon from "../components/SymbolIcon";
 
 import {
   BarChart,
@@ -848,7 +840,7 @@ function Dashboard() {
             }}
           >
             <IconButton sx={{ p: theme.spacing(1) }}>
-              <Search sx={{ color: theme.palette.text.secondary }} />
+              <SymbolIcon name="search" sx={{ color: theme.palette.text.secondary }} />
             </IconButton>
             <InputBase
               sx={{
@@ -870,7 +862,7 @@ function Dashboard() {
             aria-label="notifications"
           >
             <Badge badgeContent={notifications.length} color="secondary">
-              <Notifications sx={{ color: theme.palette.text.primary }} />
+              <SymbolIcon name="notifications" sx={{ color: theme.palette.text.primary }} />
             </Badge>
           </IconButton>
           {/* Notification Dropdown */}
@@ -1067,7 +1059,7 @@ function Dashboard() {
               {isAdmin && (
                 <Button
                   variant="contained"
-                  startIcon={<Update />}
+                  startIcon={<SymbolIcon name="sync" />}
                   onClick={handleRefreshRates}
                   disabled={rateActionLoading}
                   sx={{
@@ -1096,7 +1088,7 @@ function Dashboard() {
               {/* Gold Rates Card */}
               <motion.div custom={0} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
-                    <MonetizationOn sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
+                    <SymbolIcon name="monetization_on" sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
                       Gold Rates
                     </Typography>
@@ -1141,7 +1133,7 @@ function Dashboard() {
               {/* Silver Rate Card */}
               <motion.div custom={1} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
-                    <Grain sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
+                    <SymbolIcon name="grain" sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
                       Silver Rates
                     </Typography>
@@ -1184,7 +1176,7 @@ function Dashboard() {
               {/* Diamond Rates Card */}
               <motion.div custom={2} variants={cardVariants} initial="hidden" animate="visible" whileHover="hover">
                   <Paper sx={rateCardSx}>
-                    <Diamond sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
+                    <SymbolIcon name="diamond" sx={{ fontSize: { xs: 30, sm: 36, md: 42 }, color: theme.palette.primary.main }} />
                     <Typography variant="h6" sx={{ color: theme.palette.text.primary, mt: 1, mb: 1, fontWeight: 700 }}>
                       Diamond Rates
                     </Typography>
@@ -1303,13 +1295,13 @@ function Dashboard() {
             }}
           >
             {/* Monthly Sales Chart (Bar Chart) */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={4}>
               <Paper
                 sx={{
                   p: theme.spacing(2),
                   borderRadius: theme.shape.borderRadius * 2,
                   boxShadow: theme.shadows[4],
-                  height: 400,
+                  aspectRatio: "1 / 1",
                 }}
               >
                 <Typography
@@ -1362,13 +1354,13 @@ function Dashboard() {
             </Grid>
 
             {/* Comparison Chart for Totals (Bar Chart) */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={4}>
               <Paper
                 sx={{
                   p: theme.spacing(2),
                   borderRadius: theme.shape.borderRadius * 2,
                   boxShadow: theme.shadows[4],
-                  height: 400,
+                  aspectRatio: "1 / 1",
                 }}
               >
                 <Typography
@@ -1423,13 +1415,13 @@ function Dashboard() {
             </Grid>
 
             {/* Historical Rates Chart (Line Chart) */}
-            <Grid item xs={12} md={12}>
+            <Grid item xs={12} md={4}>
               <Paper
                 sx={{
                   p: theme.spacing(2),
                   borderRadius: theme.shape.borderRadius * 2,
                   boxShadow: theme.shadows[4],
-                  height: 400,
+                  aspectRatio: "1 / 1",
                 }}
               >
                 <Typography
@@ -1516,7 +1508,7 @@ function Dashboard() {
             onClick={handleCloseGoldModal}
             sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.getContrastText(theme.palette.primary.main) }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -1598,7 +1590,7 @@ function Dashboard() {
             onClick={handleCloseSilverModal}
             sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.getContrastText(theme.palette.primary.main) }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -1665,7 +1657,7 @@ function Dashboard() {
             onClick={handleCloseDiamondModal}
             sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.getContrastText(theme.palette.primary.main) }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -1726,7 +1718,7 @@ function Dashboard() {
         <DialogTitle sx={{ color: rateDialogType === "success" ? "green" : "red", position: "relative" }}>
           {rateDialogType === "success" ? "Success" : "Error"}
           <IconButton onClick={handleRateDialogClose} sx={{ position: "absolute", top: 8, right: 8 }}>
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent>

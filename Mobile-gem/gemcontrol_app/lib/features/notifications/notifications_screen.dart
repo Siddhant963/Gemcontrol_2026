@@ -28,6 +28,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationsControllerProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: GcAppBar(title: 'Notifications'),
@@ -35,13 +36,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         onRefresh: () => ref.read(notificationsControllerProvider.notifier).refreshAndMarkRead(),
         child: state.activities.isEmpty
             ? ListView(
-                children: const [
+                children: [
                   Padding(
-                    padding: EdgeInsets.only(top: 96),
+                    padding: const EdgeInsets.only(top: 96),
                     child: Center(
                       child: Text(
                         'No recent activity',
-                        style: TextStyle(color: AppColors.onSurfaceVariant),
+                        style: TextStyle(color: scheme.onSurfaceVariant),
                       ),
                     ),
                   ),
@@ -55,7 +56,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   final activity = state.activities[i];
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.circle, size: 10, color: AppColors.primary),
+                    leading: Icon(Icons.circle, size: 10, color: scheme.primary),
                     title: Text('${activity.activityType}: ${activity.description}'),
                     subtitle: Text(formatDateTime(activity.timestamp)),
                   );

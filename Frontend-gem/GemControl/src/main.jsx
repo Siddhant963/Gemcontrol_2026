@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./assets/fonts/work-sans.css";
+import "./index.css";
 import "./styles/print.css";
 import App from "./App.jsx";
 

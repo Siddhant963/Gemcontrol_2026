@@ -19,6 +19,7 @@ class DashboardScreen extends ConsumerWidget {
     final dataAsync = ref.watch(dashboardDataProvider);
     final monthlyAsync = ref.watch(monthlySalesProvider);
     final session = ref.watch(authControllerProvider).valueOrNull;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -37,7 +38,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: Text(
                   'Welcome back, ${session!.isAdmin ? "Admin" : "Team"}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -130,6 +131,7 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -137,7 +139,7 @@ class _StatTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: AppColors.primary, size: 18),
+            Icon(icon, color: scheme.primary, size: 18),
             const SizedBox(height: 6),
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -149,7 +151,7 @@ class _StatTile extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
+              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -167,6 +169,7 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 220,
       child: Card(
@@ -174,7 +177,7 @@ class _ChartCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
           child: Column(
             children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+              Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 4),
               Expanded(child: child),
             ],
@@ -191,9 +194,10 @@ class _RevenueChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (months.isEmpty) {
-      return const Center(
-        child: Text('No sales data yet', style: TextStyle(color: AppColors.onSurfaceVariant)),
+      return Center(
+        child: Text('No sales data yet', style: TextStyle(color: scheme.onSurfaceVariant)),
       );
     }
     final maxY = months.map((m) => m.totalRevenue).fold<double>(0, (a, b) => a > b ? a : b);
@@ -216,7 +220,7 @@ class _RevenueChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     months[i].month.substring(0, 3),
-                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                   ),
                 );
               },
@@ -230,7 +234,7 @@ class _RevenueChart extends StatelessWidget {
               barRods: [
                 BarChartRodData(
                   toY: months[i].totalRevenue,
-                  color: AppColors.primaryContainer,
+                  color: scheme.primaryContainer,
                   width: 22,
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -249,20 +253,21 @@ class _RevenuePieChart extends StatelessWidget {
   final List<MonthlySales> months;
   const _RevenuePieChart({required this.months});
 
-  static const _palette = [
-    AppColors.primary,
-    AppColors.primaryContainer,
-    AppColors.secondary,
-    AppColors.tertiary,
-    AppColors.success,
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<AppColorsExtension>()!;
+    final palette = [
+      scheme.primary,
+      scheme.primaryContainer,
+      scheme.secondary,
+      scheme.tertiary,
+      extra.onSuccessContainer,
+    ];
     final total = months.fold<double>(0, (a, m) => a + m.totalRevenue);
     if (months.isEmpty || total <= 0) {
-      return const Center(
-        child: Text('No sales data yet', style: TextStyle(color: AppColors.onSurfaceVariant)),
+      return Center(
+        child: Text('No sales data yet', style: TextStyle(color: scheme.onSurfaceVariant)),
       );
     }
     return Column(
@@ -276,13 +281,13 @@ class _RevenuePieChart extends StatelessWidget {
                 for (var i = 0; i < months.length; i++)
                   PieChartSectionData(
                     value: months[i].totalRevenue,
-                    color: _palette[i % _palette.length],
+                    color: palette[i % palette.length],
                     title: '${(months[i].totalRevenue / total * 100).round()}%',
                     radius: 36,
-                    titleStyle: const TextStyle(
+                    titleStyle: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.onPrimary,
+                      color: scheme.onPrimary,
                     ),
                   ),
               ],
@@ -303,14 +308,14 @@ class _RevenuePieChart extends StatelessWidget {
                     width: 7,
                     height: 7,
                     decoration: BoxDecoration(
-                      color: _palette[i % _palette.length],
+                      color: palette[i % palette.length],
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     months[i].month.substring(0, 3),
-                    style: const TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant),
+                    style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
                   ),
                 ],
               ),

@@ -31,7 +31,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Add, Delete, Close } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
@@ -417,7 +417,7 @@ function UserManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddUser}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -447,7 +447,7 @@ function UserManagement() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -539,7 +539,7 @@ function UserManagement() {
                         variant="outlined"
                         size="small"
                         color="error"
-                        startIcon={<Delete fontSize="small" />}
+                        startIcon={<SymbolIcon name="delete" size={18} />}
                         onClick={() => handleRemoveUser(user._id)}
                         sx={{
                           fontSize: "0.75rem",
@@ -654,7 +654,7 @@ function UserManagement() {
                             variant="outlined"
                             size="small"
                             color="error"
-                            startIcon={<Delete fontSize="small" />}
+                            startIcon={<SymbolIcon name="delete" size={18} />}
                             onClick={() => handleRemoveUser(user._id)}
                             sx={{
                               fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -740,7 +740,7 @@ function UserManagement() {
               p: { xs: 0.5, sm: 1 },
             }}
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
@@ -960,7 +960,7 @@ function UserManagement() {
               color: theme.palette.getContrastText(theme.palette.primary.main),
             }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
 

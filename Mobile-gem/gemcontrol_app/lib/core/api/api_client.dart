@@ -12,8 +12,11 @@ import '../config/api_config.dart';
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final cleaned = path.startsWith('/') ? path.substring(1) : path;
-  return '$uploadsBaseUrl/Uploads/$cleaned';
+  var cleaned = path.startsWith('/') ? path.substring(1) : path;
+  if (cleaned.startsWith('Uploads/')) {
+    cleaned = cleaned.substring('Uploads/'.length);
+  }
+  return '${ApiConfig.uploadsBaseUrl}/Uploads/$cleaned';
 }
 
 class UnauthorizedException implements Exception {}
@@ -30,6 +33,10 @@ class ApiClient {
   final Dio dio;
   final TokenStorage tokenStorage;
   void Function()? onUnauthorized;
+  // 402 + code:"SUBSCRIPTION_REQUIRED" means the session is still valid but
+  // the firm's subscription isn't -- distinct from 401, so the token is NOT
+  // cleared here, unlike onUnauthorized.
+  void Function()? onSubscriptionRequired;
 
   ApiClient(this.tokenStorage)
     : dio = Dio(
@@ -59,6 +66,8 @@ class ApiClient {
             );
             tokenStorage.clear();
             onUnauthorized?.call();
+          } else if (error.response?.statusCode == 402) {
+            onSubscriptionRequired?.call();
           }
           handler.next(error);
         },
