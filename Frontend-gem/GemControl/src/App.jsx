@@ -23,6 +23,7 @@ import Login from "./pages/Login";
 import Register from "./components/Register";
 import LandingPage from "./pages/LandingPage.jsx";
 import SubscribePage from "./pages/SubscribePage.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
 import NotFound from "./pages/NotFound";
 import { ROUTES } from "./utils/routes";
 import ErrorBoundary from "./ErrorBoundary.jsx";
@@ -68,6 +69,10 @@ function MainApp() {
               same as any SaaS homepage. Login/Register handle their own
               already-authenticated redirect below. */}
           <Route path={ROUTES.LANDING} element={<LandingPage />} />
+
+          {/* Public, unauthenticated -- linked from Play Store / App Store
+              listings and the footer, so it must never require login. */}
+          <Route path={ROUTES.PRIVACY_POLICY} element={<PrivacyPolicy />} />
 
           {/* Public Routes */}
           <Route
