@@ -32,30 +32,35 @@ const materialSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // No "required" here (default 0 instead) so the hourly live gold/silver
+    // rate job (see Utils/cronJobs.js) can create the day's first Dailrate
+    // document before an admin has entered diamond rates -- it always
+    // carries forward the previous day's diamond values when one exists,
+    // and only falls back to 0 on a brand-new install with no prior rates.
     daimond: {
       "0_5 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
       "1 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
       "1_5 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
       "2 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
       "2_5 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
       "3 Carat": {
         type: Number,
-        required: true,
+        default: 0,
       },
     },
   },

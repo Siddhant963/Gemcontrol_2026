@@ -1542,6 +1542,7 @@ function deriveGoldPurities(gold24K) {
 
 module.exports.GOLD_PURITY_FACTORS = GOLD_PURITY_FACTORS;
 module.exports.deriveGoldPurities = deriveGoldPurities;
+module.exports.normalizeToUtcDate = normalizeToUtcDate;
 
 // Turns a { value, unit } charge config into a flat rupee amount.
 // per_gram/per_kg/per_mg scale against the item's net weight; percent scales
