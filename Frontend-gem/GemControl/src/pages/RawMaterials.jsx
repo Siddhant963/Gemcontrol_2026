@@ -29,14 +29,7 @@ import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { OptimizedImage } from "../utils/imageUtils";
-import {
-  Search,
-  Add,
-  Delete,
-  UploadFile,
-  Close,
-  Edit,
-} from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
@@ -637,7 +630,7 @@ function RawMaterials() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddMaterial}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -657,7 +650,7 @@ function RawMaterials() {
             </Button>
             <Button
               variant="contained"
-              startIcon={<UploadFile />}
+              startIcon={<SymbolIcon name="upload_file" />}
               onClick={handleImportFile}
               sx={{
                 bgcolor: theme.palette.secondary.main,
@@ -687,7 +680,7 @@ function RawMaterials() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -831,7 +824,7 @@ function RawMaterials() {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<Edit fontSize="small" />}
+                        startIcon={<SymbolIcon name="edit" size={18} />}
                         onClick={() => handleEditMaterial(material)}
                         sx={{
                           fontSize: "0.75rem",
@@ -847,7 +840,7 @@ function RawMaterials() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete fontSize="small" />}
+                          startIcon={<SymbolIcon name="delete" size={18} />}
                           onClick={() => handleRemoveMaterial(material._id)}
                           sx={{
                             fontSize: "0.75rem",
@@ -999,7 +992,7 @@ function RawMaterials() {
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={<Edit fontSize="small" />}
+                            startIcon={<SymbolIcon name="edit" size={18} />}
                             onClick={() => handleEditMaterial(material)}
                             sx={{
                               fontSize: "0.75rem",
@@ -1014,7 +1007,7 @@ function RawMaterials() {
                               variant="outlined"
                               size="small"
                               color="error"
-                              startIcon={<Delete fontSize="small" />}
+                              startIcon={<SymbolIcon name="delete" size={18} />}
                               onClick={() => handleRemoveMaterial(material._id)}
                               sx={{
                                 fontSize: "0.75rem",
@@ -1111,7 +1104,7 @@ function RawMaterials() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -1383,7 +1376,7 @@ function RawMaterials() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -1513,7 +1506,7 @@ function RawMaterials() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -1529,7 +1522,7 @@ function RawMaterials() {
             <Button
               variant="contained"
               component="label"
-              startIcon={<UploadFile />}
+              startIcon={<SymbolIcon name="upload_file" />}
               sx={{
                 bgcolor: theme.palette.secondary.main,
                 color: theme.palette.getContrastText(

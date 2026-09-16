@@ -15,7 +15,12 @@ const GirviInterestModel = require("../Models/GirviInterestModel.js");
 const ActivityModel = require("../Models/ActivitesModel.js");
 const SubscriptionModel = require("../Models/SubscriptionModel.js");
 const SubscriptionPlanModel = require("../Models/SubscriptionPlanModel.js");
-const { ensureTrialSubscription, isSubscriptionCurrentlyActive } = require("../Utils/subscription.js");
+const {
+  ensureTrialSubscription,
+  activatePaidSubscription,
+  isSubscriptionCurrentlyActive,
+} = require("../Utils/subscription.js");
+const { razorpay, verifyPaymentSignature, validateWebhookSignature } = require("../Utils/razorpay.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -3251,13 +3256,29 @@ module.exports.getMySubscription = async (req, res) => {
   }
 };
 
-// Dev/test-only activation: no payment gateway involved yet. Lets the whole
-// subscribe -> gated-app flow be tested end-to-end before Razorpay (or
-// whichever gateway) is wired in -- see the TODO below for exactly where
-// that plugs in later.
+// A billing period always starts now and runs one interval (month/year)
+// from the plan -- shared by the dev/test path and the real Razorpay path
+// so both compute endDate identically.
+function computeSubscriptionPeriod(plan) {
+  const startDate = new Date();
+  const endDate = new Date(startDate);
+  if (plan.billingInterval === "year") {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  } else {
+    endDate.setMonth(endDate.getMonth() + 1);
+  }
+  return { startDate, endDate };
+}
+
+// Dev/test-only activation: no real payment. Disabled in production now
+// that Razorpay is wired in below -- this must never be a free bypass once
+// real money is involved.
 module.exports.activateTestSubscription = async (req, res) => {
   const { planKey } = req.body;
   try {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(403).json({ message: "Not available in production" });
+    }
     if (!req.user.firm) {
       return res.status(403).json({ message: "No firm associated with this account" });
     }
@@ -3269,23 +3290,7 @@ module.exports.activateTestSubscription = async (req, res) => {
       return res.status(404).json({ message: "Plan not found" });
     }
 
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    if (plan.billingInterval === "year") {
-      endDate.setFullYear(endDate.getFullYear() + 1);
-    } else {
-      endDate.setMonth(endDate.getMonth() + 1);
-    }
-
-    // TODO(production): replace this whole handler with two steps once a
-    // real gateway is wired in --
-    //   1. POST /createSubscriptionOrder: create a gateway order/intent for
-    //      plan.price and return its id to the client for checkout.
-    //   2. POST /verifySubscriptionPayment (gateway webhook or client
-    //      callback): verify the payment, THEN run this same
-    //      findOneAndUpdate with paymentProvider set to the gateway's key
-    //      and paymentReference/amountPaid filled in from the real payment.
-    // The Subscription document shape doesn't need to change either way.
+    const { startDate, endDate } = computeSubscriptionPeriod(plan);
     const subscription = await SubscriptionModel.findOneAndUpdate(
       { firm: req.user.firm },
       {
@@ -3311,6 +3316,155 @@ module.exports.activateTestSubscription = async (req, res) => {
     res.status(200).json({ message: "Subscription activated", subscription });
   } catch (error) {
     console.error("Error activating subscription:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Step 1 of the real payment flow: create a Razorpay order for the chosen
+// plan's price and hand its id to the client to open Checkout with.
+module.exports.createSubscriptionOrder = async (req, res) => {
+  const { planKey } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!planKey) {
+      return res.status(400).json({ message: "planKey is required" });
+    }
+    const plan = await SubscriptionPlanModel.findOne({ key: planKey, isActive: true });
+    if (!plan) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    // Razorpay caps receipt at 40 chars -- keep it short.
+    const receipt = `sub_${String(req.user.firm).slice(-12)}_${Date.now().toString(36)}`;
+    const order = await razorpay.orders.create({
+      amount: Math.round(plan.price * 100), // paise
+      currency: "INR",
+      receipt,
+      notes: { firmId: String(req.user.firm), planKey: plan.key },
+    });
+
+    res.status(200).json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: process.env.RAZORPAY_KEY_ID,
+      plan,
+    });
+  } catch (error) {
+    console.error("Error creating subscription order:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Step 2 of the real payment flow: verify the signature Checkout (web) or
+// razorpay_flutter (mobile, after remapping its camelCase fields) handed
+// back, then activate the subscription for real.
+module.exports.verifySubscriptionPayment = async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planKey } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !planKey) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    const validSignature = verifyPaymentSignature({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+    });
+    if (!validSignature) {
+      return res.status(400).json({ message: "Payment verification failed" });
+    }
+
+    // Re-fetch the plan server-side -- never trust a client-sent price.
+    const plan = await SubscriptionPlanModel.findOne({ key: planKey, isActive: true });
+    if (!plan) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    const { startDate, endDate } = computeSubscriptionPeriod(plan);
+    const subscription = await activatePaidSubscription({
+      firm: req.user.firm,
+      plan,
+      paymentProvider: "razorpay",
+      paymentReference: razorpay_payment_id,
+      amountPaid: plan.price,
+      startDate,
+      endDate,
+    });
+
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "subscriptionActivated",
+      `Activated ${plan.name} plan via Razorpay (payment ${razorpay_payment_id})`
+    );
+
+    res.status(200).json({ message: "Subscription activated", subscription });
+  } catch (error) {
+    console.error("Error verifying subscription payment:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Server-to-server safety net alongside verifySubscriptionPayment above --
+// in case a client closes the app/browser after paying but before the
+// verify call completes. Public (no isLoggedIn), authenticated only by the
+// Razorpay webhook signature. The route is mounted directly on `app` in
+// server.js with a raw-body parser, *before* it, so req.body here is the
+// raw Buffer/string, not pre-parsed JSON.
+module.exports.razorpayWebhook = async (req, res) => {
+  try {
+    const signature = req.headers["x-razorpay-signature"];
+    const rawBody = req.body; // Buffer, thanks to express.raw() on this route
+    const isValid = validateWebhookSignature(
+      rawBody.toString(),
+      signature,
+      process.env.RAZORPAY_WEBHOOK_SECRET
+    );
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid webhook signature" });
+    }
+
+    const event = JSON.parse(rawBody.toString());
+    if (event.event !== "order.paid") {
+      // Only subscribed to order.paid in the Razorpay Dashboard, but guard
+      // anyway in case other events ever get added there.
+      return res.status(200).json({ message: "Ignored" });
+    }
+
+    const orderEntity = event.payload?.order?.entity;
+    const paymentEntity = event.payload?.payment?.entity;
+    const firmId = orderEntity?.notes?.firmId;
+    const planKey = orderEntity?.notes?.planKey;
+    if (!firmId || !planKey || !paymentEntity?.id) {
+      console.error("razorpayWebhook: order.paid missing expected notes/payment id", event.payload);
+      return res.status(200).json({ message: "Missing data, ignored" });
+    }
+
+    const plan = await SubscriptionPlanModel.findOne({ key: planKey, isActive: true });
+    if (!plan) {
+      console.error(`razorpayWebhook: plan "${planKey}" not found/inactive`);
+      return res.status(200).json({ message: "Plan not found, ignored" });
+    }
+
+    const { startDate, endDate } = computeSubscriptionPeriod(plan);
+    await activatePaidSubscription({
+      firm: firmId,
+      plan,
+      paymentProvider: "razorpay",
+      paymentReference: paymentEntity.id,
+      amountPaid: plan.price,
+      startDate,
+      endDate,
+    });
+
+    res.status(200).json({ message: "Processed" });
+  } catch (error) {
+    console.error("Error processing Razorpay webhook:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

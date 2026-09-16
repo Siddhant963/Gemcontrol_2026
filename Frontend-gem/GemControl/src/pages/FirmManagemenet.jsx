@@ -25,7 +25,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Add, Delete, Close, Edit } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { OptimizedImage } from "../utils/imageUtils";
@@ -505,7 +505,7 @@ function FirmManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddFirm}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -539,7 +539,7 @@ function FirmManagement() {
                 sx={{ p: { xs: 0.5, sm: 1 } }}
                 aria-label="Search firms"
               >
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -651,7 +651,7 @@ function FirmManagement() {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<Edit fontSize="small" />}
+                        startIcon={<SymbolIcon name="edit" size={18} />}
                         onClick={() => handleEditFirm(firm)}
                         sx={{ fontSize: "0.75rem", px: 1, textTransform: "none" }}
                         aria-label="Edit firm"
@@ -662,7 +662,7 @@ function FirmManagement() {
                         variant="outlined"
                         size="small"
                         color="error"
-                        startIcon={<Delete fontSize="small" />}
+                        startIcon={<SymbolIcon name="delete" size={18} />}
                         onClick={() => handleDeleteFirm(firm._id)}
                         sx={{
                           fontSize: "0.75rem",
@@ -777,7 +777,7 @@ function FirmManagement() {
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={<Edit fontSize="small" />}
+                            startIcon={<SymbolIcon name="edit" size={18} />}
                             onClick={() => handleEditFirm(firm)}
                             sx={{ fontSize: "0.75rem", px: 1, mr: 1, textTransform: "none" }}
                             aria-label="Edit firm"
@@ -788,7 +788,7 @@ function FirmManagement() {
                             variant="outlined"
                             size="small"
                             color="error"
-                            startIcon={<Delete fontSize="small" />}
+                            startIcon={<SymbolIcon name="delete" size={18} />}
                             onClick={() => handleDeleteFirm(firm._id)}
                             sx={{
                               fontSize: "0.75rem",
@@ -874,7 +874,7 @@ function FirmManagement() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
@@ -1412,7 +1412,7 @@ function FirmManagement() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         {editFirm && (

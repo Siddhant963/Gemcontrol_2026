@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/theme/app_theme.dart';
 
 /// Renders loading/error/data for any AsyncValue, with a consistent
 /// error card (message + retry) and empty-state slot.
@@ -24,6 +23,7 @@ class AsyncValueWidget<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return value.when(
       data: (d) {
         if (isEmpty != null && isEmpty!(d) && emptyWidget != null) {
@@ -31,10 +31,10 @@ class AsyncValueWidget<T> extends StatelessWidget {
         }
         return data(d);
       },
-      loading: () => const Center(
+      loading: () => Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
-          child: CircularProgressIndicator(color: AppColors.primary),
+          padding: const EdgeInsets.all(32),
+          child: CircularProgressIndicator(color: scheme.primary),
         ),
       ),
       error: (err, st) => Center(
@@ -43,7 +43,7 @@ class AsyncValueWidget<T> extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, color: AppColors.error, size: 40),
+              Icon(Icons.error_outline, color: scheme.error, size: 40),
               const SizedBox(height: 12),
               Text(
                 err is ApiException ? err.message : 'Something went wrong',
@@ -76,18 +76,19 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: AppColors.outline),
+            Icon(icon, size: 48, color: scheme.outline),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.onSurfaceVariant),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
             if (action != null) ...[const SizedBox(height: 16), action!],
           ],

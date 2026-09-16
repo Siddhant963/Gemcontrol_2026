@@ -32,6 +32,41 @@ async function ensureTrialSubscription(firmId) {
   });
 }
 
+// Shared by verifySubscriptionPayment (client-callback path) and the
+// order.paid webhook -- both may fire for the same successful payment, so
+// this is idempotent: if the subscription already recorded this exact
+// paymentReference, it's returned unchanged instead of re-extending endDate
+// a second time.
+async function activatePaidSubscription({
+  firm,
+  plan,
+  paymentProvider,
+  paymentReference,
+  amountPaid,
+  startDate,
+  endDate,
+}) {
+  const existing = await SubscriptionModel.findOne({ firm });
+  if (existing && existing.paymentReference === paymentReference) {
+    return existing.populate("plan");
+  }
+
+  return SubscriptionModel.findOneAndUpdate(
+    { firm },
+    {
+      firm,
+      plan: plan._id,
+      status: "active",
+      startDate,
+      endDate,
+      paymentProvider,
+      paymentReference,
+      amountPaid,
+    },
+    { new: true, upsert: true }
+  ).populate("plan");
+}
+
 // True if `sub` currently grants access -- i.e. its status is one of the
 // "paid for" states AND its endDate hasn't passed. Doesn't mutate anything;
 // see requireActiveSubscription below for the self-healing status flip.
@@ -83,6 +118,7 @@ async function requireActiveSubscription(req, res, next) {
 module.exports = {
   TRIAL_DAYS,
   ensureTrialSubscription,
+  activatePaidSubscription,
   isSubscriptionCurrentlyActive,
   requireActiveSubscription,
 };

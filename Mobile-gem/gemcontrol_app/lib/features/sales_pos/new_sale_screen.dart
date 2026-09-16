@@ -67,6 +67,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<AppColorsExtension>()!;
     final firm = ref.watch(currentFirmProvider);
     final gst = firm?.gstConfig;
     final cgstAmount = gst != null ? _taxableAmount * gst.cgstRate / 100 : 0.0;
@@ -117,9 +119,9 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
               label: const Text('Add'),
             ),
             child: _cart.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No items added yet', style: TextStyle(color: AppColors.onSurfaceVariant)),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text('No items added yet', style: TextStyle(color: scheme.onSurfaceVariant)),
                   )
                 : Column(
                     children: [
@@ -244,7 +246,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                           ? 'Remaining: ${formatInr(remaining)}'
                           : 'Overpaid by ${formatInr(-remaining)}',
                   style: TextStyle(
-                    color: remaining.abs() < 0.01 ? AppColors.success : AppColors.error,
+                    color: remaining.abs() < 0.01 ? extra.onSuccessContainer : scheme.error,
                     fontSize: 12,
                   ),
                 ),
@@ -367,6 +369,7 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -377,7 +380,7 @@ class _SummaryRow extends StatelessWidget {
             value,
             style: emphasize
                 ? AppTheme.numericData(context)
-                : const TextStyle(color: AppColors.onSurfaceVariant),
+                : TextStyle(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -432,6 +435,7 @@ class _CartRowState extends State<_CartRow> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
@@ -441,7 +445,7 @@ class _CartRowState extends State<_CartRow> {
             children: [
               Expanded(child: Text(widget.item.name, style: const TextStyle(fontWeight: FontWeight.w600))),
               IconButton(
-                icon: const Icon(Icons.close, size: 18, color: AppColors.error),
+                icon: Icon(Icons.close, size: 18, color: scheme.error),
                 onPressed: widget.onRemove,
               ),
             ],

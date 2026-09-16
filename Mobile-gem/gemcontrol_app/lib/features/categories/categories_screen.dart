@@ -75,6 +75,7 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.sm + 4),
@@ -108,7 +109,7 @@ class _CategoryCard extends StatelessWidget {
                   if (category.description.isNotEmpty)
                     Text(
                       category.description,
-                      style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -116,7 +117,7 @@ class _CategoryCard extends StatelessWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              icon: Icon(Icons.delete_outline, color: scheme.error),
               onPressed: () => showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -148,10 +149,13 @@ class _CategoryCard extends StatelessWidget {
 class _CategoryPlaceholder extends StatelessWidget {
   const _CategoryPlaceholder();
   @override
-  Widget build(BuildContext context) => const ColoredBox(
-    color: AppColors.surfaceContainerHigh,
-    child: Icon(Icons.diamond_outlined, color: AppColors.outline),
-  );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.surfaceContainerHigh,
+      child: Icon(Icons.diamond_outlined, color: scheme.outline),
+    );
+  }
 }
 
 class _AddCategorySheet extends ConsumerStatefulWidget {
@@ -193,6 +197,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -211,7 +216,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
             child: Container(
               height: 100,
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
+                color: scheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(AppRadii.sm),
                 image: _image != null
                     ? DecorationImage(
@@ -221,8 +226,8 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
                     : null,
               ),
               child: _image == null
-                  ? const Center(
-                      child: Icon(Icons.add_photo_alternate_outlined, color: AppColors.outline),
+                  ? Center(
+                      child: Icon(Icons.add_photo_alternate_outlined, color: scheme.outline),
                     )
                   : null,
             ),

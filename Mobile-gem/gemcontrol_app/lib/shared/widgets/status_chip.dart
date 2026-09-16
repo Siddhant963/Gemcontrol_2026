@@ -8,7 +8,7 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = StatusColors.forStatus(label);
+    final (bg, fg) = StatusColors.forStatus(context, label);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadii.pill)),

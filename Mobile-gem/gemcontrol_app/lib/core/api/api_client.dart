@@ -33,6 +33,10 @@ class ApiClient {
   final Dio dio;
   final TokenStorage tokenStorage;
   void Function()? onUnauthorized;
+  // 402 + code:"SUBSCRIPTION_REQUIRED" means the session is still valid but
+  // the firm's subscription isn't -- distinct from 401, so the token is NOT
+  // cleared here, unlike onUnauthorized.
+  void Function()? onSubscriptionRequired;
 
   ApiClient(this.tokenStorage)
     : dio = Dio(
@@ -62,6 +66,8 @@ class ApiClient {
             );
             tokenStorage.clear();
             onUnauthorized?.call();
+          } else if (error.response?.statusCode == 402) {
+            onSubscriptionRequired?.call();
           }
           handler.next(error);
         },

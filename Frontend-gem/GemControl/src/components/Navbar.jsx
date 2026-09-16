@@ -14,13 +14,13 @@ import {
   DialogTitle,
   Button,
 } from "@mui/material";
-import { ExitToApp } from "@mui/icons-material";
+import SymbolIcon from "./SymbolIcon";
 import { logout } from "../redux/authSlice";
 import { toggleTheme } from "../redux/themeSlice";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/routes";
 import api from "../utils/api";
-import { useTheme } from "@mui/material/styles"; 
+import { useTheme } from "@mui/material/styles";
 
 function Navbar() {
   const dispatch = useDispatch();
@@ -28,7 +28,7 @@ function Navbar() {
   const darkMode = useSelector((state) => state.theme.darkMode);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const [openDialog, setOpenDialog] = useState(false);
-  const theme = useTheme(); 
+  const theme = useTheme();
 
   const handleLogout = () => {
     setOpenDialog(true);
@@ -52,12 +52,12 @@ function Navbar() {
   return (
     <AppBar
       position="fixed"
+      elevation={0}
       sx={{
         zIndex: theme.zIndex.drawer + 1,
-        backgroundColor: theme.palette.background.paper,
-        boxShadow: theme.shadows[3],
-        borderBottom: `1px solid ${theme.palette.divider}`, 
-
+        backgroundColor: theme.palette.surfaces.lowest,
+        boxShadow: "0 1px 8px rgba(0,0,0,0.04)",
+        borderBottom: `1px solid ${theme.palette.divider}`,
       }}
     >
       <Toolbar
@@ -75,7 +75,7 @@ function Navbar() {
             whiteSpace: { xs: "nowrap", sm: "normal" },
             overflow: "hidden",
             textOverflow: "ellipsis",
-            color: theme.palette.text.primary, 
+            color: "primary.main",
           }}
         >
           RatnSetu
@@ -88,17 +88,27 @@ function Navbar() {
               gap: { xs: 0.5, sm: 1 },
             }}
           >
+            <SymbolIcon
+              name={darkMode ? "dark_mode" : "light_mode"}
+              size={18}
+              sx={{ color: "text.secondary" }}
+            />
             <Switch
               checked={darkMode}
               onChange={() => dispatch(toggleTheme())}
+              color="secondary"
               sx={{ mr: { xs: 0, sm: 1 } }}
             />
             <IconButton
-              color="inherit"
               onClick={handleLogout}
-              sx={{ p: { xs: 0.5, sm: 1 }, color: theme.palette.text.secondary }}
+              sx={{
+                p: { xs: 0.5, sm: 1 },
+                color: "text.secondary",
+                borderRadius: 2,
+                "&:hover": { bgcolor: "surfaces.high", color: "text.primary" },
+              }}
             >
-              <ExitToApp fontSize="small" />
+              <SymbolIcon name="logout" size={20} />
             </IconButton>
           </Box>
         )}
@@ -109,12 +119,11 @@ function Navbar() {
         aria-labelledby="logout-dialog-title"
         fullWidth
         maxWidth="xs"
-        PaperProps={{ 
+        PaperProps={{
           sx: {
             bgcolor: theme.palette.background.paper,
             color: theme.palette.text.primary,
-            borderRadius: theme.shape.borderRadius,
-            boxShadow: theme.shadows[6],
+            borderRadius: 3,
           }
         }}
       >
@@ -128,6 +137,7 @@ function Navbar() {
           <Button
             onClick={handleCancelLogout}
             color="primary"
+            variant="outlined"
             fullWidth={true}
             sx={{ m: { xs: 0.5, sm: 1 }, textTransform: 'none' }}
           >
@@ -136,6 +146,7 @@ function Navbar() {
           <Button
             onClick={handleConfirmLogout}
             color="primary"
+            variant="contained"
             autoFocus
             fullWidth={true}
             sx={{ m: { xs: 0.5, sm: 1 }, textTransform: 'none' }}

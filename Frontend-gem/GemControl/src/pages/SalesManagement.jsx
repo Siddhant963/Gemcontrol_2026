@@ -33,7 +33,7 @@ import {
   FormControlLabel,
   Alert,
 } from "@mui/material";
-import { Close, Search, Add, Delete } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -1029,7 +1029,7 @@ function SalesManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleOpenSaleModal}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -1061,7 +1061,7 @@ function SalesManagement() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.75, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -1180,7 +1180,7 @@ function SalesManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete fontSize="small" />}
+                          startIcon={<SymbolIcon name="delete" size={18} />}
                           onClick={() => handleDeleteSale(sale._id)}
                           sx={{
                             fontSize: { xs: "0.75rem", sm: "0.875rem" },
@@ -1277,7 +1277,7 @@ function SalesManagement() {
                               variant="outlined"
                               size="small"
                               color="error"
-                              startIcon={<Delete fontSize="small" />}
+                              startIcon={<SymbolIcon name="delete" size={18} />}
                               onClick={() => handleDeleteSale(sale._id)}
                               sx={{
                                 fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1352,7 +1352,7 @@ function SalesManagement() {
               color: theme.palette.primary.contrastText,
             }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
@@ -1393,7 +1393,7 @@ function SalesManagement() {
                 </Button>
                 <Button
                   variant="outlined"
-                  startIcon={<Add />}
+                  startIcon={<SymbolIcon name="add" />}
                   onClick={() => setOpenCustomerModal(true)}
                   sx={{ textTransform: "none" }}
                 >
@@ -1723,7 +1723,7 @@ function SalesManagement() {
                       onClick={() => handleRemoveSplitPaymentRow(index)}
                       disabled={splitPayments.length === 1}
                     >
-                      <Delete />
+                      <SymbolIcon name="delete" />
                     </IconButton>
                   </Grid>
                 </Grid>

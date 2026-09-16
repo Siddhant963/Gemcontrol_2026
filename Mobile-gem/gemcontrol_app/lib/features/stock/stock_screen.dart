@@ -143,6 +143,7 @@ class _StockCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.card),
@@ -172,14 +173,14 @@ class _StockCard extends ConsumerWidget {
                             ? CachedNetworkImage(
                                 imageUrl: resolveUploadUrl(stock.stockImg),
                                 fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => const ColoredBox(
-                                  color: AppColors.surfaceContainerHigh,
-                                  child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                                errorWidget: (_, __, ___) => ColoredBox(
+                                  color: scheme.surfaceContainerHigh,
+                                  child: Icon(Icons.diamond_outlined, color: scheme.outline),
                                 ),
                               )
-                            : const ColoredBox(
-                                color: AppColors.surfaceContainerHigh,
-                                child: Icon(Icons.diamond_outlined, color: AppColors.outline),
+                            : ColoredBox(
+                                color: scheme.surfaceContainerHigh,
+                                child: Icon(Icons.diamond_outlined, color: scheme.outline),
                               ),
                       ),
                     ),
@@ -197,7 +198,7 @@ class _StockCard extends ConsumerWidget {
                           ),
                           Text(
                             '${stock.netWeight.toStringAsFixed(2)}g',
-                            style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -215,7 +216,7 @@ class _StockCard extends ConsumerWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                icon: Icon(Icons.delete_outline, size: 20, color: scheme.error),
                 onPressed: () async {
                   final confirm = await showDialog<bool>(
                     context: context,

@@ -2,11 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Box, Typography, Button, Paper, Chip, CircularProgress, Alert } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { CheckCircle } from "@mui/icons-material";
+import { useDispatch, useSelector } from "react-redux";
 import api from "../utils/api";
 import { ROUTES } from "../utils/routes";
 import { logout } from "../redux/authSlice";
+import SymbolIcon from "../components/SymbolIcon";
 
 function daysLeft(endDate) {
   if (!endDate) return 0;
@@ -18,6 +18,8 @@ function SubscribePage() {
   const theme = useTheme();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  const isAdmin = user?.role === "admin";
 
   const [plans, setPlans] = useState([]);
   const [mySubscription, setMySubscription] = useState(null);
@@ -46,14 +48,44 @@ function SubscribePage() {
   }, [loadData]);
 
   const handleActivate = async (planKey) => {
+    if (!isAdmin) return;
     setActivatingKey(planKey);
     setError("");
     try {
-      await api.post("/activateTestSubscription", { planKey });
-      navigate(ROUTES.DASHBOARD);
+      const { data: order } = await api.post("/createSubscriptionOrder", { planKey });
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "RatnSetu",
+        description: order.plan?.name ? `${order.plan.name} plan` : "Subscription",
+        prefill: {
+          name: user?.name || "",
+          email: user?.email || "",
+          contact: user?.contact || "",
+        },
+        theme: { color: theme.palette.primary.main },
+        handler: async (response) => {
+          try {
+            await api.post("/verifySubscriptionPayment", { ...response, planKey });
+            navigate(ROUTES.DASHBOARD);
+          } catch (err) {
+            setError(err.response?.data?.message || "Payment verification failed");
+            setActivatingKey(null);
+          }
+        },
+        modal: {
+          ondismiss: () => setActivatingKey(null),
+        },
+      });
+      rzp.on("payment.failed", (response) => {
+        setError(response.error?.description || "Payment failed");
+        setActivatingKey(null);
+      });
+      rzp.open();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to activate plan");
-    } finally {
+      setError(err.response?.data?.message || "Failed to start checkout");
       setActivatingKey(null);
     }
   };
@@ -91,10 +123,11 @@ function SubscribePage() {
             ? "Your subscription has ended. Pick a plan below to keep using RatnSetu."
             : "Pick a plan below to start using RatnSetu."}
         </Typography>
-        <Typography sx={{ textAlign: "center", fontSize: "0.8rem", color: theme.palette.text.secondary, mb: 4 }}>
-          Development mode — activation below does not charge any payment; it's here to test the
-          subscription flow before the real payment gateway is connected.
-        </Typography>
+        {!isAdmin && (
+          <Typography sx={{ textAlign: "center", fontSize: "0.85rem", color: theme.palette.text.secondary, mb: 4 }}>
+            Only your shop's admin can subscribe or renew. Please contact them.
+          </Typography>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -154,14 +187,14 @@ function SubscribePage() {
                   </Box>
                   {plan.features.map((f) => (
                     <Box key={f} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                      <CheckCircle sx={{ fontSize: 18, color: theme.palette.secondary.dark }} />
+                      <SymbolIcon name="check_circle" sx={{ fontSize: 18, color: theme.palette.secondary.dark }} />
                       <Typography sx={{ fontSize: "0.9rem" }}>{f}</Typography>
                     </Box>
                   ))}
                   <Button
                     fullWidth
                     variant={highlighted ? "contained" : "outlined"}
-                    disabled={activatingKey === plan.key || isCurrentPlan}
+                    disabled={!isAdmin || activatingKey === plan.key || isCurrentPlan}
                     onClick={() => handleActivate(plan.key)}
                     sx={{
                       mt: 2,
@@ -175,8 +208,10 @@ function SubscribePage() {
                     {isCurrentPlan
                       ? "Current Plan"
                       : activatingKey === plan.key
-                      ? "Activating..."
-                      : "Activate (Test)"}
+                      ? "Opening checkout..."
+                      : isTrialing || sub
+                      ? "Renew"
+                      : "Subscribe"}
                   </Button>
                 </Paper>
               );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Provider } from "react-redux";
 import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline } from "@mui/material";
+import { CssBaseline, Box } from "@mui/material";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import store from "./redux/store";
@@ -96,15 +96,22 @@ function MainApp() {
           
           <Route
             element={
-             <div style={{ display: "flex", minHeight: "100vh", }}>
+              <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
                 <Sidebar />
-                <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
                   <Navbar />
-                  <main style={{ flexGrow: 1, padding: "20px", paddingTop: muiTheme.mixins.toolbar.minHeight + 20 }}>
+                  <Box
+                    component="main"
+                    sx={{
+                      flexGrow: 1,
+                      p: 2.5,
+                      pt: `${muiTheme.mixins.toolbar.minHeight + 20}px`,
+                    }}
+                  >
                     <ProtectedRoute />
-                  </main>
-                </div>
-              </div>
+                  </Box>
+                </Box>
+              </Box>
             }
           >
             {/* Nested protected routes accessible to both admin and staff */}

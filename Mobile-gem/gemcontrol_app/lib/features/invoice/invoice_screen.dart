@@ -34,6 +34,7 @@ class InvoiceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     final firm = ref.watch(currentFirmProvider);
     final netReceivable = sale.totalAmount - sale.udharAmount;
 
@@ -95,10 +96,10 @@ class InvoiceScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Column(
+                    Column(
                       children: [
-                        SizedBox(width: 120, child: Divider(color: AppColors.outline)),
-                        Text('Customer Signatory', style: TextStyle(fontSize: 12)),
+                        SizedBox(width: 120, child: Divider(color: scheme.outline)),
+                        const Text('Customer Signatory', style: TextStyle(fontSize: 12)),
                       ],
                     ),
                     Column(
@@ -115,9 +116,9 @@ class InvoiceScreen extends ConsumerWidget {
                           )
                         else
                           const SizedBox(width: 120, height: 40),
-                        const SizedBox(
+                        SizedBox(
                           width: 120,
-                          child: Divider(color: AppColors.outline),
+                          child: Divider(color: scheme.outline),
                         ),
                         const Text('Authorized Signatory', style: TextStyle(fontSize: 12)),
                       ],
@@ -197,6 +198,7 @@ class _BillTo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -204,7 +206,7 @@ class _BillTo extends StatelessWidget {
         const SizedBox(height: 4),
         Text(sale.customerName ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
         if (sale.customerAddress != null && sale.customerAddress!.isNotEmpty)
-          Text(sale.customerAddress!, style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+          Text(sale.customerAddress!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
       ],
     );
   }
@@ -259,6 +261,7 @@ class _PaymentBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final rows = <(String, double)>[
       ('CASH RECEIVED', sale._cashReceived),
       ('CHEQUE RECEIVED', sale._chequeReceived),
@@ -281,7 +284,7 @@ class _PaymentBlock extends StatelessWidget {
             ),
           ),
         if (rows.isEmpty)
-          const Text('No payment received', style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+          Text('No payment received', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
       ],
     );
   }
@@ -294,6 +297,7 @@ class _TotalsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     Widget row(String label, String value, {bool red = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
@@ -302,7 +306,7 @@ class _TotalsBlock extends StatelessWidget {
               Text(label, style: const TextStyle(fontSize: 12)),
               Text(
                 value,
-                style: TextStyle(fontSize: 12, color: red ? AppColors.error : null, fontWeight: red ? FontWeight.bold : null),
+                style: TextStyle(fontSize: 12, color: red ? scheme.error : null, fontWeight: red ? FontWeight.bold : null),
               ),
             ],
           ),

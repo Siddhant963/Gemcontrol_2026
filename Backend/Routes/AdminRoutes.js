@@ -100,6 +100,8 @@ const {
   getSubscriptionPlans,
   getMySubscription,
   activateTestSubscription,
+  createSubscriptionOrder,
+  verifySubscriptionPayment,
 } = require("../Controllers/adminController");
 
 // Public self-signup: no auth required, but the controller forces role="staff"
@@ -117,6 +119,11 @@ router.get("/logout", logoutUser);
 router.get("/getSubscriptionPlans", isLoggedIn, getSubscriptionPlans);
 router.get("/getMySubscription", isLoggedIn, getMySubscription);
 router.post("/activateTestSubscription", isLoggedIn, isAdmin, activateTestSubscription);
+router.post("/createSubscriptionOrder", isLoggedIn, isAdmin, createSubscriptionOrder);
+router.post("/verifySubscriptionPayment", isLoggedIn, isAdmin, verifySubscriptionPayment);
+// Note: /razorpayWebhook is intentionally NOT registered here -- it needs a
+// raw (unparsed) body for signature verification, so it's mounted directly
+// on the Express app in server.js, before the global express.json().
 
 // Every route below requires the caller to be logged in AND their firm to
 // have a non-expired subscription (trial or paid) -- see Utils/subscription.js.

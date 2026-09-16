@@ -32,7 +32,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Search, Add, Delete, Edit, ExpandMore, Payment as PaymentIcon } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
@@ -790,7 +790,7 @@ function GirviManagement() {
         >
           <Button
             variant="contained"
-            startIcon={<Add />}
+            startIcon={<SymbolIcon name="add" />}
             onClick={handleAddGirvi}
             sx={{
               bgcolor: theme.palette.primary.main,
@@ -819,7 +819,8 @@ function GirviManagement() {
             }}
           >
             <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-              <Search
+              <SymbolIcon
+                name="search"
                 sx={{
                   color: theme.palette.text.secondary,
                   fontSize: { xs: "1.2rem", sm: "1.5rem" },
@@ -1090,7 +1091,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<PaymentIcon />}
+                          startIcon={<SymbolIcon name="payments" />}
                           onClick={() => handleOpenPaymentDialog(girvi)}
                           disabled={girvi?.status !== "active"}
                           sx={{
@@ -1105,7 +1106,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<Edit />}
+                          startIcon={<SymbolIcon name="edit" />}
                           onClick={() => handleEditGirvi(girvi)}
                           sx={{
                             color: theme.palette.secondary.main,
@@ -1127,7 +1128,7 @@ function GirviManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete />}
+                          startIcon={<SymbolIcon name="delete" />}
                           onClick={() => handleDeleteGirvi(girvi._id)}
                           sx={{
                             borderColor: theme.palette.error.main,
@@ -1239,7 +1240,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<PaymentIcon />}
+                          startIcon={<SymbolIcon name="payments" />}
                           onClick={() => handleOpenPaymentDialog(girvi)}
                           disabled={girvi?.status !== "active"}
                           sx={{
@@ -1254,7 +1255,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<Edit />}
+                          startIcon={<SymbolIcon name="edit" />}
                           onClick={() => handleEditGirvi(girvi)}
                           sx={{
                             fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1270,7 +1271,7 @@ function GirviManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete />}
+                          startIcon={<SymbolIcon name="delete" />}
                           onClick={() => handleDeleteGirvi(girvi._id)}
                           sx={{
                             fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1291,7 +1292,8 @@ function GirviManagement() {
                             transition: "transform 0.3s",
                           }}
                         >
-                          <ExpandMore
+                          <SymbolIcon
+                            name="expand_more"
                             sx={{ fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
                           />
                         </ExpandIconButton>

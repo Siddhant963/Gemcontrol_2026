@@ -1,45 +1,37 @@
 import { Box, Typography, Button, Paper, Chip } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
-import {
-  Inventory2,
-  ReceiptLong,
-  People,
-  AccountBalanceWallet,
-  Diamond,
-  PhoneIphone,
-  CheckCircle,
-} from "@mui/icons-material";
 import { ROUTES } from "../utils/routes";
+import SymbolIcon from "../components/SymbolIcon";
 
 const FEATURES = [
   {
-    icon: Inventory2,
+    icon: "inventory_2",
     title: "Stock & Raw Material Inventory",
     description: "Track every item and raw material with live gold, silver and diamond rates.",
   },
   {
-    icon: ReceiptLong,
+    icon: "receipt_long",
     title: "GST-Compliant Billing",
     description: "Generate accurate, tax-ready invoices in seconds, with full GST breakdowns.",
   },
   {
-    icon: People,
+    icon: "group",
     title: "Customer & Udhar Tracking",
     description: "Keep every customer's purchase history and outstanding credit in one place.",
   },
   {
-    icon: Diamond,
+    icon: "diamond",
     title: "Girvi / Pledge Management",
     description: "Track pledged items with automatic monthly interest accrual and easy redemption.",
   },
   {
-    icon: AccountBalanceWallet,
+    icon: "account_balance_wallet",
     title: "Multi-Staff, One Firm",
     description: "Give your team role-based access under a single shop account, admin-controlled.",
   },
   {
-    icon: PhoneIphone,
+    icon: "phone_iphone",
     title: "Companion Mobile App",
     description: "Manage your shop on the go with the RatnSetu Android app, in sync with the web.",
   },
@@ -196,7 +188,6 @@ function LandingPage() {
           }}
         >
           {FEATURES.map((feature) => {
-            const Icon = feature.icon;
             return (
               <Paper
                 key={feature.title}
@@ -207,7 +198,7 @@ function LandingPage() {
                   bgcolor: theme.palette.background.paper,
                 }}
               >
-                <Icon sx={{ fontSize: 34, color: theme.palette.secondary.dark, mb: 1.5 }} />
+                <SymbolIcon name={feature.icon} sx={{ fontSize: 34, color: theme.palette.secondary.dark, mb: 1.5 }} />
                 <Typography sx={{ fontWeight: 700, mb: 0.75, color: theme.palette.text.primary }}>
                   {feature.title}
                 </Typography>
@@ -277,7 +268,7 @@ function LandingPage() {
               </Box>
               {plan.features.map((f) => (
                 <Box key={f} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                  <CheckCircle sx={{ fontSize: 18, color: theme.palette.secondary.dark }} />
+                  <SymbolIcon name="check_circle" sx={{ fontSize: 18, color: theme.palette.secondary.dark }} />
                   <Typography sx={{ fontSize: "0.9rem", color: theme.palette.text.primary }}>{f}</Typography>
                 </Box>
               ))}
