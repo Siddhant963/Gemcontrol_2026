@@ -977,7 +977,7 @@ function Dashboard() {
                     bgcolor: theme.palette.background.paper,
                     color: theme.palette.text.primary,
                     border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: theme.shape.borderRadius * 2,
+                    borderRadius: 2,
                     transition: "all 0.3s ease",
                     "&:hover": { boxShadow: theme.shadows[8] },
                     height: "100%",
@@ -1299,7 +1299,7 @@ function Dashboard() {
               <Paper
                 sx={{
                   p: theme.spacing(2),
-                  borderRadius: theme.shape.borderRadius * 2,
+                  borderRadius: 2,
                   boxShadow: theme.shadows[4],
                   aspectRatio: "1 / 1",
                 }}
@@ -1358,7 +1358,7 @@ function Dashboard() {
               <Paper
                 sx={{
                   p: theme.spacing(2),
-                  borderRadius: theme.shape.borderRadius * 2,
+                  borderRadius: 2,
                   boxShadow: theme.shadows[4],
                   aspectRatio: "1 / 1",
                 }}
@@ -1419,7 +1419,7 @@ function Dashboard() {
               <Paper
                 sx={{
                   p: theme.spacing(2),
-                  borderRadius: theme.shape.borderRadius * 2,
+                  borderRadius: 2,
                   boxShadow: theme.shadows[4],
                   aspectRatio: "1 / 1",
                 }}
