@@ -13,8 +13,15 @@ dotenv.config();
 const app = express();
 
 // CORS Configuration - Environment-based
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [process.env.FRONTEND_URL || "https://ratnsetu.com"]
+// TEMP: local dev origins are allowed in production too, to test the
+// Razorpay payment flow from a local web/Flutter-web build against the
+// live backend. Remove these two once payment-gateway testing is done.
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      process.env.FRONTEND_URL || "https://ratnsetu.com",
+      "http://localhost:5173",
+      "http://localhost:8765",
+    ]
   : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"];
 
 app.use(
