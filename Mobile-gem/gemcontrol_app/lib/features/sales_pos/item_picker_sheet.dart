@@ -39,6 +39,7 @@ class _ItemPickerSheetState extends ConsumerState<ItemPickerSheet>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
       maxChildSize: 0.95,
@@ -50,7 +51,7 @@ class _ItemPickerSheetState extends ConsumerState<ItemPickerSheet>
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.outlineVariant,
+              color: scheme.outlineVariant,
               borderRadius: BorderRadius.circular(2),
             ),
           ),

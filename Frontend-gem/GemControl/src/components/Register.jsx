@@ -2,7 +2,15 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { setError } from "../redux/authSlice";
-import { TextField, Button, Box, Typography, Alert, Link } from "@mui/material";
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Alert,
+  Link,
+  Divider,
+} from "@mui/material";
 import api from "../utils/api";
 import { ROUTES } from "../utils/routes";
 
@@ -12,6 +20,9 @@ function Register() {
     email: "",
     contact: "",
     password: "",
+    firmName: "",
+    firmLocation: "",
+    firmSize: "",
   });
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -24,8 +35,8 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // The public /register endpoint always creates a "staff" account, regardless
-      // of role -- account creation with any other role requires an admin login.
+      // The public /register endpoint creates a brand-new shop (Firm) and
+      // its admin account together in one step.
       await api.post("/register", userData);
       dispatch(setError(null)); // Clear error on success
       navigate(ROUTES.LOGIN);
@@ -37,10 +48,13 @@ function Register() {
   return (
     <Box sx={{ maxWidth: 400, mx: "auto", mt: 8, p: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Sign Up
+        Set Up Your Shop
       </Typography>
       {error && <Alert severity="error">{error}</Alert>}
       <form onSubmit={handleSubmit}>
+        <Typography variant="subtitle2" sx={{ mt: 1, color: "text.secondary" }}>
+          Your account
+        </Typography>
         <TextField
           fullWidth
           margin="normal"
@@ -79,6 +93,40 @@ function Register() {
           onChange={handleChange}
           required
         />
+
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+          Your shop
+        </Typography>
+        <TextField
+          fullWidth
+          margin="normal"
+          label="Shop Name"
+          name="firmName"
+          value={userData.firmName}
+          onChange={handleChange}
+          required
+        />
+        <TextField
+          fullWidth
+          margin="normal"
+          label="Shop Location"
+          name="firmLocation"
+          value={userData.firmLocation}
+          onChange={handleChange}
+          required
+        />
+        <TextField
+          fullWidth
+          margin="normal"
+          label="Shop Size (sq. ft.)"
+          name="firmSize"
+          type="number"
+          value={userData.firmSize}
+          onChange={handleChange}
+          required
+        />
+
         <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
           Sign Up
         </Button>

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Box, Button, Typography, Paper } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { OptimizedImage } from '../utils/imageUtils';
 
 const ImageTest = () => {
+    const theme = useTheme();
     const [testUrls] = useState([
         'https://res.cloudinary.com/demo/image/upload/sample.jpg', // Test Cloudinary URL
         '/fallback-image.png', // Local fallback
@@ -20,7 +22,7 @@ const ImageTest = () => {
                     <Typography variant="body2" gutterBottom>
                         Test {index + 1}: {url}
                     </Typography>
-                    <Box sx={{ width: 200, height: 150, border: '1px solid #ccc' }}>
+                    <Box sx={{ width: 200, height: 150, border: `1px solid ${theme.palette.outline.variant}` }}>
                         <OptimizedImage
                             src={url}
                             alt={`Test image ${index + 1}`}

@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="gemcontrol_app"
+        android:label="RatnSetu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -40,6 +41,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Required for Razorpay's checkout to detect installed UPI apps
+             (GPay, PhonePe, Paytm, etc.) and show the UPI/QR payment option
+             on Android 11+, where package visibility is restricted by
+             default. See https://razorpay.com/docs/payments/payment-gateway/android-integration/standard/build-integration/#upi-intent-flow -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="upi"/>
         </intent>
     </queries>
 </manifest>

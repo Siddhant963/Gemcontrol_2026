@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     enum: ["admin", "staff", "user"], // Added "user" to the enum
   },
+  firm: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Firm",
+    default: null,
+  },
   removeAt: { type: Date, default: null },
 });
 

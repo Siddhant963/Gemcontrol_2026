@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Box, Typography, Paper, Button } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { OptimizedImage } from '../utils/imageUtils';
 import { getImageUrl } from '../utils/imageUtils';
 
 const ImageDebugger = ({ src, alt = "Debug Image", title = "Image Debug" }) => {
     const [showDetails, setShowDetails] = useState(false);
+    const theme = useTheme();
 
     if (!src) return null;
 
     const processedUrl = getImageUrl(src);
 
     return (
-        <Paper sx={{ p: 2, m: 1, border: '1px solid #ddd' }}>
+        <Paper sx={{ p: 2, m: 1, border: `1px solid ${theme.palette.outline.variant}` }}>
             <Typography variant="h6" gutterBottom>
                 {title}
             </Typography>
@@ -25,11 +27,11 @@ const ImageDebugger = ({ src, alt = "Debug Image", title = "Image Debug" }) => {
                     <Box sx={{
                         width: 150,
                         height: 150,
-                        border: '1px solid #ccc',
+                        border: `1px solid ${theme.palette.outline.variant}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: '#f5f5f5'
+                        backgroundColor: theme.palette.surfaces.low
                     }}>
                         <OptimizedImage
                             src={src}
@@ -60,7 +62,7 @@ const ImageDebugger = ({ src, alt = "Debug Image", title = "Image Debug" }) => {
                             <Typography variant="subtitle2">Original src:</Typography>
                             <Typography sx={{
                                 wordBreak: 'break-all',
-                                backgroundColor: '#f0f0f0',
+                                backgroundColor: theme.palette.surfaces.container,
                                 p: 1,
                                 borderRadius: 1,
                                 mb: 1
@@ -71,7 +73,7 @@ const ImageDebugger = ({ src, alt = "Debug Image", title = "Image Debug" }) => {
                             <Typography variant="subtitle2">Processed URL:</Typography>
                             <Typography sx={{
                                 wordBreak: 'break-all',
-                                backgroundColor: '#f0f0f0',
+                                backgroundColor: theme.palette.surfaces.container,
                                 p: 1,
                                 borderRadius: 1,
                                 mb: 1

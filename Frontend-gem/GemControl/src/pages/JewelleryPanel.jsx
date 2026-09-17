@@ -23,7 +23,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Close } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
@@ -223,7 +223,7 @@ function JewelleryPanel() {
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {selectedCategory?.name} — {selectedItems.length} item(s)
           <IconButton onClick={() => setSelectedCategory(null)}>
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>

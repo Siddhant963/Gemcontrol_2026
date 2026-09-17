@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Provider } from "react-redux";
+import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline } from "@mui/material";
+import { CssBaseline, Box } from "@mui/material";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import store from "./redux/store";
@@ -20,21 +22,38 @@ import PaymentManagement from "./pages/PaymentManagement";
 import UdharManagement from "./pages/UdharManagement";
 import Login from "./pages/Login";
 import Register from "./components/Register";
+import LandingPage from "./pages/LandingPage.jsx";
+import SubscribePage from "./pages/SubscribePage.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import AboutPage from "./pages/AboutPage.jsx";
+import FeaturesPage from "./pages/FeaturesPage.jsx";
+import PricingPage from "./pages/PricingPage.jsx";
+import TestimonialsPage from "./pages/TestimonialsPage.jsx";
+import BlogListPage from "./pages/BlogListPage.jsx";
+import BlogDetailPage from "./pages/BlogDetailPage.jsx";
+import ContactPage from "./pages/ContactPage.jsx";
+import TermsPage from "./pages/TermsPage.jsx";
 import NotFound from "./pages/NotFound";
+import AnalyticsRouteListener from "./components/AnalyticsRouteListener.jsx";
 import { ROUTES } from "./utils/routes";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GirviManagement from "./pages/GirviManagement.jsx";
 import JewelleryPanel from "./pages/JewelleryPanel.jsx";
 import DayBook from "./pages/DayBook.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
+import SplashScreen from "./components/SplashScreen.jsx";
 import {useTheme} from "@mui/material/styles";
+
+const SPLASH_DURATION_MS = 2000;
 
 function App() {
   return (
     <Provider store={store}>
-      <ErrorBoundary>
-        <MainApp />
-      </ErrorBoundary>
+      <HelmetProvider>
+        <ErrorBoundary>
+          <MainApp />
+        </ErrorBoundary>
+      </HelmetProvider>
     </Provider>
   );
 }
@@ -45,17 +64,38 @@ function MainApp() {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const muiTheme = useTheme();
 
+  // Splash shows once per full page load (not on in-app navigation).
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), SPLASH_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <SplashScreen visible={showSplash} />
       <BrowserRouter>
+        <AnalyticsRouteListener />
         <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Navigate to={ROUTES.LOGIN} />
-            }
-          />
+          {/* Public marketing landing page — shown regardless of auth state,
+              same as any SaaS homepage. Login/Register handle their own
+              already-authenticated redirect below. */}
+          <Route path={ROUTES.LANDING} element={<LandingPage />} />
+
+          {/* Public, unauthenticated -- linked from Play Store / App Store
+              listings and the footer, so it must never require login. */}
+          <Route path={ROUTES.PRIVACY_POLICY} element={<PrivacyPolicy />} />
+
+          {/* Public marketing site pages */}
+          <Route path={ROUTES.ABOUT} element={<AboutPage />} />
+          <Route path={ROUTES.FEATURES} element={<FeaturesPage />} />
+          <Route path={ROUTES.PRICING} element={<PricingPage />} />
+          <Route path={ROUTES.TESTIMONIALS} element={<TestimonialsPage />} />
+          <Route path={ROUTES.BLOGS} element={<BlogListPage />} />
+          <Route path={ROUTES.BLOG_DETAIL} element={<BlogDetailPage />} />
+          <Route path={ROUTES.CONTACT} element={<ContactPage />} />
+          <Route path={ROUTES.TERMS} element={<TermsPage />} />
 
           {/* Public Routes */}
           <Route
@@ -70,19 +110,36 @@ function MainApp() {
               isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Register />
             }
           />
+
+          {/* Requires auth but deliberately NOT wrapped in ProtectedRoute --
+              this is the page ProtectedRoute redirects to when the firm's
+              subscription isn't active, so it can't itself require one. */}
+          <Route
+            path={ROUTES.SUBSCRIBE}
+            element={
+              isAuthenticated ? <SubscribePage /> : <Navigate to={ROUTES.LOGIN} />
+            }
+          />
           {/* Protected Routes with Layout */}
           
           <Route
             element={
-             <div style={{ display: "flex", minHeight: "100vh", }}>
+              <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
                 <Sidebar />
-                <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
                   <Navbar />
-                  <main style={{ flexGrow: 1, padding: "20px", paddingTop: muiTheme.mixins.toolbar.minHeight + 20 }}>
+                  <Box
+                    component="main"
+                    sx={{
+                      flexGrow: 1,
+                      p: 2.5,
+                      pt: `${muiTheme.mixins.toolbar.minHeight + 20}px`,
+                    }}
+                  >
                     <ProtectedRoute />
-                  </main>
-                </div>
-              </div>
+                  </Box>
+                </Box>
+              </Box>
             }
           >
             {/* Nested protected routes accessible to both admin and staff */}

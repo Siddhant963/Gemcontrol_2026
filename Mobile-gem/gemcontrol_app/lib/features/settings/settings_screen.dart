@@ -7,7 +7,10 @@ import '../../core/auth/auth_state.dart';
 import '../../core/repositories/daily_rate_repository.dart';
 import '../../core/repositories/export_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_mode_provider.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/gc_app_bar.dart';
+import '../subscription/subscription_providers.dart';
 import 'daily_rate_sheet.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -17,20 +20,41 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider).valueOrNull;
     final isAdmin = session?.isAdmin ?? false;
+    final scheme = Theme.of(context).colorScheme;
+    final themeMode = ref.watch(themeModeControllerProvider);
+    final isDark = themeMode == ThemeMode.dark;
+    final subAsync = ref.watch(subscriptionControllerProvider);
+    final sub = subAsync.valueOrNull?.subscription;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Settings'),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           Card(
             child: ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.primaryContainer,
-                child: Icon(Icons.person_outline, color: AppColors.primary),
+              leading: CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                child: Icon(Icons.person_outline, color: scheme.onPrimaryContainer),
               ),
               title: Text(isAdmin ? 'Admin' : 'Staff'),
-              subtitle: const Text('Signed in to GemControl'),
+              subtitle: const Text('Signed in to RatnSetu'),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            child: SwitchListTile(
+              secondary: Icon(
+                isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                color: scheme.primary,
+              ),
+              title: const Text('Dark Mode'),
+              subtitle: Text(isDark ? 'Obsidian & sovereign gold' : 'Alabaster & antique gold'),
+              value: isDark,
+              onChanged: (value) => ref
+                  .read(themeModeControllerProvider.notifier)
+                  .setMode(value ? ThemeMode.dark : ThemeMode.light),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -39,21 +63,33 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.storefront_outlined, color: AppColors.primary),
+                    leading: Icon(Icons.workspace_premium_outlined, color: scheme.primary),
+                    title: const Text('Subscription'),
+                    subtitle: Text(
+                      sub == null
+                          ? 'No subscription yet'
+                          : '${sub.plan?.name ?? sub.status} · ${sub.status == 'trialing' ? 'Trial' : sub.status}',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/subscribe'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(Icons.storefront_outlined, color: scheme.primary),
                     title: const Text('Firm Management'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/settings/firm'),
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.people_outline, color: AppColors.primary),
+                    leading: Icon(Icons.people_outline, color: scheme.primary),
                     title: const Text('User Management'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/settings/users'),
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.currency_exchange_outlined, color: AppColors.primary),
+                    leading: Icon(Icons.currency_exchange_outlined, color: scheme.primary),
                     title: const Text("Today's Rate"),
                     subtitle: const Text('Set gold/silver/diamond rates'),
                     trailing: const Icon(Icons.chevron_right),
@@ -70,7 +106,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.download_outlined, color: AppColors.primary),
+                    leading: Icon(Icons.download_outlined, color: scheme.primary),
                     title: const Text('Export All Data'),
                     subtitle: const Text('Download .xlsx of all business data'),
                     trailing: const Icon(Icons.chevron_right),
@@ -92,8 +128,8 @@ class SettingsScreen extends ConsumerWidget {
           ],
           Card(
             child: ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.error),
-              title: const Text('Logout', style: TextStyle(color: AppColors.error)),
+              leading: Icon(Icons.logout, color: scheme.error),
+              title: Text('Logout', style: TextStyle(color: scheme.error)),
               onTap: () async {
                 await ref.read(authControllerProvider.notifier).logout();
                 if (context.mounted) context.go('/login');
@@ -101,10 +137,10 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const Center(
+          Center(
             child: Text(
-              'GemControl v1.0.0',
-              style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 12),
+              'RatnSetu v1.0.0',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
           ),
         ],

@@ -2,29 +2,21 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/token_storage.dart';
+import '../config/api_config.dart';
 
-/// Points at the hosted backend (same Render deployment + MongoDB the web
-/// app's production build uses, see Frontend-gem/GemControl/.env.production).
-/// Override at build/run time to hit a local backend instead, e.g.:
-///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api/admin
-///   flutter run --dart-define=UPLOADS_BASE_URL=http://10.0.2.2:5000
-const String apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'https://gemcontrol-2026.onrender.com/api/admin',
-);
-
-const String uploadsBaseUrl = String.fromEnvironment(
-  'UPLOADS_BASE_URL',
-  defaultValue: 'https://gemcontrol-2026.onrender.com',
-);
-
-/// Prefixes a relative upload path (e.g. "stock/17012-abc.jpg") returned by
-/// the API with the server's uploads root. Already-absolute URLs pass through.
+/// Prefixes a relative upload path returned by the API with the server's
+/// uploads root. Already-absolute URLs pass through. The backend actually
+/// returns paths already including the "Uploads/" segment (e.g.
+/// "/Uploads/stock/17012-abc.jpg"), so that's stripped first to avoid
+/// doubling it up into ".../Uploads/Uploads/stock/..." (a 404).
 String resolveUploadUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final cleaned = path.startsWith('/') ? path.substring(1) : path;
-  return '$uploadsBaseUrl/Uploads/$cleaned';
+  var cleaned = path.startsWith('/') ? path.substring(1) : path;
+  if (cleaned.startsWith('Uploads/')) {
+    cleaned = cleaned.substring('Uploads/'.length);
+  }
+  return '${ApiConfig.uploadsBaseUrl}/Uploads/$cleaned';
 }
 
 class UnauthorizedException implements Exception {}
@@ -41,11 +33,15 @@ class ApiClient {
   final Dio dio;
   final TokenStorage tokenStorage;
   void Function()? onUnauthorized;
+  // 402 + code:"SUBSCRIPTION_REQUIRED" means the session is still valid but
+  // the firm's subscription isn't -- distinct from 401, so the token is NOT
+  // cleared here, unlike onUnauthorized.
+  void Function()? onSubscriptionRequired;
 
   ApiClient(this.tokenStorage)
     : dio = Dio(
         BaseOptions(
-          baseUrl: apiBaseUrl,
+          baseUrl: ApiConfig.apiBaseUrl,
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 30),
         ),
@@ -70,6 +66,8 @@ class ApiClient {
             );
             tokenStorage.clear();
             onUnauthorized?.call();
+          } else if (error.response?.statusCode == 402) {
+            onSubscriptionRequired?.call();
           }
           handler.next(error);
         },

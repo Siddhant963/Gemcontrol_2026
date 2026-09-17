@@ -1,10 +1,14 @@
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 const GirviModel = require('../Models/GirviModel');
 const GirviInterestModel = require('../Models/GirviInterestModel');
 const ActivityModel = require('../Models/ActivitesModel');
-const { buildFullExportWorkbook } = require('../Controllers/adminController');
+const DailrateModel = require('../Models/DailrateModel');
+const { buildFullExportWorkbook, deriveGoldPurities, normalizeToUtcDate } = require('../Controllers/adminController');
+
+const OROPOCKET_PRICES_URL = 'https://api.oropocket.com/public/prices';
 
 const EXPORTS_DIR = path.join(__dirname, '../Exports');
 
@@ -164,7 +168,7 @@ const runWeeklyExport = async () => {
       fs.mkdirSync(EXPORTS_DIR, { recursive: true });
     }
 
-    const fileName = `GemControl_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
     const filePath = path.join(EXPORTS_DIR, fileName);
     fs.writeFileSync(filePath, excelBuffer);
 
@@ -192,11 +196,90 @@ const scheduleWeeklyExport = () => {
   console.log('Weekly automatic data export cron job scheduled for Sunday midnight IST');
 };
 
+// Pulls live gold/silver rates from OroPocket and saves them as today's
+// Dailrate. Uses the "buy" price (per gram) as-is, excluding the API's
+// separate "gst" figure -- GST continues to be applied per-invoice via each
+// Firm's own gstConfig, so folding it into the stored rate would double it.
+const fetchAndSaveLiveRates = async () => {
+  try {
+    console.log('Fetching live gold/silver rates from OroPocket...');
+    const { data } = await axios.get(OROPOCKET_PRICES_URL, { timeout: 10000 });
+    const goldBuy = data?.data?.gold?.buy;
+    const silverBuy = data?.data?.silver?.buy;
+
+    if (typeof goldBuy !== 'number' || typeof silverBuy !== 'number') {
+      throw new Error('Unexpected response shape from OroPocket');
+    }
+
+    const today = normalizeToUtcDate(new Date());
+    const goldPurities = deriveGoldPurities(goldBuy);
+    const setFields = { 'rate.silver': silverBuy };
+    Object.entries(goldPurities).forEach(([karat, value]) => {
+      setFields[`rate.gold.${karat}`] = value;
+    });
+
+    let dailrate = await DailrateModel.findOneAndUpdate(
+      { date: today },
+      { $set: setFields },
+      { new: true }
+    );
+
+    if (!dailrate) {
+      // First update of a new day -- no document to $set into yet. Carry
+      // forward the most recent diamond rates (OroPocket doesn't cover
+      // diamonds) rather than starting the day with unset diamond pricing.
+      const previous = await DailrateModel.findOne({ date: { $lt: today } }).sort({ date: -1 });
+      const daimond = previous?.rate?.daimond || {
+        "0_5 Carat": 0,
+        "1 Carat": 0,
+        "1_5 Carat": 0,
+        "2 Carat": 0,
+        "2_5 Carat": 0,
+        "3 Carat": 0,
+      };
+      dailrate = await DailrateModel.create({
+        date: today,
+        rate: { gold: goldPurities, silver: silverBuy, daimond },
+      });
+    }
+
+    await addActivity(
+      'system',
+      'liveRateUpdate',
+      `Live gold/silver rate updated: gold ₹${goldBuy}/g, silver ₹${silverBuy}/g`
+    );
+    console.log(`Live rates saved: gold ₹${goldBuy}/g, silver ₹${silverBuy}/g`);
+
+    return { success: true, gold: goldBuy, silver: silverBuy, dailrate };
+  } catch (error) {
+    console.error('Error fetching/saving live gold/silver rates:', error.message);
+    await addActivity('system', 'liveRateUpdateError', `Live rate update failed: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+// Schedule live rate updates (runs at the top of every hour)
+const scheduleLiveRateUpdates = () => {
+  cron.schedule('0 * * * *', async () => {
+    console.log('Running scheduled live gold/silver rate update...');
+    await fetchAndSaveLiveRates();
+  }, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
+  });
+
+  console.log('Live gold/silver rate update cron job scheduled for every hour');
+};
+
 // Initialize all cron jobs
 const initializeCronJobs = () => {
   scheduleMonthlyInterestCalculation();
   scheduleOverdueCheck();
   scheduleWeeklyExport();
+  scheduleLiveRateUpdates();
+  // Run once immediately on boot too, so today's rate is populated right
+  // away instead of waiting for the next hour boundary.
+  fetchAndSaveLiveRates();
   console.log('All Girvi cron jobs initialized successfully');
 };
 
@@ -204,8 +287,10 @@ module.exports = {
   calculateMonthlyInterest,
   checkOverdueGirviItems,
   runWeeklyExport,
+  fetchAndSaveLiveRates,
   initializeCronJobs,
   scheduleMonthlyInterestCalculation,
   scheduleOverdueCheck,
-  scheduleWeeklyExport
+  scheduleWeeklyExport,
+  scheduleLiveRateUpdates
 };

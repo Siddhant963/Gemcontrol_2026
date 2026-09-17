@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const adminRoutes = require("./Routes/AdminRoutes");
 const { initializeCronJobs } = require("./Utils/cronJobs");
+const { razorpayWebhook } = require("./Controllers/adminController");
 const path = require("path");
 
 dotenv.config();
@@ -12,8 +13,15 @@ dotenv.config();
 const app = express();
 
 // CORS Configuration - Environment-based
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [process.env.FRONTEND_URL || "http://13.233.204.102:3002"]
+// TEMP: local dev origins are allowed in production too, to test the
+// Razorpay payment flow from a local web/Flutter-web build against the
+// live backend. Remove these two once payment-gateway testing is done.
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      process.env.FRONTEND_URL || "https://ratnsetu.com",
+      "http://localhost:5173",
+      "http://localhost:8765",
+    ]
   : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"];
 
 app.use(
@@ -21,6 +29,15 @@ app.use(
     origin: allowedOrigins,
     credentials: true,
   })
+);
+
+// Razorpay webhook -- must be mounted before the global express.json()
+// below with its own raw-body parser, since signature verification needs
+// the exact raw bytes Razorpay signed, not a re-serialized parsed object.
+app.post(
+  "/api/admin/razorpayWebhook",
+  express.raw({ type: "application/json" }),
+  razorpayWebhook
 );
 
 // Middleware

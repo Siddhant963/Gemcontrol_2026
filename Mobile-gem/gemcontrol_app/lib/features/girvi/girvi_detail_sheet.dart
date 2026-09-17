@@ -52,6 +52,7 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
   Widget build(BuildContext context) {
     final g = widget.girvi;
     final projected = _interestPreview?['interestCalculation'] as Map<String, dynamic>?;
+    final scheme = Theme.of(context).colorScheme;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -69,7 +70,7 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
             ],
           ),
           Text('${g.customerName ?? "-"} · ${g.itemType} · ${g.itemWeight}g',
-              style: const TextStyle(color: AppColors.onSurfaceVariant)),
+              style: TextStyle(color: scheme.onSurfaceVariant)),
           const GoldDivider(),
           _row('Principal Amount', formatInr(g.principalAmount)),
           _row('Outstanding Principal', formatInr(g.outstandingPrincipal)),
@@ -146,7 +147,10 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 13)),
+            Text(
+              label,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+            ),
             Text(
               value,
               style: emphasize ? AppTheme.numericData(context) : const TextStyle(fontSize: 13),

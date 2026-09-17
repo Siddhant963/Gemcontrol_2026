@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/firm.dart';
@@ -11,6 +12,7 @@ import '../../core/utils/currency.dart';
 import '../../core/utils/number_to_words.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
+import 'invoice_pdf.dart';
 
 /// GST invoice layout per the reference "Krishna Jewellers" screenshots
 /// (invoice-format-spec memory): header / bill-to / line items / payment +
@@ -32,11 +34,30 @@ class InvoiceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     final firm = ref.watch(currentFirmProvider);
     final netReceivable = sale.totalAmount - sale.udharAmount;
 
     return Scaffold(
-      appBar: GcAppBar(title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice'),
+      appBar: GcAppBar(
+        title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice',
+        actions: [
+          IconButton(
+            tooltip: 'Print',
+            icon: const Icon(Icons.print_outlined),
+            onPressed: () => Printing.layoutPdf(onLayout: (_) => buildInvoicePdf(sale, firm)),
+          ),
+          IconButton(
+            tooltip: 'Download / Share',
+            icon: const Icon(Icons.download_outlined),
+            onPressed: () async {
+              final bytes = await buildInvoicePdf(sale, firm);
+              final name = sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'invoice';
+              await Printing.sharePdf(bytes: bytes, filename: '$name.pdf');
+            },
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Card(
@@ -75,27 +96,29 @@ class InvoiceScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Column(
+                    Column(
                       children: [
-                        SizedBox(width: 120, child: Divider(color: AppColors.outline)),
-                        Text('Customer Signatory', style: TextStyle(fontSize: 12)),
+                        SizedBox(width: 120, child: Divider(color: scheme.outline)),
+                        const Text('Customer Signatory', style: TextStyle(fontSize: 12)),
                       ],
                     ),
                     Column(
                       children: [
                         if (firm != null && firm.ownerSignature.isNotEmpty)
                           SizedBox(
+                            width: 120,
                             height: 40,
                             child: CachedNetworkImage(
                               imageUrl: resolveUploadUrl(firm.ownerSignature),
+                              fit: BoxFit.contain,
                               errorWidget: (_, __, ___) => const SizedBox(),
                             ),
                           )
                         else
                           const SizedBox(width: 120, height: 40),
-                        const SizedBox(
+                        SizedBox(
                           width: 120,
-                          child: Divider(color: AppColors.outline),
+                          child: Divider(color: scheme.outline),
                         ),
                         const Text('Authorized Signatory', style: TextStyle(fontSize: 12)),
                       ],
@@ -128,6 +151,7 @@ class _Header extends StatelessWidget {
             height: 48,
             child: CachedNetworkImage(
               imageUrl: resolveUploadUrl(logo),
+              fit: BoxFit.contain,
               errorWidget: (_, __, ___) => const SizedBox(),
             ),
           )
@@ -174,6 +198,7 @@ class _BillTo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -181,7 +206,7 @@ class _BillTo extends StatelessWidget {
         const SizedBox(height: 4),
         Text(sale.customerName ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
         if (sale.customerAddress != null && sale.customerAddress!.isNotEmpty)
-          Text(sale.customerAddress!, style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+          Text(sale.customerAddress!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
       ],
     );
   }
@@ -236,6 +261,7 @@ class _PaymentBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final rows = <(String, double)>[
       ('CASH RECEIVED', sale._cashReceived),
       ('CHEQUE RECEIVED', sale._chequeReceived),
@@ -258,7 +284,7 @@ class _PaymentBlock extends StatelessWidget {
             ),
           ),
         if (rows.isEmpty)
-          const Text('No payment received', style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+          Text('No payment received', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
       ],
     );
   }
@@ -271,6 +297,7 @@ class _TotalsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     Widget row(String label, String value, {bool red = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
@@ -279,7 +306,7 @@ class _TotalsBlock extends StatelessWidget {
               Text(label, style: const TextStyle(fontSize: 12)),
               Text(
                 value,
-                style: TextStyle(fontSize: 12, color: red ? AppColors.error : null, fontWeight: red ? FontWeight.bold : null),
+                style: TextStyle(fontSize: 12, color: red ? scheme.error : null, fontWeight: red ? FontWeight.bold : null),
               ),
             ],
           ),

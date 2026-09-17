@@ -7,6 +7,6 @@ void main() {
   testWidgets('App boots to the splash screen', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: GemControlApp()));
     await tester.pump();
-    expect(find.text('GemControl'), findsOneWidget);
+    expect(find.text('RatnSetu'), findsOneWidget);
   });
 }

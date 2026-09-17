@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/repositories/dashboard_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
@@ -24,6 +25,7 @@ class DayBookScreen extends ConsumerWidget {
     final dayBookAsync = ref.watch(dayBookProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(
         title: 'Day Book',
         actions: [
@@ -55,12 +57,12 @@ class DayBookScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _summaryRow('Sales Count', '${data.summary['salesCount'] ?? 0}'),
-                    _summaryRow('Total Sales', formatInr((data.summary['totalSalesAmount'] as num?) ?? 0)),
-                    _summaryRow('Payments Received', formatInr((data.summary['totalPaymentsReceived'] as num?) ?? 0)),
-                    _summaryRow('New Stock Added', '${data.summary['newStockCount'] ?? 0}'),
-                    _summaryRow('Udhar Given', formatInr((data.summary['udharGivenAmount'] as num?) ?? 0)),
-                    _summaryRow('Udhar Settled', formatInr((data.summary['udharSettledAmount'] as num?) ?? 0)),
+                    _summaryRow(context, 'Sales Count', '${data.summary['salesCount'] ?? 0}'),
+                    _summaryRow(context, 'Total Sales', formatInr((data.summary['totalSalesAmount'] as num?) ?? 0)),
+                    _summaryRow(context, 'Payments Received', formatInr((data.summary['totalPaymentsReceived'] as num?) ?? 0)),
+                    _summaryRow(context, 'New Stock Added', '${data.summary['newStockCount'] ?? 0}'),
+                    _summaryRow(context, 'Udhar Given', formatInr((data.summary['udharGivenAmount'] as num?) ?? 0)),
+                    _summaryRow(context, 'Udhar Settled', formatInr((data.summary['udharSettledAmount'] as num?) ?? 0)),
                   ],
                 ),
               ),
@@ -76,7 +78,7 @@ class DayBookScreen extends ConsumerWidget {
                       Text('Payments By Mode', style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.sm),
                       for (final entry in data.paymentsByMode.entries)
-                        _summaryRow(entry.key, formatInr((entry.value as num?) ?? 0)),
+                        _summaryRow(context, entry.key, formatInr((entry.value as num?) ?? 0)),
                     ],
                   ),
                 ),
@@ -92,12 +94,12 @@ class DayBookScreen extends ConsumerWidget {
     );
   }
 
-  Widget _summaryRow(String label, String value) => Padding(
+  Widget _summaryRow(BuildContext context, String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: AppColors.onSurfaceVariant)),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
@@ -149,7 +151,7 @@ class _EntryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppColors.primary),
+          Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           Expanded(child: Text('$label', maxLines: 1, overflow: TextOverflow.ellipsis)),
           if (amount != null) Text(formatInr(amount as num, decimals: false)),

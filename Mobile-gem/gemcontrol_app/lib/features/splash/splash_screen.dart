@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_theme.dart';
-
 /// Shown briefly while the router's redirect logic (core/router/app_router.dart)
 /// waits for authControllerProvider to hydrate from secure storage, then
 /// forwards to /login or /home.
@@ -12,8 +10,10 @@ class SplashScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -27,7 +27,7 @@ class SplashScreen extends ConsumerWidget {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
+                    color: scheme.primary.withValues(alpha: 0.25),
                     blurRadius: 24,
                     spreadRadius: 2,
                   ),
@@ -37,11 +37,11 @@ class SplashScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'GemControl',
-              style: GoogleFonts.bodoniModa(
+              'RatnSetu',
+              style: GoogleFonts.openSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onBackground,
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -50,16 +50,16 @@ class SplashScreen extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 13,
                 letterSpacing: 1.5,
-                color: AppColors.onSurfaceVariant,
+                color: scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 32),
-            const SizedBox(
+            SizedBox(
               width: 28,
               height: 28,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                color: AppColors.primary,
+                color: scheme.primary,
               ),
             ),
           ],

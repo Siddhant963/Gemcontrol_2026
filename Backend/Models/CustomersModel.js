@@ -7,12 +7,10 @@ const CoustomersSchema = mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
   },
   contact: {
     type: String,
     required: true,
-    unique: true,
   },
   firm: {
     type: mongoose.Schema.Types.ObjectId,
@@ -33,4 +31,8 @@ const CoustomersSchema = mongoose.Schema({
     default: null,
   },
 });
+// Email/contact only need to be unique within a firm — two different shops
+// can have customers who happen to share an email or phone number.
+CoustomersSchema.index({ firm: 1, email: 1 }, { unique: true });
+CoustomersSchema.index({ firm: 1, contact: 1 }, { unique: true });
 module.exports = mongoose.model("Customer", CoustomersSchema);

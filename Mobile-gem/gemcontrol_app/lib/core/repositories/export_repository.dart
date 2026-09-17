@@ -21,7 +21,7 @@ class ExportRepository {
         options: Options(responseType: ResponseType.bytes),
       );
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'GemControl_Export_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final fileName = 'RatnSetu_Export_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(response.data!);
       return file;

@@ -1,7 +1,7 @@
 {
   "name": "gem-control",
   "version": "1.0.0",
-  "description": "A backend for the gem control application",
+  "description": "A backend for the RatnSetu application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -26,6 +26,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^3.0.3",
     "nodemon": "^3.1.10",
+    "razorpay": "^2.9.8",
     "xlsx": "^0.18.5"
   }
 }

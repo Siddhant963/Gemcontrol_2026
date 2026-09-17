@@ -30,13 +30,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Search,
-  Add,
-  Delete,
-  Print as PrintIcon,
-  Close,
-} from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { OptimizedImage } from "../utils/imageUtils";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -232,6 +226,12 @@ function ItemManagement() {
       !newItem.karat
     )
       errors.karat = "Karat is required for gold and diamond items";
+    if (newItem.lessWeight !== "" && newItem.lessWeight !== undefined) {
+      if (isNaN(newItem.lessWeight) || Number(newItem.lessWeight) < 0)
+        errors.lessWeight = "Less weight cannot be negative";
+      else if (Number(newItem.lessWeight) > (Number(newItem.waight) || 0))
+        errors.lessWeight = "Less weight cannot exceed gross weight";
+    }
     if (!newItem.category) errors.category = "Category is required";
     if (!newItem.firm) errors.firm = "Firm is required";
     if (!newItem.quantity || isNaN(newItem.quantity) || newItem.quantity <= 0)
@@ -244,6 +244,14 @@ function ItemManagement() {
       newItem.makingCharge < 0
     )
       errors.makingCharge = "Valid making charge is required";
+    if (newItem.labourChargeValue !== "" && newItem.labourChargeValue !== undefined) {
+      if (isNaN(newItem.labourChargeValue) || Number(newItem.labourChargeValue) < 0)
+        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
+    }
+    if (newItem.stoneCharge !== "" && newItem.stoneCharge !== undefined) {
+      if (isNaN(newItem.stoneCharge) || Number(newItem.stoneCharge) < 0)
+        errors.stoneCharge = "Stone charge cannot be negative";
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [newItem]);
@@ -673,6 +681,12 @@ function ItemManagement() {
       !editItem.karat
     )
       errors.karat = "Karat is required for gold and diamond items";
+    if (editItem.lessWeight !== "" && editItem.lessWeight !== undefined) {
+      if (isNaN(editItem.lessWeight) || Number(editItem.lessWeight) < 0)
+        errors.lessWeight = "Less weight cannot be negative";
+      else if (Number(editItem.lessWeight) > (Number(editItem.waight) || 0))
+        errors.lessWeight = "Less weight cannot exceed gross weight";
+    }
     if (!editItem.category) errors.category = "Category is required";
     if (!editItem.firm) errors.firm = "Firm is required";
     if (
@@ -689,6 +703,14 @@ function ItemManagement() {
       editItem.makingCharge < 0
     )
       errors.makingCharge = "Valid making charge is required";
+    if (editItem.labourChargeValue !== "" && editItem.labourChargeValue !== undefined) {
+      if (isNaN(editItem.labourChargeValue) || Number(editItem.labourChargeValue) < 0)
+        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
+    }
+    if (editItem.stoneCharge !== "" && editItem.stoneCharge !== undefined) {
+      if (isNaN(editItem.stoneCharge) || Number(editItem.stoneCharge) < 0)
+        errors.stoneCharge = "Stone charge cannot be negative";
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [editItem]);
@@ -827,6 +849,9 @@ function ItemManagement() {
     () =>
       stocks.filter((item) => {
         const matchesGlobalSearch =
+          (item.name || "")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
           (item.category.name || "")
             .toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
@@ -1102,7 +1127,7 @@ function ItemManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleAddItem}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -1132,7 +1157,7 @@ function ItemManagement() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -1496,7 +1521,7 @@ function ItemManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete fontSize="small" />}
+                          startIcon={<SymbolIcon name="delete" size={18} />}
                           onClick={() => handleRemoveItem(item._id)}
                           sx={{
                             fontSize: "0.75rem",
@@ -1510,7 +1535,7 @@ function ItemManagement() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<PrintIcon fontSize="small" />}
+                        startIcon={<SymbolIcon name="print" size={18} />}
                         onClick={() => handlePrintBarcode(item)}
                         disabled={!item.stockcode}
                         sx={{
@@ -1723,7 +1748,7 @@ function ItemManagement() {
                               variant="outlined"
                               size="small"
                               color="error"
-                              startIcon={<Delete fontSize="small" />}
+                              startIcon={<SymbolIcon name="delete" size={18} />}
                               onClick={() => handleRemoveItem(item._id)}
                               sx={{
                                 fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1737,7 +1762,7 @@ function ItemManagement() {
                           <Button
                             variant="contained"
                             size="small"
-                            startIcon={<PrintIcon fontSize="small" />}
+                            startIcon={<SymbolIcon name="print" size={18} />}
                             onClick={() => handlePrintBarcode(item)}
                             disabled={!item.stockcode}
                             sx={{
@@ -1808,7 +1833,7 @@ function ItemManagement() {
               p: 0.5,
             }}
           >
-            <Close sx={{ fontSize: "1rem" }} />
+            <SymbolIcon name="close" sx={{ fontSize: "1rem" }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -2016,6 +2041,9 @@ function ItemManagement() {
             fullWidth
             value={newItem.lessWeight}
             onChange={handleInputChange}
+            error={!!formErrors.lessWeight}
+            helperText={formErrors.lessWeight}
+            InputProps={{ inputProps: { min: 0 } }}
             sx={{
               mb: { xs: 1, sm: 2 },
               "& .MuiInputBase-input": {
@@ -2139,6 +2167,9 @@ function ItemManagement() {
               fullWidth
               value={newItem.labourChargeValue}
               onChange={handleInputChange}
+              error={!!formErrors.labourChargeValue}
+              helperText={formErrors.labourChargeValue}
+              InputProps={{ inputProps: { min: 0 } }}
             />
             <Select
               name="labourChargeUnit"
@@ -2161,6 +2192,9 @@ function ItemManagement() {
             fullWidth
             value={newItem.stoneCharge}
             onChange={handleInputChange}
+            error={!!formErrors.stoneCharge}
+            helperText={formErrors.stoneCharge}
+            InputProps={{ inputProps: { min: 0 } }}
             sx={{ mb: { xs: 1, sm: 2 } }}
           />
           <Box sx={{ mb: { xs: 1, sm: 2 } }}>
@@ -2288,7 +2322,7 @@ function ItemManagement() {
               color: theme.palette.getContrastText(theme.palette.primary.main),
             }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
@@ -2403,6 +2437,9 @@ function ItemManagement() {
               type="number"
               value={editItem.lessWeight}
               onChange={handleEditInputChange}
+              error={!!formErrors.lessWeight}
+              helperText={formErrors.lessWeight}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
               sx={{ mb: 1 }}
             />
@@ -2561,6 +2598,9 @@ function ItemManagement() {
               type="number"
               value={editItem.labourChargeValue}
               onChange={handleEditInputChange}
+              error={!!formErrors.labourChargeValue}
+              helperText={formErrors.labourChargeValue}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
             />
             <Select
@@ -2586,6 +2626,9 @@ function ItemManagement() {
               type="number"
               value={editItem.stoneCharge}
               onChange={handleEditInputChange}
+              error={!!formErrors.stoneCharge}
+              helperText={formErrors.stoneCharge}
+              InputProps={{ inputProps: { min: 0 } }}
               size="small"
             />
           </Box>

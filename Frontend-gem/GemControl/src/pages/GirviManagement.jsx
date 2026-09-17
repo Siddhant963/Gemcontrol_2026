@@ -32,7 +32,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Search, Add, Delete, Edit, ExpandMore, Payment as PaymentIcon } from "@mui/icons-material";
+import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setError as setAuthError } from "../redux/authSlice";
@@ -87,6 +87,7 @@ function GirviManagement() {
     loadingPreview: false,
   });
   const [paymentError, setPaymentError] = useState("");
+  const [redeemSubmitting, setRedeemSubmitting] = useState(false);
 
   // Animation variants
   const sectionVariants = {
@@ -562,7 +563,14 @@ function GirviManagement() {
           : prev
       );
     } catch (err) {
+      // Surface this rather than silently falling back to the (possibly
+      // stale) last-saved accruedInterest — a silent failure here is
+      // exactly what makes interest look like it "isn't calculating".
       setPaymentDialog((prev) => ({ ...prev, loadingPreview: false }));
+      setPaymentError(
+        err.response?.data?.message ||
+          "Could not fetch the live interest calculation — showing the last saved figures below instead."
+      );
     }
   };
 
@@ -613,6 +621,34 @@ function GirviManagement() {
       setPaymentError(
         err.response?.data?.message || "Failed to record payment."
       );
+    }
+  };
+
+  // Redeem — the customer is here to take their item back and clear the
+  // whole loan in one go, same intent as finalizing a sale. Uses the
+  // dedicated /redeemGirviItem endpoint (accrues interest then settles the
+  // full balance atomically) rather than pre-filling the payment amount,
+  // so the amount actually charged is always the server's own live figure.
+  const handleRedeemFull = async () => {
+    if (!paymentDialog.girvi) return;
+    setRedeemSubmitting(true);
+    setPaymentError("");
+    try {
+      const response = await api.post("/redeemGirviItem", {
+        girviId: paymentDialog.girvi._id,
+        paymentMethod: paymentDialog.method,
+        paymentReference: paymentDialog.reference,
+      });
+      await fetchData();
+      handleClosePaymentDialog();
+      setSuccessMessage(
+        `${response.data.girviItem.itemName} redeemed for ₹${response.data.girviItem.finalAmount.toFixed(2)}`
+      );
+      setIsSuccessModalOpen(true);
+    } catch (err) {
+      setPaymentError(err.response?.data?.message || "Failed to redeem item.");
+    } finally {
+      setRedeemSubmitting(false);
     }
   };
 
@@ -754,7 +790,7 @@ function GirviManagement() {
         >
           <Button
             variant="contained"
-            startIcon={<Add />}
+            startIcon={<SymbolIcon name="add" />}
             onClick={handleAddGirvi}
             sx={{
               bgcolor: theme.palette.primary.main,
@@ -783,7 +819,8 @@ function GirviManagement() {
             }}
           >
             <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-              <Search
+              <SymbolIcon
+                name="search"
                 sx={{
                   color: theme.palette.text.secondary,
                   fontSize: { xs: "1.2rem", sm: "1.5rem" },
@@ -1054,7 +1091,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<PaymentIcon />}
+                          startIcon={<SymbolIcon name="payments" />}
                           onClick={() => handleOpenPaymentDialog(girvi)}
                           disabled={girvi?.status !== "active"}
                           sx={{
@@ -1069,7 +1106,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<Edit />}
+                          startIcon={<SymbolIcon name="edit" />}
                           onClick={() => handleEditGirvi(girvi)}
                           sx={{
                             color: theme.palette.secondary.main,
@@ -1091,7 +1128,7 @@ function GirviManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete />}
+                          startIcon={<SymbolIcon name="delete" />}
                           onClick={() => handleDeleteGirvi(girvi._id)}
                           sx={{
                             borderColor: theme.palette.error.main,
@@ -1203,7 +1240,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<PaymentIcon />}
+                          startIcon={<SymbolIcon name="payments" />}
                           onClick={() => handleOpenPaymentDialog(girvi)}
                           disabled={girvi?.status !== "active"}
                           sx={{
@@ -1218,7 +1255,7 @@ function GirviManagement() {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<Edit />}
+                          startIcon={<SymbolIcon name="edit" />}
                           onClick={() => handleEditGirvi(girvi)}
                           sx={{
                             fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1234,7 +1271,7 @@ function GirviManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete />}
+                          startIcon={<SymbolIcon name="delete" />}
                           onClick={() => handleDeleteGirvi(girvi._id)}
                           sx={{
                             fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -1255,7 +1292,8 @@ function GirviManagement() {
                             transition: "transform 0.3s",
                           }}
                         >
-                          <ExpandMore
+                          <SymbolIcon
+                            name="expand_more"
                             sx={{ fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
                           />
                         </ExpandIconButton>
@@ -2335,6 +2373,33 @@ function GirviManagement() {
         <DialogContent sx={{ mt: { xs: 1, sm: 2 }, px: { xs: 1.5, sm: 2 } }}>
           {paymentDialog.girvi && (
             <>
+              {(() => {
+                const customerId =
+                  paymentDialog.girvi?.Customer?._id ?? paymentDialog.girvi?.Customer;
+                const otherActiveCount = girvis.filter((g) => {
+                  const gCustomerId = g?.Customer?._id ?? g?.Customer;
+                  return (
+                    g?._id !== paymentDialog.girvi._id &&
+                    g?.status === "active" &&
+                    gCustomerId === customerId
+                  );
+                }).length;
+                if (!otherActiveCount) return null;
+                return (
+                  <Typography
+                    sx={{
+                      fontSize: "0.75rem",
+                      color: theme.palette.text.secondary,
+                      mb: 1.5,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    This customer has {otherActiveCount} other active pledge
+                    {otherActiveCount > 1 ? "s" : ""} — tracked and calculated separately from
+                    this one; paying or redeeming this item does not affect the others.
+                  </Typography>
+                );
+              })()}
               <Box
                 sx={{
                   p: 1.5,
@@ -2359,6 +2424,15 @@ function GirviManagement() {
                         paymentDialog.livePreview
                       ).toFixed(2)}`}
                 </Typography>
+                {!paymentDialog.loadingPreview && paymentDialog.livePreview && (
+                  <Typography
+                    sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary, mt: 0.5 }}
+                  >
+                    {paymentDialog.livePreview.monthsElapsed > 0
+                      ? `${paymentDialog.livePreview.monthsElapsed} full month(s) have elapsed since the last accrual, adding ₹${paymentDialog.livePreview.interestAmount.toFixed(2)} interest just now.`
+                      : "Interest accrues in full-month increments — none has completed since the last accrual yet, so nothing new is due right now."}
+                  </Typography>
+                )}
                 <Typography
                   sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary, mt: 0.5 }}
                 >
@@ -2371,6 +2445,27 @@ function GirviManagement() {
                   {paymentError}
                 </Typography>
               )}
+
+              {/* Primary action: the customer is here to take the item back
+                  and clear the loan in full — same one-click intent as
+                  finalizing a sale. */}
+              <Button
+                variant="contained"
+                color="success"
+                fullWidth
+                onClick={handleRedeemFull}
+                disabled={paymentDialog.loadingPreview || redeemSubmitting}
+                sx={{ mb: 2, textTransform: "none", fontWeight: 700 }}
+              >
+                {redeemSubmitting
+                  ? "Redeeming..."
+                  : `Redeem — Settle ₹${getOutstandingTotal(
+                      paymentDialog.girvi,
+                      paymentDialog.livePreview
+                    ).toFixed(2)} in Full`}
+              </Button>
+
+              <Divider sx={{ mb: 2 }}>or record a partial payment</Divider>
 
               <TextField
                 label="Payment Amount (₹)"
@@ -2389,7 +2484,7 @@ function GirviManagement() {
                 sx={{ mb: 2, textTransform: "none" }}
                 disabled={paymentDialog.loadingPreview}
               >
-                Pay Full Amount (Redeem)
+                Fill full outstanding amount
               </Button>
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel id="payment-method-label">Payment Method</InputLabel>
@@ -2452,6 +2547,7 @@ function GirviManagement() {
           <Button
             variant="contained"
             onClick={handleSubmitPayment}
+            disabled={redeemSubmitting}
             sx={{
               bgcolor: theme.palette.primary.main,
               color: theme.palette.primary.contrastText,
@@ -2459,7 +2555,7 @@ function GirviManagement() {
               textTransform: "none",
             }}
           >
-            Record Payment
+            Record Partial Payment
           </Button>
         </DialogActions>
       </Dialog>

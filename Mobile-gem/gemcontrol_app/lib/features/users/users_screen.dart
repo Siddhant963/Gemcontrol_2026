@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/user.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
@@ -19,7 +20,9 @@ class UsersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(allUsersProvider);
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'User Management'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showModalBottomSheet(
@@ -50,7 +53,7 @@ class UsersScreen extends ConsumerWidget {
                   children: [
                     StatusChip(label: u.role),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                      icon: Icon(Icons.delete_outline, color: scheme.error),
                       onPressed: () async {
                         await ref.read(authRepositoryProvider).removeUser(u.id);
                         ref.invalidate(allUsersProvider);

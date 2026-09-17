@@ -9,7 +9,3 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) {
 final monthlySalesProvider = FutureProvider.autoDispose<List<MonthlySales>>((ref) {
   return ref.watch(dashboardRepositoryProvider).getMonthlySales();
 });
-
-final recentActivitiesProvider = FutureProvider.autoDispose((ref) {
-  return ref.watch(dashboardRepositoryProvider).getRecentActivities();
-});

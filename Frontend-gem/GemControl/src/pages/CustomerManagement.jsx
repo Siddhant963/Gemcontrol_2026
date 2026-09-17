@@ -34,10 +34,10 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Add, Close, Delete, Edit } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import api from "../utils/api";
 import NotificationModal from "../components/NotificationModal";
+import SymbolIcon from "../components/SymbolIcon";
 
 function CustomerManagement() {
   const theme = useTheme();
@@ -339,13 +339,12 @@ function CustomerManagement() {
   const filteredCustomers = useMemo(
     () =>
       customers.filter((customer) => {
+        const query = searchQuery.toLowerCase();
         const matchesSearch =
-          (customer.firm.name || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          (customer.address || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase());
+          (customer.name || "").toLowerCase().includes(query) ||
+          (customer.contact || "").toLowerCase().includes(query) ||
+          (customer.email || "").toLowerCase().includes(query) ||
+          (customer.address || "").toLowerCase().includes(query);
         return matchesSearch;
       }),
     [customers, searchQuery]
@@ -412,7 +411,7 @@ function CustomerManagement() {
           >
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={<SymbolIcon name="add" />}
               onClick={handleOpenModal}
               sx={{
                 bgcolor: theme.palette.primary.main,
@@ -442,7 +441,7 @@ function CustomerManagement() {
               }}
             >
               <IconButton sx={{ p: { xs: 0.5, sm: 1 } }}>
-                <Search sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+                <SymbolIcon name="search" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
               </IconButton>
               <InputBase
                 sx={{
@@ -499,7 +498,7 @@ function CustomerManagement() {
             }}
             aria-label="Close dialog"
           >
-            <Close sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
+            <SymbolIcon name="close" sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 } }}>
@@ -755,7 +754,7 @@ function CustomerManagement() {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<Edit fontSize="small" />}
+                        startIcon={<SymbolIcon name="edit" size={18} />}
                         onClick={() => handleEditCustomer(customer)}
                         sx={{
                           fontSize: "0.75rem",
@@ -771,7 +770,7 @@ function CustomerManagement() {
                           variant="outlined"
                           size="small"
                           color="error"
-                          startIcon={<Delete fontSize="small" />}
+                          startIcon={<SymbolIcon name="delete" size={18} />}
                           onClick={() => handleDeleteCustomer(customer._id)}
                           sx={{
                             fontSize: "0.75rem",
@@ -892,7 +891,7 @@ function CustomerManagement() {
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={<Edit fontSize="small" />}
+                            startIcon={<SymbolIcon name="edit" size={18} />}
                             onClick={() => handleEditCustomer(customer)}
                             sx={{
                               fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -907,7 +906,7 @@ function CustomerManagement() {
                               variant="outlined"
                               size="small"
                               color="error"
-                              startIcon={<Delete fontSize="small" />}
+                              startIcon={<SymbolIcon name="delete" size={18} />}
                               onClick={() => handleDeleteCustomer(customer._id)}
                               sx={{
                                 fontSize: { xs: "0.7rem", sm: "0.8rem" },
@@ -983,7 +982,7 @@ function CustomerManagement() {
             onClick={handleCloseCustomerDetail}
             sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.getContrastText(theme.palette.primary.main) }}
           >
-            <Close />
+            <SymbolIcon name="close" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
