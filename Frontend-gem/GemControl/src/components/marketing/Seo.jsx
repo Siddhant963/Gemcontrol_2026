@@ -2,10 +2,11 @@ import { Helmet } from "react-helmet-async";
 import { SITE_CONFIG } from "../../data/siteConfig";
 
 // Always-present base schema (Organization + WebSite). Deliberately omits
-// address/phone/founding year/social profiles/logo details that aren't
-// verified anywhere in the project -- only fields backed by real data
-// (name, url, support email, the real ADRS Techno relationship) are
-// included. See docs/SEO_AUDIT_REPORT.md for what's intentionally left out.
+// founding year/social profiles that aren't verified anywhere in the
+// project -- only fields backed by real data (name, url, support
+// email/phone, the real ADRS Techno relationship and registered address)
+// are included. See docs/SEO_AUDIT_REPORT.md for what's intentionally left
+// out.
 function buildBaseSchema() {
   return [
     {
@@ -15,10 +16,15 @@ function buildBaseSchema() {
       url: SITE_CONFIG.siteUrl,
       logo: `${SITE_CONFIG.siteUrl}/ratnsetu-logo.png`,
       email: SITE_CONFIG.supportEmail,
+      telephone: SITE_CONFIG.supportPhone,
       parentOrganization: {
         "@type": "Organization",
         name: SITE_CONFIG.legalCompanyName,
         url: SITE_CONFIG.legalCompanyUrl,
+        address: {
+          "@type": "PostalAddress",
+          ...SITE_CONFIG.registeredAddressParts,
+        },
       },
     },
     {

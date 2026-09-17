@@ -7,12 +7,20 @@ export const SITE_CONFIG = {
   legalCompanyName: "ADRS Techno Pvt. Ltd.",
   legalCompanyUrl: "https://www.adrstechno.com/",
   supportEmail: "support@ratnsetu.com",
-  // TODO: replace with verified real values before launch -- do not publish
-  // invented numbers/addresses.
-  supportPhone: "",
-  whatsappNumber: "",
+  supportPhone: "+91 92013 47033",
+  whatsappNumber: "+91 92013 47033",
   businessHours: "Mon–Sat, 10:00 AM – 7:00 PM IST",
-  registeredAddress: "",
+  // ADRS Techno Pvt. Ltd.'s registered address (RatnSetu's developer/company).
+  registeredAddress: "71, Dadda Nagar, Karmeta, Katangi Bypass, Jabalpur, Madhya Pradesh 482002, India",
+  // Same address, broken into parts for schema.org PostalAddress structured
+  // data (see Seo.jsx) -- keep in sync with registeredAddress above.
+  registeredAddressParts: {
+    streetAddress: "71, Dadda Nagar, Karmeta, Katangi Bypass",
+    addressLocality: "Jabalpur",
+    addressRegion: "Madhya Pradesh",
+    postalCode: "482002",
+    addressCountry: "IN",
+  },
   siteUrl: "https://www.ratnsetu.com",
 };
 

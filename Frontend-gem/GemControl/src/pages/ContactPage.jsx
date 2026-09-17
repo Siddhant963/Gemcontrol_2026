@@ -7,11 +7,30 @@ import Seo from "../components/marketing/Seo";
 import SymbolIcon from "../components/SymbolIcon";
 import { SITE_CONFIG, PAGE_SEO } from "../data/siteConfig";
 
+// wa.me needs digits only (country code, no +, spaces, or leading 0).
+const whatsappDigits = SITE_CONFIG.whatsappNumber.replace(/\D/g, "");
+
 const INFO_ROWS = [
   { icon: "mail", label: "Email", value: SITE_CONFIG.supportEmail, href: `mailto:${SITE_CONFIG.supportEmail}` },
-  { icon: "call", label: "Phone", value: SITE_CONFIG.supportPhone || "Coming soon", href: null },
-  { icon: "chat", label: "WhatsApp", value: SITE_CONFIG.whatsappNumber || "Coming soon", href: null },
+  {
+    icon: "call",
+    label: "Phone",
+    value: SITE_CONFIG.supportPhone || "Coming soon",
+    href: SITE_CONFIG.supportPhone ? `tel:${SITE_CONFIG.supportPhone.replace(/\s/g, "")}` : null,
+  },
+  {
+    icon: "chat",
+    label: "WhatsApp",
+    value: SITE_CONFIG.whatsappNumber || "Coming soon",
+    href: SITE_CONFIG.whatsappNumber ? `https://wa.me/${whatsappDigits}` : null,
+  },
   { icon: "schedule", label: "Business Hours", value: SITE_CONFIG.businessHours, href: null },
+  {
+    icon: "location_on",
+    label: "Registered Office (ADRS Techno Pvt. Ltd.)",
+    value: SITE_CONFIG.registeredAddress || "Coming soon",
+    href: null,
+  },
 ];
 
 function ContactPage() {
@@ -57,6 +76,7 @@ function ContactPage() {
                     <Typography
                       component="a"
                       href={row.href}
+                      {...(row.href.startsWith("https://") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       sx={{ fontWeight: 600, color: theme.palette.text.primary, textDecoration: "none" }}
                     >
                       {row.value}
