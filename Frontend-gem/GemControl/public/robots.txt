@@ -14,24 +14,6 @@ Disallow: /udhar
 Disallow: /girvi
 Disallow: /jewellery-panel
 Disallow: /day-book
-
-Sitemap: https://www.ratnsetu.com/sitemap.xml
-User-agent: *
-Allow: /
-Disallow: /dashboard
-Disallow: /users
-Disallow: /firms
-Disallow: /rates
-Disallow: /customers
-Disallow: /materials
-Disallow: /categories
-Disallow: /items
-Disallow: /sales
-Disallow: /payments
-Disallow: /udhar
-Disallow: /girvi
-Disallow: /jewellery-panel
-Disallow: /day-book
 Disallow: /subscribe
 
 Sitemap: https://www.ratnsetu.com/sitemap.xml
