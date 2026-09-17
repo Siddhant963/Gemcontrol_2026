@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Provider } from "react-redux";
+import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box } from "@mui/material";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -24,7 +25,16 @@ import Register from "./components/Register";
 import LandingPage from "./pages/LandingPage.jsx";
 import SubscribePage from "./pages/SubscribePage.jsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import AboutPage from "./pages/AboutPage.jsx";
+import FeaturesPage from "./pages/FeaturesPage.jsx";
+import PricingPage from "./pages/PricingPage.jsx";
+import TestimonialsPage from "./pages/TestimonialsPage.jsx";
+import BlogListPage from "./pages/BlogListPage.jsx";
+import BlogDetailPage from "./pages/BlogDetailPage.jsx";
+import ContactPage from "./pages/ContactPage.jsx";
+import TermsPage from "./pages/TermsPage.jsx";
 import NotFound from "./pages/NotFound";
+import AnalyticsRouteListener from "./components/AnalyticsRouteListener.jsx";
 import { ROUTES } from "./utils/routes";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GirviManagement from "./pages/GirviManagement.jsx";
@@ -39,9 +49,11 @@ const SPLASH_DURATION_MS = 2000;
 function App() {
   return (
     <Provider store={store}>
-      <ErrorBoundary>
-        <MainApp />
-      </ErrorBoundary>
+      <HelmetProvider>
+        <ErrorBoundary>
+          <MainApp />
+        </ErrorBoundary>
+      </HelmetProvider>
     </Provider>
   );
 }
@@ -64,6 +76,7 @@ function MainApp() {
       <CssBaseline />
       <SplashScreen visible={showSplash} />
       <BrowserRouter>
+        <AnalyticsRouteListener />
         <Routes>
           {/* Public marketing landing page — shown regardless of auth state,
               same as any SaaS homepage. Login/Register handle their own
@@ -73,6 +86,16 @@ function MainApp() {
           {/* Public, unauthenticated -- linked from Play Store / App Store
               listings and the footer, so it must never require login. */}
           <Route path={ROUTES.PRIVACY_POLICY} element={<PrivacyPolicy />} />
+
+          {/* Public marketing site pages */}
+          <Route path={ROUTES.ABOUT} element={<AboutPage />} />
+          <Route path={ROUTES.FEATURES} element={<FeaturesPage />} />
+          <Route path={ROUTES.PRICING} element={<PricingPage />} />
+          <Route path={ROUTES.TESTIMONIALS} element={<TestimonialsPage />} />
+          <Route path={ROUTES.BLOGS} element={<BlogListPage />} />
+          <Route path={ROUTES.BLOG_DETAIL} element={<BlogDetailPage />} />
+          <Route path={ROUTES.CONTACT} element={<ContactPage />} />
+          <Route path={ROUTES.TERMS} element={<TermsPage />} />
 
           {/* Public Routes */}
           <Route
