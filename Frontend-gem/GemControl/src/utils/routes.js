@@ -1,5 +1,13 @@
 export const ROUTES = {
   LANDING: "/",
+  ABOUT: "/about",
+  FEATURES: "/features",
+  PRICING: "/pricing",
+  TESTIMONIALS: "/testimonials",
+  BLOGS: "/blogs",
+  BLOG_DETAIL: "/blogs/:slug",
+  CONTACT: "/contact",
+  TERMS: "/terms-and-conditions",
   LOGIN: "/login",
   REGISTER: "/register",
   SUBSCRIBE: "/subscribe",

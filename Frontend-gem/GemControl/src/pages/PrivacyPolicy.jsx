@@ -1,6 +1,8 @@
 import { Box, Typography, Divider } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Link as RouterLink } from "react-router-dom";
+import MarketingHeader from "../components/marketing/MarketingHeader";
+import MarketingFooter from "../components/marketing/MarketingFooter";
+import Seo from "../components/marketing/Seo";
 import { ROUTES } from "../utils/routes";
 
 const LAST_UPDATED = "September 16, 2026";
@@ -22,20 +24,15 @@ function PrivacyPolicy() {
   const theme = useTheme();
 
   return (
-    <Box sx={{ bgcolor: theme.palette.background.default, minHeight: "100vh", py: { xs: 4, sm: 6 } }}>
-      <Box sx={{ maxWidth: 800, mx: "auto", px: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
-          <Box component="img" src="/ratnsetu-icon.png" alt="RatnSetu" sx={{ width: 32, height: 32 }} />
-          <Typography
-            component={RouterLink}
-            to={ROUTES.LANDING}
-            variant="h6"
-            sx={{ fontWeight: 700, color: theme.palette.primary.main, textDecoration: "none" }}
-          >
-            RatnSetu
-          </Typography>
-        </Box>
-
+    <Box sx={{ bgcolor: theme.palette.background.default, minHeight: "100vh" }}>
+      <Seo
+        title="Privacy Policy | RatnSetu"
+        description="How RatnSetu collects, uses, and protects data for jewellery business management ERP customers."
+        path={ROUTES.PRIVACY_POLICY}
+      />
+      <MarketingHeader />
+      <main>
+      <Box sx={{ maxWidth: 800, mx: "auto", px: 2, py: { xs: 4, sm: 6 } }}>
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
           Privacy Policy
         </Typography>
@@ -156,6 +153,8 @@ function PrivacyPolicy() {
           .
         </Section>
       </Box>
+      </main>
+      <MarketingFooter />
     </Box>
   );
 }
