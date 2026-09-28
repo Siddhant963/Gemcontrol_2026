@@ -10,7 +10,45 @@ const path = require("path");
 
 dotenv.config();
 
+// Safety net: on Node 15+, an unhandled promise rejection crashes the
+// entire process by default. That's exactly what took production down
+// (a fire-and-forget addActivity() call in Utils/cronJobs.js threw on a
+// bad ObjectId, with nothing awaiting it) -- fixed at the source, but this
+// stays as a backstop so one isolated, unawaited failure anywhere else in
+// the app can never do the same again. Deliberately does NOT install an
+// uncaughtException handler -- that indicates the process may be in a
+// genuinely inconsistent state, where letting it crash and restart (Render
+// does this automatically) is safer than continuing.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection (server continues running):", reason);
+});
+
 const app = express();
+
+// The apex domain (ratnsetu.com) and its "www." subdomain are two
+// DIFFERENT origins as far as a browser's CORS check is concerned, even
+// though they're the same site to a human -- a visitor can land on either
+// depending on how they typed the URL, an old bookmark, a search engine
+// result, a shared link, etc. This derives both variants from whichever
+// one FRONTEND_URL happens to be set to, so CORS never breaks purely
+// because of which variant was configured (this is exactly what caused a
+// "CORS error" / failed preflight on ratnsetu.com when FRONTEND_URL was
+// set to https://www.ratnsetu.com only).
+function withWwwVariant(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    const altHostname = parsed.hostname.startsWith("www.")
+      ? parsed.hostname.slice(4)
+      : `www.${parsed.hostname}`;
+    const port = parsed.port ? `:${parsed.port}` : "";
+    const altOrigin = `${parsed.protocol}//${altHostname}${port}`;
+    return [parsed.origin, altOrigin];
+  } catch {
+    // Malformed FRONTEND_URL -- fall back to whatever was given rather
+    // than crashing CORS setup entirely.
+    return [urlString];
+  }
+}
 
 // CORS Configuration - Environment-based
 // TEMP: local dev origins are allowed in production too, to test the
@@ -18,7 +56,7 @@ const app = express();
 // live backend. Remove these two once payment-gateway testing is done.
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? [
-      process.env.FRONTEND_URL || "https://ratnsetu.com",
+      ...withWwwVariant(process.env.FRONTEND_URL || "https://ratnsetu.com"),
       "http://localhost:5173",
       "http://localhost:8765",
     ]

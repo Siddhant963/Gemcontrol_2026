@@ -15,11 +15,21 @@ const OROPOCKET_PRICES_URL = 'https://api.oropocket.com/public/prices';
 
 const EXPORTS_DIR = path.join(__dirname, '../Exports');
 
-// Function to add activity (reused from controller)
+// Fire-and-forget audit logging for cron/system-triggered events -- every
+// call site below invokes this without `await`, so it must NEVER throw:
+// on Node 15+, an unhandled rejection from an unawaited call terminates
+// the whole process by default (this is exactly what was crashing the
+// server in production -- passing the literal string 'system' as userId
+// failed ObjectId casting on every single call, and the resulting throw
+// here had nothing to catch it). Logging a failure to log is the correct
+// behavior; letting it take down the server is not.
 const addActivity = async (userId, activityType, description) => {
   try {
     const newActivity = new ActivityModel({
-      userId: userId || 'system',
+      // 'system' was never a valid ObjectId -- omit userId entirely for
+      // system-triggered activities now that ActivitesModel.js no longer
+      // requires it, rather than passing a value guaranteed to fail casting.
+      userId: userId && userId !== 'system' ? userId : undefined,
       activityType,
       description,
       timestamp: new Date(),
@@ -28,7 +38,7 @@ const addActivity = async (userId, activityType, description) => {
     return newActivity;
   } catch (error) {
     console.error("Error adding activity:", error);
-    throw new Error("Internal server error");
+    return null;
   }
 };
 

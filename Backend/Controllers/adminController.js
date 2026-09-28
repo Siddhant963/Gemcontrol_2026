@@ -3182,7 +3182,13 @@ module.exports.getMonthlySalesData = async (req, res) => {
   }
 };
 
-//write a funxtion to add activites
+// Fire-and-forget audit logging -- every one of this function's ~25 call
+// sites throughout this file invokes it without `await` (confirmed by
+// grep), so it must NEVER throw: on Node 15+, an unhandled rejection from
+// an unawaited async call terminates the whole process by default. This
+// used to re-throw on failure, which is exactly what took production down
+// -- a completely unrelated logging failure (Utils/cronJobs.js passing an
+// invalid userId) crashed the entire backend, not just the log write.
 const addActivity = async (userId, firm, activityType, description) => {
   try {
     const newActivity = new ActivityModel({
@@ -3197,7 +3203,7 @@ const addActivity = async (userId, firm, activityType, description) => {
     return savedActivity; // Return the saved activity document
   } catch (error) {
     console.error("Error adding activity:", error);
-    throw new Error("Internal server error");
+    return null;
   }
 };
 
