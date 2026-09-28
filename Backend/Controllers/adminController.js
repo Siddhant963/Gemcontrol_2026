@@ -3753,6 +3753,16 @@ module.exports.getAppleAppAccountToken = async (req, res) => {
 // purely as a sanity cross-check for a clearer error message -- the actual
 // plan mapping always comes from Apple's verified transaction, never from
 // this field.
+// Order matters here and is deliberate (each step assumes every step above
+// it already passed):
+//   1. Verify the Apple transaction (fetchVerifiedTransaction)
+//   2. Verify environment (Production, or Sandbox if explicitly allowed)
+//   3. Reject a revoked/expired transaction outright
+//   4. Resolve the verified product -> internal plan
+//   5. Find any existing originalTransactionId owner
+//   6. Reject if that owner is a DIFFERENT firm
+//   7. Validate appAccountToken against the current firm (fail-closed)
+//   8. Activate -- only after every step above has passed
 module.exports.verifyAppleSubscription = async (req, res) => {
   const { transactionId, productId } = req.body;
   try {
@@ -3763,6 +3773,7 @@ module.exports.verifyAppleSubscription = async (req, res) => {
       return res.status(400).json({ message: "transactionId is required" });
     }
 
+    // Step 1: verify the transaction.
     let decoded, environment;
     try {
       ({ decoded, environment } = await appleIap.fetchVerifiedTransaction(String(transactionId)));
@@ -3771,11 +3782,11 @@ module.exports.verifyAppleSubscription = async (req, res) => {
       return res.status(400).json({ message: "Could not verify this purchase with Apple" });
     }
 
-    // BLOCKER FIX: a cryptographically genuine Sandbox transaction must
-    // never activate a real subscription unless this deployment has
-    // explicitly opted in (APPLE_IAP_ALLOW_SANDBOX=true, staging only).
-    // This is checked BEFORE any other logic -- nothing below this point
-    // may run for a disallowed environment.
+    // Step 2: verify environment. A cryptographically genuine Sandbox
+    // transaction must never activate a real subscription unless this
+    // deployment has explicitly opted in (APPLE_IAP_ALLOW_SANDBOX=true,
+    // staging only). Nothing below this point may run for a disallowed
+    // environment.
     if (!appleIap.isEnvironmentAllowedForEntitlement(environment)) {
       console.warn(
         `verifyAppleSubscription: rejected a ${environment} transaction (APPLE_IAP_ALLOW_SANDBOX=${appleIap.ALLOW_SANDBOX})`
@@ -3792,6 +3803,7 @@ module.exports.verifyAppleSubscription = async (req, res) => {
       );
     }
 
+    // Step 3: the transaction itself must be currently valid.
     if (appleIap.isTransactionRevoked(decoded)) {
       return res.status(400).json({ message: "This purchase has been refunded or revoked" });
     }
@@ -3799,11 +3811,24 @@ module.exports.verifyAppleSubscription = async (req, res) => {
       return res.status(400).json({ message: "This purchase is not currently active" });
     }
 
-    // BLOCKER FIX: this Apple subscription must not already belong to a
+    // Step 4: resolve the verified product to an internal plan. Done
+    // BEFORE the ownership/token checks below so a request for a product
+    // that isn't even a recognized plan fails fast with a clear reason,
+    // rather than being told about ownership/token status for something
+    // that was never going to activate anyway.
+    let plan;
+    try {
+      plan = await appleIap.resolvePlanForProductId(decoded.productId);
+    } catch (mappingError) {
+      console.error("Apple product mapping failed:", mappingError);
+      return res.status(404).json({ message: "This product is not a recognized subscription plan" });
+    }
+
+    // Step 5/6: this Apple subscription must not already belong to a
     // DIFFERENT firm. Idempotent resubmission by the SAME firm (e.g. a
     // redelivered unfinished transaction) is fine and falls through to the
-    // normal activatePaidSubscription call below, which is itself
-    // idempotent on paymentReference.
+    // token check and then activatePaidSubscription below, which is
+    // itself idempotent on paymentReference.
     const existingOwner = await findSubscriptionByAppleOriginalTransactionId(
       decoded.originalTransactionId
     );
@@ -3815,31 +3840,29 @@ module.exports.verifyAppleSubscription = async (req, res) => {
       return res.status(409).json({ message: "This purchase is already associated with a different account" });
     }
 
-    // BLOCKER FIX (structural): if the transaction carries an
-    // appAccountToken (set client-side via PurchaseParam.applicationUserName
-    // -- see apple_iap_controller.dart), it must match THIS firm's own
-    // token. Absent for purchases made before this field existed or by an
-    // older client build -- not fatal on its own since the ownership
-    // lookup above is the primary, always-on guard; this is an additional
-    // layer when the data is available.
-    if (decoded.appAccountToken) {
-      const firm = await FirmModel.findById(req.user.firm).select("appleAppAccountToken");
-      if (!appleIap.appAccountTokenMatches(decoded.appAccountToken, firm?.appleAppAccountToken)) {
-        console.warn(
-          `verifyAppleSubscription: appAccountToken mismatch for firm ${req.user.firm}`
-        );
-        return res.status(403).json({ message: "This purchase is not associated with your account" });
-      }
+    // Step 7: appAccountToken check -- FAIL CLOSED. RatnSetu's Apple IAP
+    // has never been live in production, so there is no pre-existing
+    // token-less subscription to preserve compatibility with: the
+    // verified transaction's appAccountToken and this firm's own stored
+    // token MUST both be present and equal, in every environment this
+    // deployment accepts (Production, or Sandbox when explicitly
+    // allowed -- APPLE_IAP_ALLOW_SANDBOX does not relax this check, it
+    // only controls whether a Sandbox transaction reaches this point at
+    // all). Missing on either side, or a mismatch, is rejected with a
+    // generic message that reveals nothing about any other firm. This
+    // runs AFTER the ownership check above (an already-differently-owned
+    // transaction is rejected for that reason first) but does not itself
+    // depend on whether an existingOwner was found -- it's unconditional.
+    const firm = await FirmModel.findById(req.user.firm).select("appleAppAccountToken");
+    if (!appleIap.appAccountTokenMatches(decoded.appAccountToken, firm?.appleAppAccountToken)) {
+      console.warn(
+        `verifyAppleSubscription: appAccountToken check failed for firm ${req.user.firm} ` +
+          `(apple token present=${Boolean(decoded.appAccountToken)}, firm token present=${Boolean(firm?.appleAppAccountToken)})`
+      );
+      return res.status(403).json({ message: "This purchase could not be verified for your account" });
     }
 
-    let plan;
-    try {
-      plan = await appleIap.resolvePlanForProductId(decoded.productId);
-    } catch (mappingError) {
-      console.error("Apple product mapping failed:", mappingError);
-      return res.status(404).json({ message: "This product is not a recognized subscription plan" });
-    }
-
+    // Step 8: activate, only now that every check above has passed.
     let subscription;
     try {
       subscription = await activatePaidSubscription({

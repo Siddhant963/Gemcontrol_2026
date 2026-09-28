@@ -25,11 +25,20 @@ class AppleIapState {
   final String? error;
   final bool storeUnavailable;
   // This firm's Apple app-account token (see subscription_repository.dart's
-  // getAppleAppAccountToken) -- null until fetched. buy()/restorePurchases()
-  // below pass it to StoreKit when available; a purchase made before it
-  // loads still works, just without this extra binding layer (the backend's
-  // originalTransactionId ownership check is the primary guard regardless).
+  // getAppleAppAccountToken) -- null until fetched. The backend now FAILS
+  // CLOSED without a matching token (Backend/Utils/appleIap.js's
+  // appAccountTokenMatches), so buy() below refuses to start a purchase
+  // until this is non-null -- see appAccountTokenLoading/Failed.
   final String? appAccountToken;
+  // True from construction until the first getAppleAppAccountToken() call
+  // resolves (success or failure) -- buy() checks this (not just
+  // appAccountToken == null) so it can distinguish "still loading" from
+  // "loaded and still somehow null", though in practice a successful load
+  // always yields a non-empty token.
+  final bool appAccountTokenLoading;
+  // True if the most recent getAppleAppAccountToken() call failed. Drives
+  // the UI's retry affordance; buy() refuses to start while this is true.
+  final bool appAccountTokenFailed;
 
   const AppleIapState({
     this.status = AppleIapStatus.idle,
@@ -38,6 +47,8 @@ class AppleIapState {
     this.error,
     this.storeUnavailable = false,
     this.appAccountToken,
+    this.appAccountTokenLoading = true,
+    this.appAccountTokenFailed = false,
   });
 
   AppleIapState copyWith({
@@ -49,6 +60,8 @@ class AppleIapState {
     bool clearError = false,
     bool? storeUnavailable,
     String? appAccountToken,
+    bool? appAccountTokenLoading,
+    bool? appAccountTokenFailed,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -59,8 +72,23 @@ class AppleIapState {
       error: clearError ? null : (error ?? this.error),
       storeUnavailable: storeUnavailable ?? this.storeUnavailable,
       appAccountToken: appAccountToken ?? this.appAccountToken,
+      appAccountTokenLoading: appAccountTokenLoading ?? this.appAccountTokenLoading,
+      appAccountTokenFailed: appAccountTokenFailed ?? this.appAccountTokenFailed,
     );
   }
+}
+
+/// Whether [AppleIapController.buy] is allowed to actually start a
+/// StoreKit purchase. Pure -- no I/O, no platform channels -- so it's
+/// directly unit-testable without any StoreKit/mock-platform setup,
+/// mirroring the backend's fail-closed requirement (Backend/Utils/
+/// appleIap.js's appAccountTokenMatches): a purchase must never start
+/// while the firm's Apple token is still loading or failed/absent, since
+/// the backend would reject it anyway.
+bool canStartApplePurchase(AppleIapState state) {
+  if (state.appAccountTokenLoading) return false;
+  if (state.appAccountToken == null) return false;
+  return true;
 }
 
 /// Owns the single StoreKit purchase-stream subscription for the app's
@@ -103,21 +131,29 @@ class AppleIapController extends StateNotifier<AppleIapState> {
         error: 'Store connection error: $error',
       ),
     );
-    // Best-effort -- a failure here just means buy()/restorePurchases()
-    // proceed without the extra appAccountToken binding (see AppleIapState
-    // doc comment); it must never block loading products/purchasing.
+    // Runs concurrently with loadProducts() below (product listing doesn't
+    // depend on it), but buy() itself refuses to proceed until this
+    // resolves -- see buy()'s guard. Not awaited here only so it doesn't
+    // delay showing the product list while the token round-trip is
+    // in flight.
     unawaited(_loadAppAccountToken());
     await loadProducts();
   }
 
   Future<void> _loadAppAccountToken() async {
+    state = state.copyWith(appAccountTokenLoading: true, appAccountTokenFailed: false);
     try {
       final token = await _subscriptionRepository.getAppleAppAccountToken();
-      state = state.copyWith(appAccountToken: token);
+      state = state.copyWith(appAccountToken: token, appAccountTokenLoading: false);
     } catch (_) {
-      // Swallowed deliberately -- see call site's comment.
+      state = state.copyWith(appAccountTokenLoading: false, appAccountTokenFailed: true);
     }
   }
+
+  /// Lets the UI retry after a failed token load (see buy()'s guard) --
+  /// e.g. a "Retry" button shown alongside "Could not prepare your
+  /// purchase" in subscription_screen.dart.
+  Future<void> retryLoadAppAccountToken() => _loadAppAccountToken();
 
   /// Queries the App Store for the real, localized product info (including
   /// price) -- the displayed price on iOS must come from here, never from
@@ -147,7 +183,29 @@ class AppleIapController extends StateNotifier<AppleIapState> {
     }
   }
 
+  /// Refuses to start a purchase until the firm's appAccountToken has
+  /// loaded -- the backend now FAILS CLOSED without one (see
+  /// Backend/Utils/appleIap.js's appAccountTokenMatches: a missing token on
+  /// either side is a rejection, not a pass-through), so starting a
+  /// purchase we already know would be rejected server-side would just
+  /// waste a real StoreKit purchase sheet interaction for nothing. This
+  /// check is synchronous and runs before any `await`, so there is no
+  /// window in which a call arriving while the token is mid-load could
+  /// slip through.
   Future<void> buy(ProductDetails product) async {
+    if (!canStartApplePurchase(state)) {
+      state = state.copyWith(
+        // Defensively also failed (not just loading) if appAccountToken
+        // somehow ended up null after loading already finished -- never
+        // silently continue with no token; surface a retryable error.
+        appAccountTokenFailed: !state.appAccountTokenLoading,
+        error: state.appAccountTokenLoading
+            ? 'Still preparing your purchase -- please try again in a moment.'
+            : 'Could not prepare your purchase. Tap Retry and try again.',
+      );
+      return;
+    }
+
     state = state.copyWith(
       status: AppleIapStatus.purchasing,
       purchasingProductId: product.id,
@@ -156,9 +214,9 @@ class AppleIapController extends StateNotifier<AppleIapState> {
     // applicationUserName is the cross-platform in_app_purchase name for
     // what in_app_purchase_storekit (0.4.13, the version installed here --
     // see in_app_purchase_storekit_platform.dart) passes straight through
-    // as StoreKit's appAccountToken. Null is fine (the token may not have
-    // loaded yet) -- the backend's ownership-by-originalTransactionId check
-    // is the primary guard either way; this is an additional layer.
+    // as StoreKit's appAccountToken. Guaranteed non-null here by the guard
+    // above -- never generated locally, always the firm's own token from
+    // the backend (see AppleIapState doc comment).
     final param = PurchaseParam(productDetails: product, applicationUserName: state.appAccountToken);
     // The outcome arrives asynchronously via purchaseStream
     // (_onPurchaseUpdate below), not via this call's return value --
@@ -178,8 +236,22 @@ class AppleIapController extends StateNotifier<AppleIapState> {
   Future<void> restorePurchases() async {
     state = state.copyWith(status: AppleIapStatus.restoring, clearError: true);
     try {
-      // Same ownership-association token as buy() above, so a restore
-      // follows the identical backend validation path.
+      // NOTE (corrected -- an earlier comment here was wrong): this
+      // package (in_app_purchase_storekit 0.4.13) defaults to
+      // `_useStoreKit2 = true`, and under that path its restorePurchases()
+      // calls `SK2Transaction.restorePurchases()` with NO arguments at
+      // all -- `applicationUserName` below is silently dropped and has NO
+      // EFFECT (confirmed by reading
+      // in_app_purchase_storekit_platform.dart:237-247; it's only honored
+      // on the legacy StoreKit-1 fallback path). This is passed anyway for
+      // that StoreKit-1 fallback, and is harmless either way: a restored
+      // PurchaseDetails still carries whatever appAccountToken Apple
+      // embedded in the ORIGINAL transaction at the time it was first
+      // purchased (see AppStorePurchaseDetails.appAccountToken), which is
+      // what the backend actually re-verifies in _verifyAndFinish below --
+      // NOT anything passed to this call. The backend's ownership +
+      // appAccountToken checks are the sole authority here; nothing about
+      // "who is logged in right now" ever factors into activation.
       await _iap.restorePurchases(applicationUserName: state.appAccountToken);
       // Outcomes (including "nothing to restore", which simply produces no
       // further stream events) surface through _onPurchaseUpdate too.

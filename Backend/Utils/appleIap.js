@@ -241,17 +241,21 @@ function isOwnedByDifferentFirm(existingFirmId, requestingFirmId) {
   return String(existingFirmId) !== String(requestingFirmId);
 }
 
-// True if the verified transaction's appAccountToken (if any) matches this
-// firm's own stored token -- i.e. "no conflict found". Returns true
-// (nothing to object to) whenever there's nothing to compare: the
-// transaction carries no token (older client build, or a purchase made
-// before this feature existed) or the firm has none yet (ditto) --
-// verifyAppleSubscription treats this as an ADDITIONAL layer on top of the
-// always-on originalTransactionId ownership lookup (isOwnedByDifferentFirm
-// above), never a replacement for it, precisely so those absent-token
-// cases stay safe rather than silently unchecked.
+// FAIL CLOSED. RatnSetu's Apple IAP has never been live in production, so
+// there is no pre-existing token-less production subscription this needs
+// to stay compatible with -- a NEW Apple entitlement REQUIRES both the
+// verified transaction and the requesting firm to carry an
+// appAccountToken, and the two must be equal. Missing on EITHER side, or a
+// mismatch, is a rejection -- there is no "nothing to compare, so allow"
+// case. (An earlier version of this function returned true whenever
+// either side was absent; that was a confirmed fail-open gap and has been
+// removed.) verifyAppleSubscription runs this AFTER the
+// originalTransactionId ownership check (isOwnedByDifferentFirm above),
+// so an already-differently-owned transaction is still rejected for that
+// reason first -- but this check itself is now unconditional, not gated
+// behind "only if a token happens to be present."
 function appAccountTokenMatches(decodedAppAccountToken, firmAppleAppAccountToken) {
-  if (!decodedAppAccountToken || !firmAppleAppAccountToken) return true;
+  if (!decodedAppAccountToken || !firmAppleAppAccountToken) return false;
   return decodedAppAccountToken === firmAppleAppAccountToken;
 }
 

@@ -228,8 +228,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           isIOS &&
                           appleState?.status == AppleIapStatus.purchasing &&
                           appleState?.purchasingProductId == plan.appleProductId,
+                      // The backend now FAILS CLOSED without this firm's
+                      // Apple token (see Backend/Utils/appleIap.js's
+                      // appAccountTokenMatches) -- the button must not be
+                      // tappable until it's loaded, so no purchase attempt
+                      // can ever be rejected purely for arriving too early.
+                      isAppleTokenLoading: isIOS && (appleState?.appAccountTokenLoading ?? true),
+                      isAppleTokenFailed: isIOS && (appleState?.appAccountTokenFailed ?? false),
                       onAppleTap: (product) =>
                           ref.read(appleIapControllerProvider.notifier).buy(product),
+                      onRetryAppleToken: () =>
+                          ref.read(appleIapControllerProvider.notifier).retryLoadAppAccountToken(),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
@@ -265,7 +274,10 @@ class _PlanCard extends StatelessWidget {
   final bool isIOS;
   final ProductDetails? appleProduct;
   final bool isApplePurchasing;
+  final bool isAppleTokenLoading;
+  final bool isAppleTokenFailed;
   final ValueChanged<ProductDetails>? onAppleTap;
+  final VoidCallback? onRetryAppleToken;
 
   const _PlanCard({
     required this.plan,
@@ -277,7 +289,10 @@ class _PlanCard extends StatelessWidget {
     this.isIOS = false,
     this.appleProduct,
     this.isApplePurchasing = false,
+    this.isAppleTokenLoading = false,
+    this.isAppleTokenFailed = false,
     this.onAppleTap,
+    this.onRetryAppleToken,
   });
 
   @override
@@ -339,20 +354,35 @@ class _PlanCard extends StatelessWidget {
               // for it to lapse. Only "not an admin" or "checkout already
               // opening" should block the tap.
               child: isIOS
-                  ? ElevatedButton(
-                      onPressed: (!isAdmin || isApplePurchasing || appleProduct == null)
-                          ? null
-                          : () => onAppleTap?.call(appleProduct!),
-                      child: Text(
-                        isApplePurchasing
-                            ? 'Purchasing...'
-                            : appleProduct == null
-                                ? 'Unavailable'
-                                : (isCurrentPlan || isRenewal)
-                                    ? 'Renew'
-                                    : 'Subscribe',
-                      ),
-                    )
+                  ? (isAppleTokenFailed
+                      // The firm's Apple token failed to load -- the
+                      // backend fails closed without one, so there is
+                      // nothing useful the Subscribe button can do until
+                      // this is retried successfully.
+                      ? OutlinedButton(
+                          onPressed: isAdmin ? onRetryAppleToken : null,
+                          child: const Text('Retry'),
+                        )
+                      : ElevatedButton(
+                          onPressed:
+                              (!isAdmin ||
+                                  isAppleTokenLoading ||
+                                  isApplePurchasing ||
+                                  appleProduct == null)
+                              ? null
+                              : () => onAppleTap?.call(appleProduct!),
+                          child: Text(
+                            isAppleTokenLoading
+                                ? 'Preparing secure purchase...'
+                                : isApplePurchasing
+                                    ? 'Purchasing...'
+                                    : appleProduct == null
+                                        ? 'Unavailable'
+                                        : (isCurrentPlan || isRenewal)
+                                            ? 'Renew'
+                                            : 'Subscribe',
+                          ),
+                        ))
                   : ElevatedButton(
                       onPressed: (!isAdmin || isActivating) ? null : onTap,
                       child: Text(

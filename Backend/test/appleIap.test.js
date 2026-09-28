@@ -7,6 +7,29 @@
 // (Node's built-in test runner -- no new dependency needed; this repo is
 // on Node 24, which has had node:test since Node 18.)
 //
+// Coverage against the fail-closed appAccountToken fix's requested test
+// matrix:
+//   1. token + matching token -> PASS ................. covered below
+//   2. token + mismatching token -> REJECT ............. covered below
+//   3. missing Apple token + firm token -> REJECT ...... covered below
+//   4. Apple token + missing firm token -> REJECT ...... covered below
+//   5. both missing -> REJECT ........................... covered below
+//   6. buy() cannot execute before token loaded ......... Flutter-side;
+//      see Mobile-gem/.../test/apple_iap_controller_test.dart
+//   7. token retrieval failure cannot start purchase .... ditto
+//   8. Sandbox behavior controlled by APPLE_IAP_ALLOW_SANDBOX
+//      .................................................. covered below
+//      (tests B / B(alt) / B(staging))
+//   9. existing originalTransactionId cross-firm protection still works
+//      .................................................. covered below
+//      (test D)
+//  10. notification with no resolvable firm does not mutate anything
+//      .................................................. NOT unit-tested
+//      here (needs a real/mocked DB + Mongoose model -- verified by
+//      manual code trace of appleAppStoreNotifications's
+//      `if (!targetFirm) { return ...200, no mutation... }` guard, which
+//      this change did not touch)
+//
 // What is deliberately NOT covered here (documented, not silently skipped):
 //   - Idempotent resubmission by the same firm (needs a real/mocked DB to
 //     observe activatePaidSubscription's findOneAndUpdate + populate
@@ -62,7 +85,7 @@ test("B(staging). Sandbox transaction IS accepted when APPLE_IAP_ALLOW_SANDBOX=t
   assert.equal(appleIap.isEnvironmentAllowedForEntitlement(appleIap.Environment.PRODUCTION), true);
 });
 
-test("D. Different firm claiming an already-owned transaction is flagged", () => {
+test("9./D. Existing originalTransactionId cross-firm ownership protection still works", () => {
   const appleIap = freshAppleIap();
   assert.equal(appleIap.isOwnedByDifferentFirm("firmA", "firmB"), true);
   assert.equal(appleIap.isOwnedByDifferentFirm("firmA", "firmA"), false);
@@ -143,15 +166,39 @@ test("Active (unexpired, unrevoked) transaction resolves to entitled/active usin
   assert.equal(verdict.endDateMs, expiresDate);
 });
 
-test("L/M. appAccountToken mismatch is rejected, match and absence are accepted", () => {
+// appAccountTokenMatches is FAIL CLOSED -- RatnSetu's Apple IAP has never
+// been live in production, so there is no legacy token-less subscription
+// to stay compatible with. An earlier version of this function returned
+// `true` (accept) whenever either side was absent; that was a confirmed
+// fail-open gap (Apple transactions without a token, or firms without one,
+// were silently accepted) and has been removed. These five tests are the
+// exact scenarios from that fix's spec.
+test("1. token + matching firm token -> PASS (accepted)", () => {
   const appleIap = freshAppleIap();
-  // L: different firm's token -- rejected.
-  assert.equal(appleIap.appAccountTokenMatches("firm-A-token", "firm-B-token"), false);
-  // M: correct token -- accepted.
   assert.equal(appleIap.appAccountTokenMatches("firm-A-token", "firm-A-token"), true);
-  // Backward compatibility: nothing to compare (older client / older firm
-  // record) must not be treated as a mismatch.
-  assert.equal(appleIap.appAccountTokenMatches(undefined, "firm-A-token"), true);
-  assert.equal(appleIap.appAccountTokenMatches("firm-A-token", undefined), true);
-  assert.equal(appleIap.appAccountTokenMatches(undefined, undefined), true);
+});
+
+test("2. token + mismatching firm token -> REJECT", () => {
+  const appleIap = freshAppleIap();
+  assert.equal(appleIap.appAccountTokenMatches("firm-A-token", "firm-B-token"), false);
+});
+
+test("3. missing Apple token + firm HAS a token -> REJECT", () => {
+  const appleIap = freshAppleIap();
+  assert.equal(appleIap.appAccountTokenMatches(undefined, "firm-A-token"), false);
+  assert.equal(appleIap.appAccountTokenMatches(null, "firm-A-token"), false);
+  assert.equal(appleIap.appAccountTokenMatches("", "firm-A-token"), false);
+});
+
+test("4. Apple token present + firm is MISSING a token -> REJECT", () => {
+  const appleIap = freshAppleIap();
+  assert.equal(appleIap.appAccountTokenMatches("apple-token", undefined), false);
+  assert.equal(appleIap.appAccountTokenMatches("apple-token", null), false);
+  assert.equal(appleIap.appAccountTokenMatches("apple-token", ""), false);
+});
+
+test("5. both missing -> REJECT", () => {
+  const appleIap = freshAppleIap();
+  assert.equal(appleIap.appAccountTokenMatches(undefined, undefined), false);
+  assert.equal(appleIap.appAccountTokenMatches(null, null), false);
 });
