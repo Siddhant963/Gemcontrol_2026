@@ -2034,37 +2034,8 @@ function ItemManagement() {
               {formErrors.karat}
             </Typography>
           )}
-          <Select
-            name="category"
-            value={newItem.category}
-            onChange={handleInputChange}
-            fullWidth
-            sx={{
-              mb: { xs: 1, sm: 2 },
-              "& .MuiSelect-select": {
-                fontSize: { xs: "0.8rem", sm: "0.9rem" },
-              },
-            }}
-            error={!!formErrors.category}
-            required
-          >
-            <MenuItem
-              value=""
-              disabled
-              sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-            >
-              Select Category
-            </MenuItem>
-            {formCategories.map((cat) => (
-              <MenuItem
-                key={cat._id}
-                value={cat._id}
-                sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                {cat.name}
-              </MenuItem>
-            ))}
-          </Select>
+          {/* Firm before Category -- a firm is the more fundamental choice
+              (which shop this item belongs to), so it comes first. */}
           <Select
             name="firm"
             value={newItem.firm}
@@ -2093,6 +2064,37 @@ function ItemManagement() {
                 sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
               >
                 {firm.name}
+              </MenuItem>
+            ))}
+          </Select>
+          <Select
+            name="category"
+            value={newItem.category}
+            onChange={handleInputChange}
+            fullWidth
+            sx={{
+              mb: { xs: 1, sm: 2 },
+              "& .MuiSelect-select": {
+                fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              },
+            }}
+            error={!!formErrors.category}
+            required
+          >
+            <MenuItem
+              value=""
+              disabled
+              sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+            >
+              Select Category
+            </MenuItem>
+            {formCategories.map((cat) => (
+              <MenuItem
+                key={cat._id}
+                value={cat._id}
+                sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                {cat.name}
               </MenuItem>
             ))}
           </Select>
@@ -2543,34 +2545,7 @@ function ItemManagement() {
             </Typography>
           </Box>
 
-          <Box sx={{ mb: 2 }}>
-            <Select
-              fullWidth
-              name="category"
-              value={editItem.category}
-              onChange={handleEditInputChange}
-              displayEmpty
-              size="small"
-              sx={{ mb: 1 }}
-            >
-              <MenuItem value="" disabled>
-                Select Category
-              </MenuItem>
-              {formCategories.map((cat) => (
-                <MenuItem key={cat._id} value={cat._id}>
-                  {cat.name}
-                </MenuItem>
-              ))}
-            </Select>
-            {formErrors.category && (
-              <Typography
-                sx={{ color: theme.palette.error.main, fontSize: "0.75rem" }}
-              >
-                {formErrors.category}
-              </Typography>
-            )}
-          </Box>
-
+          {/* Firm before Category -- same order as the Add Item form. */}
           <Box sx={{ mb: 2 }}>
             <Select
               fullWidth
@@ -2595,6 +2570,34 @@ function ItemManagement() {
                 sx={{ color: theme.palette.error.main, fontSize: "0.75rem" }}
               >
                 {formErrors.firm}
+              </Typography>
+            )}
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Select
+              fullWidth
+              name="category"
+              value={editItem.category}
+              onChange={handleEditInputChange}
+              displayEmpty
+              size="small"
+              sx={{ mb: 1 }}
+            >
+              <MenuItem value="" disabled>
+                Select Category
+              </MenuItem>
+              {formCategories.map((cat) => (
+                <MenuItem key={cat._id} value={cat._id}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {formErrors.category && (
+              <Typography
+                sx={{ color: theme.palette.error.main, fontSize: "0.75rem" }}
+              >
+                {formErrors.category}
               </Typography>
             )}
           </Box>
