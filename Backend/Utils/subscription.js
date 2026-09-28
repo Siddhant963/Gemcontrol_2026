@@ -3,6 +3,25 @@ const SubscriptionPlanModel = require("../Models/SubscriptionPlanModel");
 
 const TRIAL_DAYS = 14;
 
+// Thrown by activatePaidSubscription when writing appleOriginalTransactionId
+// would collide with a DIFFERENT firm's Subscription doc -- the database
+// unique index on that field (SubscriptionModel.js) is the last-resort
+// backstop against a race between two concurrent requests for two
+// different firms both passing an earlier in-memory ownership check before
+// either has written (see verifyAppleSubscription's explicit pre-check for
+// the common case; this is the TOCTOU backstop for the rare one). Callers
+// on the Apple path catch this and respond 409; Razorpay/manual callers
+// never set appleOriginalTransactionId, so they can never trigger it.
+class AppleTransactionOwnershipConflictError extends Error {
+  constructor(appleOriginalTransactionId) {
+    super(
+      `appleOriginalTransactionId ${appleOriginalTransactionId} is already associated with a different firm`
+    );
+    this.name = "AppleTransactionOwnershipConflictError";
+    this.appleOriginalTransactionId = appleOriginalTransactionId;
+  }
+}
+
 // Called once, right after a new Firm is created during self-signup. Gives
 // every new shop a free 14-day trial with no payment provider involved, so
 // they can use the whole app before ever seeing a plan/paywall.
@@ -32,11 +51,17 @@ async function ensureTrialSubscription(firmId) {
   });
 }
 
-// Shared by verifySubscriptionPayment (client-callback path) and the
-// order.paid webhook -- both may fire for the same successful payment, so
-// this is idempotent: if the subscription already recorded this exact
+// Shared by verifySubscriptionPayment (client-callback path), the
+// order.paid webhook, and the Apple IAP verify endpoint/notifications --
+// all may fire more than once for the same successful payment, so this is
+// idempotent: if the subscription already recorded this exact
 // paymentReference, it's returned unchanged instead of re-extending endDate
 // a second time.
+//
+// appleOriginalTransactionId is optional and only ever set by the Apple
+// IAP path (Utils/appleIap.js) -- Razorpay/manual callers simply omit it,
+// which leaves the field untouched on an existing doc and unset on a new
+// one, so this is fully backward compatible with the existing Razorpay flow.
 async function activatePaidSubscription({
   firm,
   plan,
@@ -45,25 +70,63 @@ async function activatePaidSubscription({
   amountPaid,
   startDate,
   endDate,
+  appleOriginalTransactionId,
 }) {
   const existing = await SubscriptionModel.findOne({ firm });
   if (existing && existing.paymentReference === paymentReference) {
     return existing.populate("plan");
   }
 
+  const update = {
+    firm,
+    plan: plan._id,
+    status: "active",
+    startDate,
+    endDate,
+    paymentProvider,
+    paymentReference,
+    amountPaid,
+  };
+  if (appleOriginalTransactionId) {
+    update.appleOriginalTransactionId = appleOriginalTransactionId;
+  }
+
+  try {
+    return await SubscriptionModel.findOneAndUpdate({ firm }, update, {
+      new: true,
+      upsert: true,
+    }).populate("plan");
+  } catch (error) {
+    // E11000 on the appleOriginalTransactionId unique index means some
+    // OTHER firm's Subscription doc already has this value -- this firm's
+    // write must not silently overwrite or duplicate it.
+    if (error?.code === 11000 && appleOriginalTransactionId) {
+      throw new AppleTransactionOwnershipConflictError(appleOriginalTransactionId);
+    }
+    throw error;
+  }
+}
+
+// Looks up the Subscription doc that owns a given Apple subscription,
+// independent of firm -- needed by the App Store Server Notifications
+// handler, which only ever gets an originalTransactionId from Apple, never
+// a firm id. Used for the lifecycle events that aren't "activate a
+// payment" (expire, cancel/revoke) as well as to find which firm a renewal
+// notification belongs to before calling activatePaidSubscription above.
+function findSubscriptionByAppleOriginalTransactionId(appleOriginalTransactionId) {
+  return SubscriptionModel.findOne({ appleOriginalTransactionId }).populate("plan");
+}
+
+// Directly sets status for lifecycle events that are NOT a successful
+// payment (expired, cancelled/revoked) -- activatePaidSubscription above
+// is only for the "grant/extend access" path, so those cases update the
+// existing row in place instead of going through it. No-op (returns null)
+// if no subscription is associated with this Apple subscription yet.
+async function setStatusByAppleOriginalTransactionId(appleOriginalTransactionId, status) {
   return SubscriptionModel.findOneAndUpdate(
-    { firm },
-    {
-      firm,
-      plan: plan._id,
-      status: "active",
-      startDate,
-      endDate,
-      paymentProvider,
-      paymentReference,
-      amountPaid,
-    },
-    { new: true, upsert: true }
+    { appleOriginalTransactionId },
+    { status },
+    { new: true }
   ).populate("plan");
 }
 
@@ -119,6 +182,9 @@ module.exports = {
   TRIAL_DAYS,
   ensureTrialSubscription,
   activatePaidSubscription,
+  findSubscriptionByAppleOriginalTransactionId,
+  setStatusByAppleOriginalTransactionId,
   isSubscriptionCurrentlyActive,
   requireActiveSubscription,
+  AppleTransactionOwnershipConflictError,
 };

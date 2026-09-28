@@ -44,10 +44,25 @@ const subscriptionPlanSchema = mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Apple App Store Connect product identifier for this plan's iOS
+  // auto-renewable subscription (e.g. "Ratnsetu" for basic, "Ratnsetu1" for
+  // pro). Optional -- existing plans/documents with no Apple product don't
+  // need one, and a plan not sold on iOS can simply leave this unset. This
+  // is the single source of truth for the Apple productId -> internal plan
+  // mapping; see Utils/appleIap.js, which looks plans up by this field
+  // rather than hardcoding the mapping in controller code.
+  appleProductId: {
+    type: String,
+    default: undefined,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Sparse: only iOS-sold plans set this, and a plain unique index would
+// otherwise collide across every plan that leaves it unset (undefined).
+subscriptionPlanSchema.index({ appleProductId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("SubscriptionPlan", subscriptionPlanSchema);

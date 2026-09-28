@@ -87,7 +87,11 @@ function UserManagement() {
     const errors = {};
 
     if (!editUser.name) errors.name = "Name is required";
+    else if (!/[A-Za-z]/.test(editUser.name))
+      errors.name = "Name must contain letters, not just numbers";
     if (!editUser.contact) errors.contact = "Contact is required";
+    else if (!/^\d{10}$/.test(editUser.contact.trim()))
+      errors.contact = "Contact must be exactly 10 digits";
     if (!editUser.role) errors.role = "Role is required";
 
     setFormErrors(errors);
@@ -160,6 +164,8 @@ function UserManagement() {
   const validateForm = () => {
     const errors = {};
     if (!newUser.name.trim()) errors.name = "Name is required";
+    else if (!/[A-Za-z]/.test(newUser.name))
+      errors.name = "Name must contain letters, not just numbers";
     if (!newUser.email.trim()) errors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(newUser.email))
       errors.email = "Invalid email format";

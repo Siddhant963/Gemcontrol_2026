@@ -133,6 +133,8 @@ function CustomerManagement() {
   const validateForm = () => {
     const newErrors = {};
     if (!newCustomer.name.trim()) newErrors.name = "Name is required";
+    else if (!/[A-Za-z]/.test(newCustomer.name))
+      newErrors.name = "Name must contain letters, not just numbers";
     if (!newCustomer.contact.trim()) newErrors.contact = "Contact is required";
     else if (!/^\d{10}$/.test(newCustomer.contact.trim()))
       newErrors.contact = "Contact must be 10 digits";

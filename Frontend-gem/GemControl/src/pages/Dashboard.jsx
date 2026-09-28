@@ -26,6 +26,8 @@ import {
   CardContent,
   Pagination,
   Chip,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
@@ -99,6 +101,7 @@ function Dashboard() {
   const [recentActivitiesData, setRecentActivitiesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [rateError, setRateError] = useState(null);
   const [ratesLoading, setRatesLoading] = useState(false);
 
@@ -353,23 +356,27 @@ function Dashboard() {
     setSearchQuery(e.target.value);
   };
 
-  const handleExportToExcel = async () => {
+  const handleExportData = async (format) => {
+    setExportMenuAnchor(null);
+    const isPdf = format === "pdf";
     try {
       setLoading(true);
-      const response = await api.get('/exportAllDataToExcel', {
-        responseType: 'blob', // Important for file download
-      });
+      const response = await api.get(
+        isPdf ? "/exportAllDataToPdf" : "/exportAllDataToExcel",
+        { responseType: "blob" } // Important for file download
+      );
 
-      // Create a blob from the response
       const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type: isPdf
+          ? "application/pdf"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
 
       // Create a download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.${isPdf ? "pdf" : "xlsx"}`;
       document.body.appendChild(link);
       link.click();
 
@@ -722,6 +729,12 @@ function Dashboard() {
     transition: "box-shadow 0.3s ease, border-color 0.3s ease",
     "&:hover": { boxShadow: theme.shadows[10], borderColor: theme.palette.primary.main },
     height: "100%",
+    // Gold/Silver/Diamond cards have different amounts of content (5 rows,
+    // 1 row, 6 rows), so without a flex column + mt:"auto" on the button
+    // below, the "Update Rates" buttons end up at different heights across
+    // the three cards instead of lining up.
+    display: "flex",
+    flexDirection: "column",
   };
 
   return (
@@ -798,24 +811,34 @@ function Dashboard() {
           </Typography>
 
           {isAdmin && (
-            <Button
-              variant="contained"
-              onClick={handleExportToExcel}
-              disabled={loading}
-              sx={{
-                bgcolor: theme.palette.success.main,
-                color: 'white',
-                '&:hover': {
-                  bgcolor: theme.palette.success.dark,
-                },
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
-                py: 1,
-              }}
-            >
-              {loading ? 'Exporting...' : 'Export All Data to Excel'}
-            </Button>
+            <>
+              <Button
+                variant="contained"
+                onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                disabled={loading}
+                sx={{
+                  bgcolor: theme.palette.success.main,
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: theme.palette.success.dark,
+                  },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1,
+                }}
+              >
+                {loading ? 'Exporting...' : 'Export All Data'}
+              </Button>
+              <Menu
+                anchorEl={exportMenuAnchor}
+                open={Boolean(exportMenuAnchor)}
+                onClose={() => setExportMenuAnchor(null)}
+              >
+                <MenuItem onClick={() => handleExportData("excel")}>Excel (.xlsx)</MenuItem>
+                <MenuItem onClick={() => handleExportData("pdf")}>PDF</MenuItem>
+              </Menu>
+            </>
           )}
         </Box>
         <Box
@@ -1117,7 +1140,7 @@ function Dashboard() {
                       </Box>
                     ))}
                     {isAdmin && (
-                      <Box sx={{ mt: 1.5 }}>
+                      <Box sx={{ mt: "auto", pt: 1.5 }}>
                         <Button
                           variant="outlined"
                           onClick={handleOpenRateModal("gold")}
@@ -1160,7 +1183,7 @@ function Dashboard() {
                       </Typography>
                     </Box>
                     {isAdmin && (
-                      <Box sx={{ mt: 1.5 }}>
+                      <Box sx={{ mt: "auto", pt: 1.5 }}>
                         <Button
                           variant="outlined"
                           onClick={handleOpenRateModal("silver")}
@@ -1205,7 +1228,7 @@ function Dashboard() {
                       </Box>
                     ))}
                     {isAdmin && (
-                      <Box sx={{ mt: 1.5 }}>
+                      <Box sx={{ mt: "auto", pt: 1.5 }}>
                         <Button
                           variant="outlined"
                           onClick={handleOpenRateModal("diamond")}
@@ -1301,7 +1324,9 @@ function Dashboard() {
                   p: theme.spacing(2),
                   borderRadius: 2,
                   boxShadow: theme.shadows[4],
-                  aspectRatio: "1 / 1",
+                  height: { xs: 320, sm: 380, md: 420 },
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <Typography
@@ -1314,7 +1339,8 @@ function Dashboard() {
                 >
                   Monthly Sales Revenue
                 </Typography>
-                <ResponsiveContainer width="100%" height="80%">
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={monthlySalesData.map((d) => ({
                       ...d,
@@ -1350,6 +1376,7 @@ function Dashboard() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+                </Box>
               </Paper>
             </Grid>
 
@@ -1360,7 +1387,9 @@ function Dashboard() {
                   p: theme.spacing(2),
                   borderRadius: 2,
                   boxShadow: theme.shadows[4],
-                  aspectRatio: "1 / 1",
+                  height: { xs: 320, sm: 380, md: 420 },
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <Typography
@@ -1373,7 +1402,8 @@ function Dashboard() {
                 >
                   Overall Metrics Comparison
                 </Typography>
-                <ResponsiveContainer width="100%" height="80%">
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={summaryComparisonData}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -1411,6 +1441,7 @@ function Dashboard() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+                </Box>
               </Paper>
             </Grid>
 
@@ -1421,7 +1452,9 @@ function Dashboard() {
                   p: theme.spacing(2),
                   borderRadius: 2,
                   boxShadow: theme.shadows[4],
-                  aspectRatio: "1 / 1",
+                  height: { xs: 320, sm: 380, md: 420 },
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <Typography
@@ -1434,7 +1467,8 @@ function Dashboard() {
                 >
                   Last 5 Months Rates Trend
                 </Typography>
-                <ResponsiveContainer width="100%" height="80%">
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={historicalRatesData}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -1482,6 +1516,7 @@ function Dashboard() {
                     />
                   </LineChart>
                 </ResponsiveContainer>
+                </Box>
               </Paper>
             </Grid>
           </Grid>

@@ -143,7 +143,14 @@ function SubscribePage() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: `repeat(${Math.min(plans.length, 2)}, 1fr)` },
+              // Scale columns with the actual plan count instead of always
+              // capping at 2 -- a 3rd+ plan was wrapping onto its own row
+              // with empty grid space next to it.
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: `repeat(${Math.min(plans.length, 2)}, 1fr)`,
+                md: `repeat(${Math.min(plans.length, 4)}, 1fr)`,
+              },
               gap: 3,
             }}
           >
@@ -160,6 +167,11 @@ function SubscribePage() {
                       ? `2px solid ${theme.palette.secondary.main}`
                       : `1px solid ${theme.palette.divider}`,
                     position: "relative",
+                    // Flex column + the button's mt:"auto" below keeps the
+                    // CTA pinned to the bottom across cards even when plans
+                    // have different numbers of features.
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
                   {highlighted && (
@@ -197,7 +209,7 @@ function SubscribePage() {
                     disabled={!isAdmin || activatingKey === plan.key || isCurrentPlan}
                     onClick={() => handleActivate(plan.key)}
                     sx={{
-                      mt: 2,
+                      mt: "auto",
                       textTransform: "none",
                       ...(highlighted && {
                         bgcolor: theme.palette.primary.main,

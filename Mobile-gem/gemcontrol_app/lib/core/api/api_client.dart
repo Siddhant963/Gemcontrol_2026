@@ -57,13 +57,6 @@ class ApiClient {
         },
         onError: (error, handler) {
           if (error.response?.statusCode == 401) {
-            // TEMP DIAGNOSTIC — remove once the spurious-logout cause is found.
-            // ignore: avoid_print
-            print(
-              '[401] ${error.requestOptions.method} ${error.requestOptions.path} '
-              'auth-header-sent=${error.requestOptions.headers['Authorization'] != null} '
-              'body=${error.response?.data}',
-            );
             tokenStorage.clear();
             onUnauthorized?.call();
           } else if (error.response?.statusCode == 402) {

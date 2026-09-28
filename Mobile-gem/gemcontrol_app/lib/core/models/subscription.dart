@@ -6,6 +6,13 @@ class SubscriptionPlan {
   final String billingInterval;
   final int maxStaff;
   final List<String> features;
+  // App Store Connect product id for this plan's iOS auto-renewable
+  // subscription (e.g. "Ratnsetu"/"Ratnsetu1") -- null for a plan not sold
+  // on iOS, or on a backend that predates this field. This is only ever
+  // used to match this plan against a StoreKit ProductDetails id (see
+  // apple_iap_controller.dart); the backend's SubscriptionPlan.appleProductId
+  // remains the sole source of truth for what each Apple product grants.
+  final String? appleProductId;
 
   SubscriptionPlan({
     required this.id,
@@ -15,6 +22,7 @@ class SubscriptionPlan {
     required this.billingInterval,
     required this.maxStaff,
     required this.features,
+    this.appleProductId,
   });
 
   factory SubscriptionPlan.fromJson(Map<String, dynamic> json) => SubscriptionPlan(
@@ -25,6 +33,7 @@ class SubscriptionPlan {
     billingInterval: json['billingInterval'] ?? 'month',
     maxStaff: (json['maxStaff'] as num?)?.toInt() ?? 0,
     features: (json['features'] as List?)?.map((e) => e.toString()).toList() ?? [],
+    appleProductId: json['appleProductId'] as String?,
   );
 }
 

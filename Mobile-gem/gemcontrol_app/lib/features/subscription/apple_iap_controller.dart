@@ -1,0 +1,292 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+
+import '../../core/api/api_client.dart';
+import '../../core/repositories/subscription_repository.dart';
+import 'subscription_providers.dart';
+
+/// Apple product ids configured in App Store Connect's "RatnSetu Plans"
+/// subscription group -- must exactly match
+/// Backend/seed/seedSubscriptionPlans.js's appleProductId values
+/// (Ratnsetu -> basic, Ratnsetu1 -> pro). This list only decides which
+/// products to *ask the App Store about*; which internal plan each one
+/// grants is still decided authoritatively by the backend via
+/// SubscriptionPlan.appleProductId, never assumed here.
+const kAppleSubscriptionProductIds = <String>{'Ratnsetu', 'Ratnsetu1'};
+
+enum AppleIapStatus { idle, loadingProducts, purchasing, restoring }
+
+class AppleIapState {
+  final AppleIapStatus status;
+  final List<ProductDetails> products;
+  final String? purchasingProductId;
+  final String? error;
+  final bool storeUnavailable;
+  // This firm's Apple app-account token (see subscription_repository.dart's
+  // getAppleAppAccountToken) -- null until fetched. buy()/restorePurchases()
+  // below pass it to StoreKit when available; a purchase made before it
+  // loads still works, just without this extra binding layer (the backend's
+  // originalTransactionId ownership check is the primary guard regardless).
+  final String? appAccountToken;
+
+  const AppleIapState({
+    this.status = AppleIapStatus.idle,
+    this.products = const [],
+    this.purchasingProductId,
+    this.error,
+    this.storeUnavailable = false,
+    this.appAccountToken,
+  });
+
+  AppleIapState copyWith({
+    AppleIapStatus? status,
+    List<ProductDetails>? products,
+    String? purchasingProductId,
+    bool clearPurchasingProductId = false,
+    String? error,
+    bool clearError = false,
+    bool? storeUnavailable,
+    String? appAccountToken,
+  }) {
+    return AppleIapState(
+      status: status ?? this.status,
+      products: products ?? this.products,
+      purchasingProductId: clearPurchasingProductId
+          ? null
+          : (purchasingProductId ?? this.purchasingProductId),
+      error: clearError ? null : (error ?? this.error),
+      storeUnavailable: storeUnavailable ?? this.storeUnavailable,
+      appAccountToken: appAccountToken ?? this.appAccountToken,
+    );
+  }
+}
+
+/// Owns the single StoreKit purchase-stream subscription for the app's
+/// lifetime -- created lazily the first time something watches
+/// [appleIapControllerProvider] (SubscriptionScreen, on iOS only) and then
+/// kept alive by Riverpod rather than torn down on navigation, so a
+/// purchase/restore outcome that arrives while the subscription screen
+/// isn't mounted is never missed, and re-opening that screen never
+/// registers a second listener.
+///
+/// Deliberately NOT built as an implementation of the same interface as
+/// the existing Razorpay flow in subscription_screen.dart -- StoreKit's
+/// stream-based purchase model (pending/purchased/restored/error/canceled
+/// events that can arrive at any time, including after app restart) has a
+/// different shape than razorpay_flutter's one-shot success/error
+/// callbacks, and forcing both into one shared interface would have meant
+/// rewriting the existing, working Razorpay callbacks to fit it.
+class AppleIapController extends StateNotifier<AppleIapState> {
+  final InAppPurchase _iap;
+  final SubscriptionRepository _subscriptionRepository;
+  final Future<void> Function() _onEntitlementChanged;
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
+
+  AppleIapController(this._iap, this._subscriptionRepository, this._onEntitlementChanged)
+    : super(const AppleIapState()) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    final available = await _iap.isAvailable();
+    if (!available) {
+      state = state.copyWith(storeUnavailable: true);
+      return;
+    }
+    _purchaseSub = _iap.purchaseStream.listen(
+      _onPurchaseUpdate,
+      onError: (error) => state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        error: 'Store connection error: $error',
+      ),
+    );
+    // Best-effort -- a failure here just means buy()/restorePurchases()
+    // proceed without the extra appAccountToken binding (see AppleIapState
+    // doc comment); it must never block loading products/purchasing.
+    unawaited(_loadAppAccountToken());
+    await loadProducts();
+  }
+
+  Future<void> _loadAppAccountToken() async {
+    try {
+      final token = await _subscriptionRepository.getAppleAppAccountToken();
+      state = state.copyWith(appAccountToken: token);
+    } catch (_) {
+      // Swallowed deliberately -- see call site's comment.
+    }
+  }
+
+  /// Queries the App Store for the real, localized product info (including
+  /// price) -- the displayed price on iOS must come from here, never from
+  /// the backend's plan.price, since only Apple knows the customer's actual
+  /// storefront/currency/localized price string.
+  Future<void> loadProducts() async {
+    state = state.copyWith(status: AppleIapStatus.loadingProducts, clearError: true);
+    try {
+      final response = await _iap.queryProductDetails(kAppleSubscriptionProductIds);
+      if (response.error != null) {
+        state = state.copyWith(
+          status: AppleIapStatus.idle,
+          error: 'Could not load plans from the App Store',
+        );
+        return;
+      }
+      if (response.productDetails.isEmpty) {
+        state = state.copyWith(
+          status: AppleIapStatus.idle,
+          error: 'No subscription products are available right now',
+        );
+        return;
+      }
+      state = state.copyWith(status: AppleIapStatus.idle, products: response.productDetails);
+    } catch (e) {
+      state = state.copyWith(status: AppleIapStatus.idle, error: 'Could not load plans: $e');
+    }
+  }
+
+  Future<void> buy(ProductDetails product) async {
+    state = state.copyWith(
+      status: AppleIapStatus.purchasing,
+      purchasingProductId: product.id,
+      clearError: true,
+    );
+    // applicationUserName is the cross-platform in_app_purchase name for
+    // what in_app_purchase_storekit (0.4.13, the version installed here --
+    // see in_app_purchase_storekit_platform.dart) passes straight through
+    // as StoreKit's appAccountToken. Null is fine (the token may not have
+    // loaded yet) -- the backend's ownership-by-originalTransactionId check
+    // is the primary guard either way; this is an additional layer.
+    final param = PurchaseParam(productDetails: product, applicationUserName: state.appAccountToken);
+    // The outcome arrives asynchronously via purchaseStream
+    // (_onPurchaseUpdate below), not via this call's return value --
+    // buyNonConsumable only opens the purchase sheet. Auto-renewable
+    // subscriptions go through the same non-consumable API on iOS; Apple's
+    // StoreKit tracks the actual renewal behavior server-side.
+    final started = await _iap.buyNonConsumable(purchaseParam: param);
+    if (!started) {
+      state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        error: 'Could not start the purchase',
+      );
+    }
+  }
+
+  Future<void> restorePurchases() async {
+    state = state.copyWith(status: AppleIapStatus.restoring, clearError: true);
+    try {
+      // Same ownership-association token as buy() above, so a restore
+      // follows the identical backend validation path.
+      await _iap.restorePurchases(applicationUserName: state.appAccountToken);
+      // Outcomes (including "nothing to restore", which simply produces no
+      // further stream events) surface through _onPurchaseUpdate too.
+    } catch (e) {
+      state = state.copyWith(status: AppleIapStatus.idle, error: 'Restore failed: $e');
+    }
+  }
+
+  Future<void> _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
+    for (final purchase in purchases) {
+      switch (purchase.status) {
+        case PurchaseStatus.pending:
+          state = state.copyWith(status: AppleIapStatus.purchasing);
+          break;
+
+        case PurchaseStatus.error:
+          state = state.copyWith(
+            status: AppleIapStatus.idle,
+            clearPurchasingProductId: true,
+            error: purchase.error?.message ?? 'Purchase failed',
+          );
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
+          break;
+
+        case PurchaseStatus.canceled:
+          state = state.copyWith(status: AppleIapStatus.idle, clearPurchasingProductId: true);
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
+          break;
+
+        case PurchaseStatus.purchased:
+        case PurchaseStatus.restored:
+          await _verifyAndFinish(purchase);
+          break;
+      }
+    }
+  }
+
+  /// The only place a purchase actually grants entitlement: sends the
+  /// StoreKit transaction id to the backend, which independently
+  /// re-verifies it against Apple's own servers before activating anything
+  /// (Backend/Utils/appleIap.js) -- never activates based on local device
+  /// state alone. Used identically for a fresh purchase and for Restore
+  /// Purchases, since both arrive through this same stream as `purchased`/
+  /// `restored` events.
+  ///
+  /// Only finishes the StoreKit transaction (`completePurchase`) AFTER the
+  /// backend confirms activation. If the network drops or the backend is
+  /// briefly unreachable right after payment, the transaction is left
+  /// unfinished on purpose, so StoreKit redelivers it (next app launch, or
+  /// the next Restore Purchases) instead of silently losing it --
+  /// verifyApplePurchase is idempotent server-side, so a redelivered
+  /// transaction is always safe to resubmit.
+  Future<void> _verifyAndFinish(PurchaseDetails purchase) async {
+    final transactionId = purchase.purchaseID;
+    if (transactionId == null || transactionId.isEmpty) {
+      state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        error: 'Purchase is missing a transaction id',
+      );
+      return;
+    }
+    try {
+      await _subscriptionRepository.verifyApplePurchase(
+        transactionId: transactionId,
+        productId: purchase.productID,
+      );
+      await _onEntitlementChanged();
+      state = state.copyWith(status: AppleIapStatus.idle, clearPurchasingProductId: true);
+    } on ApiException catch (e) {
+      state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        error: e.message,
+      );
+      return;
+    } catch (e) {
+      state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        error: 'Could not verify purchase: $e',
+      );
+      return;
+    }
+    if (purchase.pendingCompletePurchase) {
+      await _iap.completePurchase(purchase);
+    }
+  }
+
+  @override
+  void dispose() {
+    _purchaseSub?.cancel();
+    super.dispose();
+  }
+}
+
+final appleIapControllerProvider = StateNotifierProvider<AppleIapController, AppleIapState>((
+  ref,
+) {
+  final repo = ref.watch(subscriptionRepositoryProvider);
+  return AppleIapController(
+    InAppPurchase.instance,
+    repo,
+    () => ref.read(subscriptionControllerProvider.notifier).refresh(),
+  );
+});

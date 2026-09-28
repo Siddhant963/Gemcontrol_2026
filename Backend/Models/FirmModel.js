@@ -130,6 +130,17 @@ const farmSchema = mongoose.Schema({
     ref: "User",
     required: true,
   },
+  // Stable UUID sent by the iOS app on every Apple purchase/restore as
+  // StoreKit's appAccountToken (see Utils/appleIap.js's
+  // ensureAppleAppAccountToken -- generated lazily, once, never
+  // regenerated). Lets the backend verify that an Apple transaction was
+  // actually purchased for THIS firm rather than just trusting whichever
+  // firm happens to be logged into the app when the purchase is verified.
+  // Optional/absent for firms that predate this field or never use iOS.
+  appleAppAccountToken: {
+    type: String,
+    default: undefined,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -139,4 +150,9 @@ const farmSchema = mongoose.Schema({
     default: null,
   },
 });
+
+// Sparse: only firms that have made an Apple purchase get this set. Unique
+// so two firms can never end up sharing one token.
+farmSchema.index({ appleAppAccountToken: 1 }, { unique: true, sparse: true });
+
 module.exports = mongoose.model("Firm", farmSchema);

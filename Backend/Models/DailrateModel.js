@@ -82,6 +82,12 @@ const dailrateSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Set whenever an admin manually edits today's rate via Settings, so the
+    // hourly live-rate cron (see Utils/cronJobs.js) knows not to clobber it.
+    manuallySetAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

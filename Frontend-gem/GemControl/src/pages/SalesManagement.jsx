@@ -1323,7 +1323,11 @@ function SalesManagement() {
       </Box>
       {/* Create Sale Modal */}
       <Dialog
-        open={openSaleModal}
+        // Hidden (not just layered under) while the New Customer dialog is
+        // open -- two simultaneously-centered MUI Dialogs otherwise render
+        // on top of each other. Form state lives in component state, not in
+        // the Dialog itself, so it's preserved when this reappears.
+        open={openSaleModal && !openCustomerModal}
         onClose={handleCancel}
         fullWidth
         maxWidth="md"
@@ -1536,9 +1540,9 @@ function SalesManagement() {
                     label="Amount"
                     type="number"
                     value={item.amount}
+                    onChange={(e) => handleInputChange(e, index)}
                     fullWidth
-                    InputProps={{ readOnly: true }}
-                    helperText="Auto-calculated from price × quantity"
+                    helperText="Auto-calculated from price × quantity — editable if you need to override it"
                   />
                 </Grid>
                 <Grid item xs={12}>

@@ -14,6 +14,13 @@ import {
 import api from "../utils/api";
 import { ROUTES } from "../utils/routes";
 
+// A "name" must contain at least one letter -- rejects garbage like "11222"
+// while staying permissive about legitimate business names with digits.
+const NAME_REGEX = /[A-Za-z]/;
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const PHONE_REGEX = /^\d{10}$/;
+const MIN_PASSWORD_LENGTH = 6;
+
 function Register() {
   const [userData, setUserData] = useState({
     name: "",
@@ -24,6 +31,7 @@ function Register() {
     firmLocation: "",
     firmSize: "",
   });
+  const [fieldErrors, setFieldErrors] = useState({});
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const error = useSelector((state) => state.auth.error);
@@ -32,8 +40,36 @@ function Register() {
     setUserData({ ...userData, [e.target.name]: e.target.value });
   };
 
+  const validate = () => {
+    const errors = {};
+    if (!userData.name.trim() || !NAME_REGEX.test(userData.name)) {
+      errors.name = "Name must contain letters, not just numbers";
+    }
+    if (!EMAIL_REGEX.test(userData.email)) {
+      errors.email = "Enter a valid email address";
+    }
+    if (!PHONE_REGEX.test(userData.contact)) {
+      errors.contact = "Contact number must be exactly 10 digits";
+    }
+    if (userData.password.length < MIN_PASSWORD_LENGTH) {
+      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+    }
+    if (!userData.firmName.trim() || !NAME_REGEX.test(userData.firmName)) {
+      errors.firmName = "Shop name must contain letters, not just numbers";
+    }
+    if (!userData.firmLocation.trim()) {
+      errors.firmLocation = "Shop location is required";
+    }
+    if (!userData.firmSize || isNaN(userData.firmSize) || Number(userData.firmSize) <= 0) {
+      errors.firmSize = "Enter a valid shop size";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
     try {
       // The public /register endpoint creates a brand-new shop (Firm) and
       // its admin account together in one step.
@@ -62,6 +98,8 @@ function Register() {
           name="name"
           value={userData.name}
           onChange={handleChange}
+          error={!!fieldErrors.name}
+          helperText={fieldErrors.name}
           required
         />
         <TextField
@@ -72,6 +110,8 @@ function Register() {
           type="email"
           value={userData.email}
           onChange={handleChange}
+          error={!!fieldErrors.email}
+          helperText={fieldErrors.email}
           required
         />
         <TextField
@@ -81,6 +121,8 @@ function Register() {
           name="contact"
           value={userData.contact}
           onChange={handleChange}
+          error={!!fieldErrors.contact}
+          helperText={fieldErrors.contact}
           required
         />
         <TextField
@@ -91,6 +133,8 @@ function Register() {
           type="password"
           value={userData.password}
           onChange={handleChange}
+          error={!!fieldErrors.password}
+          helperText={fieldErrors.password}
           required
         />
 
@@ -105,6 +149,8 @@ function Register() {
           name="firmName"
           value={userData.firmName}
           onChange={handleChange}
+          error={!!fieldErrors.firmName}
+          helperText={fieldErrors.firmName}
           required
         />
         <TextField
@@ -114,6 +160,8 @@ function Register() {
           name="firmLocation"
           value={userData.firmLocation}
           onChange={handleChange}
+          error={!!fieldErrors.firmLocation}
+          helperText={fieldErrors.firmLocation}
           required
         />
         <TextField
@@ -124,6 +172,8 @@ function Register() {
           type="number"
           value={userData.firmSize}
           onChange={handleChange}
+          error={!!fieldErrors.firmSize}
+          helperText={fieldErrors.firmSize}
           required
         />
 

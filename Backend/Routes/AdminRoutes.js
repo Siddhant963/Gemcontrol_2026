@@ -17,6 +17,18 @@ const uploadExcel = multer({
   },
 });
 
+// Raw material import additionally accepts .csv (the frontend's file picker
+// offers all three).
+const uploadImportSheet = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedExt = /\.(csv|xlsx|xls)$/i;
+    if (allowedExt.test(file.originalname)) return cb(null, true);
+    cb(new Error("Only .csv, .xlsx or .xls files are allowed"));
+  },
+});
+
 const {
   RegisterUser,
   GetAllUsers,
@@ -44,6 +56,7 @@ const {
   getStockbyFirm,
   createRawMaterial,
   updateRawMaterial,
+  importRawMaterials,
   getAllRawMaterials,
   getRawMaterialbyFirm,
   getRawMaterialbyType,
@@ -96,12 +109,17 @@ const {
   getGirviSummary,
   // Export function
   exportAllDataToExcel,
+  exportAllDataToPdf,
   // Subscription functions
   getSubscriptionPlans,
   getMySubscription,
   activateTestSubscription,
   createSubscriptionOrder,
   verifySubscriptionPayment,
+  // Apple In-App Purchase (iOS only) -- second payment provider alongside
+  // Razorpay above
+  getAppleAppAccountToken,
+  verifyAppleSubscription,
 } = require("../Controllers/adminController");
 
 // Public self-signup: no auth required, but the controller forces role="staff"
@@ -121,9 +139,19 @@ router.get("/getMySubscription", isLoggedIn, getMySubscription);
 router.post("/activateTestSubscription", isLoggedIn, isAdmin, activateTestSubscription);
 router.post("/createSubscriptionOrder", isLoggedIn, isAdmin, createSubscriptionOrder);
 router.post("/verifySubscriptionPayment", isLoggedIn, isAdmin, verifySubscriptionPayment);
-// Note: /razorpayWebhook is intentionally NOT registered here -- it needs a
-// raw (unparsed) body for signature verification, so it's mounted directly
-// on the Express app in server.js, before the global express.json().
+// iOS-only counterpart to createSubscriptionOrder/verifySubscriptionPayment
+// above -- same auth requirement, same "reachable even while expired" reason
+// (an admin renewing on iOS hits this exact same 402-locked-out state).
+router.post("/verifyAppleSubscription", isLoggedIn, isAdmin, verifyAppleSubscription);
+// Fetched by any logged-in staff of the firm (not just admin) purely to
+// pass along at purchase time -- reachable pre-subscription like
+// getSubscriptionPlans/getMySubscription above, since a firm needs it
+// before its first purchase can even happen.
+router.get("/getAppleAppAccountToken", isLoggedIn, getAppleAppAccountToken);
+// Note: /razorpayWebhook and /apple/notifications are intentionally NOT
+// registered here -- both need a raw (unparsed) body for signature
+// verification, so they're mounted directly on the Express app in
+// server.js, before the global express.json().
 
 // Every route below requires the caller to be logged in AND their firm to
 // have a non-expired subscription (trial or paid) -- see Utils/subscription.js.
@@ -201,6 +229,12 @@ router.put(
   upload.single("rawMaterial"),
   updateRawMaterial
 );
+router.post(
+  "/importRawMaterials",
+  isLoggedIn,
+  uploadImportSheet.single("file"),
+  importRawMaterials
+);
 router.get("/getAllRawMaterials", isLoggedIn, getAllRawMaterials);
 router.get("/removeRawMaterial", isLoggedIn, isAdmin, removeRawMaterial);
 router.get("/getRawMaterialbyFirm", isLoggedIn, getRawMaterialbyFirm);
@@ -270,5 +304,6 @@ router.get("/getGirviSummary", isLoggedIn, isAdmin, getGirviSummary);
 
 // ============ EXPORT DATA TO EXCEL ROUTE ============
 router.get("/exportAllDataToExcel", isLoggedIn, isAdmin, exportAllDataToExcel);
+router.get("/exportAllDataToPdf", isLoggedIn, isAdmin, exportAllDataToPdf);
 
 module.exports = router;

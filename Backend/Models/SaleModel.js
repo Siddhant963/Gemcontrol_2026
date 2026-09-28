@@ -106,7 +106,7 @@ const SaleSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['cash', 'card', 'credit', 'online', 'bankTransfer', 'Upi', 'split']
+    enum: ['cash', 'card', 'credit', 'online', 'bankTransfer', 'Upi', 'cheque', 'split']
   },
   // Per-mode payment breakdown. Always populated (single entry for the
   // legacy non-split case) so invoices can render "Cash Received / Card

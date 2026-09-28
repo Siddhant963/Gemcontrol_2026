@@ -118,10 +118,27 @@ class _CustomerCard extends ConsumerWidget {
             ),
             IconButton(
               icon: Icon(Icons.delete_outline, color: scheme.error, size: 20),
-              onPressed: () async {
-                await ref.read(customerRepositoryProvider).removeCustomer(customer.id);
-                ref.invalidate(customersProvider);
-              },
+              onPressed: () => showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete customer?'),
+                  content: Text('Remove "${customer.name}"?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ref.read(customerRepositoryProvider).removeCustomer(customer.id);
+                        ref.invalidate(customersProvider);
+                      },
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -145,7 +162,14 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
 
   Future<void> _save() async {
     final firm = ref.read(currentFirmProvider);
-    if (_nameCtrl.text.trim().isEmpty || firm == null) return;
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty || firm == null) return;
+    if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name must contain letters, not just numbers')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(customerRepositoryProvider).addCustomer(

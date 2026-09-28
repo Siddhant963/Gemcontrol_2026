@@ -13,6 +13,7 @@ import '../../core/utils/currency.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 import '../customers/customers_providers.dart';
+import '../sales_history/sales_history_providers.dart';
 import 'item_picker_sheet.dart';
 
 const _paymentMethods = ['cash', 'card', 'online', 'bankTransfer', 'Upi', 'cheque'];
@@ -320,6 +321,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     );
     try {
       final sale = await ref.read(saleRepositoryProvider).createSale(request);
+      ref.invalidate(allSalesProvider);
       if (mounted) context.pushReplacement('/sales/${sale.id}', extra: sale);
     } on ApiException catch (e) {
       if (mounted) {

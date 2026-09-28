@@ -18,9 +18,10 @@ const paymentSchema = mongoose.Schema({
           default: Date.now
           },
           sale: {
+          // Optional: Girvi (pawn/loan) payments aren't tied to a Sale.
           type: mongoose.Schema.Types.ObjectId,
           ref: 'Sale',
-          required: true
+          default: null
           },
           customer: {
           type: mongoose.Schema.Types.ObjectId,

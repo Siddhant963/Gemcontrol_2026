@@ -26,6 +26,7 @@ import {
   Tabs,
   Tab,
   Menu,
+  Checkbox,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
@@ -85,6 +86,7 @@ function ItemManagement() {
     priceMax: "",
   });
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [selectedItemIds, setSelectedItemIds] = useState(() => new Set());
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [bulkImportFile, setBulkImportFile] = useState(null);
   const [bulkImporting, setBulkImporting] = useState(false);
@@ -92,6 +94,11 @@ function ItemManagement() {
   const [openAddModal, setOpenAddModal] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [categories, setCategories] = useState([]);
+  // Categories scoped to whichever firm is selected in the Add/Edit item
+  // form -- an admin managing multiple firms may not have a `req.user.firm`
+  // that matches the firm they're adding an item for, so `categories`
+  // (loaded once for the page's own filter) can't be reused here.
+  const [formCategories, setFormCategories] = useState([]);
   const [firms, setFirms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -214,9 +221,33 @@ function ItemManagement() {
     fetchData();
   }, [fetchData]);
 
+  // Re-fetch categories scoped to whichever firm is currently selected in
+  // the Add or Edit item form (only one is ever open at a time).
+  useEffect(() => {
+    const firmId = newItem.firm || editItem.firm;
+    if (!firmId) {
+      setFormCategories([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/getAllStockCategories?firm=${firmId}`)
+      .then((res) => {
+        if (!cancelled) setFormCategories(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setFormCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [newItem.firm, editItem.firm]);
+
   const validateForm = useCallback(() => {
     const errors = {};
     if (!newItem.name.trim()) errors.name = "Item name is required";
+    else if (!/[A-Za-z]/.test(newItem.name))
+      errors.name = "Item name must contain letters, not just numbers";
     if (!newItem.materialgitType)
       errors.materialgitType = "Material type is required"; // Fixed typo
     if (!newItem.waight || isNaN(newItem.waight) || newItem.waight <= 0)
@@ -672,6 +703,8 @@ function ItemManagement() {
   const validateEditForm = useCallback(() => {
     const errors = {};
     if (!editItem.name.trim()) errors.name = "Item name is required";
+    else if (!/[A-Za-z]/.test(editItem.name))
+      errors.name = "Item name must contain letters, not just numbers";
     if (!editItem.materialgitType)
       errors.materialgitType = "Material type is required";
     if (!editItem.waight || isNaN(editItem.waight) || editItem.waight <= 0)
@@ -915,23 +948,43 @@ function ItemManagement() {
     { key: "hsnCode", label: "HSN Code" },
   ];
 
-  const buildExportRows = useCallback(
-    () =>
-      filteredItems.map((item) => ({
-        stockcode: item.stockcode || "",
-        name: item.name || "",
-        materialgitType: item.materialgitType || "",
-        karat: item.karat || "",
-        categoryName: item.category?.name || "",
-        grossWeight: item.grossWeight || item.waight || 0,
-        lessWeight: item.lessWeight || 0,
-        netWeight: item.netWeight || item.waight || 0,
-        quantity: item.quantity || 0,
-        price: item.price || 0,
-        makingCharge: item.makingCharge || 0,
-        totalValue: item.totalValue || 0,
-        hsnCode: item.hsnCode || "",
-      })),
+  const buildExportRows = useCallback(() => {
+    // Export the checked rows when any are selected, otherwise fall back to
+    // the current filtered view.
+    const source =
+      selectedItemIds.size > 0
+        ? filteredItems.filter((item) => selectedItemIds.has(item._id))
+        : filteredItems;
+    return source.map((item) => ({
+      stockcode: item.stockcode || "",
+      name: item.name || "",
+      materialgitType: item.materialgitType || "",
+      karat: item.karat || "",
+      categoryName: item.category?.name || "",
+      grossWeight: item.grossWeight || item.waight || 0,
+      lessWeight: item.lessWeight || 0,
+      netWeight: item.netWeight || item.waight || 0,
+      quantity: item.quantity || 0,
+      price: item.price || 0,
+      makingCharge: item.makingCharge || 0,
+      totalValue: item.totalValue || 0,
+      hsnCode: item.hsnCode || "",
+    }));
+  }, [filteredItems, selectedItemIds]);
+
+  const toggleItemSelected = useCallback((id) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllFiltered = useCallback(
+    (checked) => {
+      setSelectedItemIds(checked ? new Set(filteredItems.map((item) => item._id)) : new Set());
+    },
     [filteredItems]
   );
 
@@ -951,7 +1004,18 @@ function ItemManagement() {
     (format) => {
       setExportMenuAnchor(null);
       const rows = buildExportRows();
-      if (rows.length === 0) return;
+      if (rows.length === 0) {
+        setNotificationDialog({
+          open: true,
+          message:
+            selectedItemIds.size > 0
+              ? "No matching items in your selection to export."
+              : "No items to export.",
+          type: "warning",
+          title: "Nothing to export",
+        });
+        return;
+      }
 
       if (format === "csv") {
         const header = EXPORT_COLUMNS.map((c) => `"${c.label}"`).join(",");
@@ -1012,7 +1076,7 @@ function ItemManagement() {
         };
       }
     },
-    [buildExportRows] // eslint-disable-line react-hooks/exhaustive-deps -- EXPORT_COLUMNS is a static local constant
+    [buildExportRows, selectedItemIds] // eslint-disable-line react-hooks/exhaustive-deps -- EXPORT_COLUMNS is a static local constant
   );
 
   // ---- Bulk stock import (wholesale, via Excel) ----
@@ -1330,8 +1394,18 @@ function ItemManagement() {
             onClick={(e) => setExportMenuAnchor(e.currentTarget)}
             sx={{ textTransform: "none" }}
           >
-            Export
+            {selectedItemIds.size > 0 ? `Export (${selectedItemIds.size} selected)` : "Export"}
           </Button>
+          {selectedItemIds.size > 0 && (
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setSelectedItemIds(new Set())}
+              sx={{ textTransform: "none" }}
+            >
+              Clear selection
+            </Button>
+          )}
           <Menu
             anchorEl={exportMenuAnchor}
             open={Boolean(exportMenuAnchor)}
@@ -1583,6 +1657,20 @@ function ItemManagement() {
                         },
                       }}
                     >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={
+                            filteredItems.length > 0 &&
+                            filteredItems.every((item) => selectedItemIds.has(item._id))
+                          }
+                          indeterminate={
+                            selectedItemIds.size > 0 &&
+                            !filteredItems.every((item) => selectedItemIds.has(item._id))
+                          }
+                          onChange={(e) => toggleSelectAllFiltered(e.target.checked)}
+                          inputProps={{ "aria-label": "Select all items" }}
+                        />
+                      </TableCell>
                       <TableCell sx={{ minWidth: 80 }}>Image</TableCell>
                       <TableCell sx={{ minWidth: 120 }}>Item Name</TableCell>
                       <TableCell
@@ -1658,6 +1746,13 @@ function ItemManagement() {
                           },
                         }}
                       >
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedItemIds.has(item._id)}
+                            onChange={() => toggleItemSelected(item._id)}
+                            inputProps={{ "aria-label": `Select ${item.name || "item"}` }}
+                          />
+                        </TableCell>
                         <TableCell>
                           {item.stockImg ? (
                             <Box
@@ -1960,7 +2055,7 @@ function ItemManagement() {
             >
               Select Category
             </MenuItem>
-            {categories.map((cat) => (
+            {formCategories.map((cat) => (
               <MenuItem
                 key={cat._id}
                 value={cat._id}
@@ -2461,7 +2556,7 @@ function ItemManagement() {
               <MenuItem value="" disabled>
                 Select Category
               </MenuItem>
-              {categories.map((cat) => (
+              {formCategories.map((cat) => (
                 <MenuItem key={cat._id} value={cat._id}>
                   {cat.name}
                 </MenuItem>

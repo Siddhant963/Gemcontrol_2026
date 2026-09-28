@@ -121,7 +121,12 @@ class _StockList extends ConsumerWidget {
                   saleType: 'stock',
                   materialId: s.id,
                   quantity: 1,
-                  amount: s.price,
+                  // Must match the backend's authoritative line-amount formula
+                  // (price + making charge) -- using price alone understated
+                  // the total the server would recompute at sale creation,
+                  // producing a payment/udhar split that didn't match what
+                  // was actually saved.
+                  amount: s.totalValue > 0 ? s.totalValue : s.price,
                   name: s.name,
                   hsnCode: s.hsnCode,
                   karat: s.karat,

@@ -44,6 +44,12 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
       );
       return;
     }
+    if (!RegExp(r'[A-Za-z]').hasMatch(_itemNameCtrl.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Item name must contain letters, not just numbers')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(girviRepositoryProvider).addGirviItem(

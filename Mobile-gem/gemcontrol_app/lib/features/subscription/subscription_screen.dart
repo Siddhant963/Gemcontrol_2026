@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../core/api/api_client.dart';
@@ -10,6 +13,7 @@ import '../../core/repositories/subscription_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/gc_app_bar.dart';
+import 'apple_iap_controller.dart';
 import 'subscription_providers.dart';
 
 final _plansProvider = FutureProvider.autoDispose<List<SubscriptionPlan>>((ref) {
@@ -20,6 +24,17 @@ int _daysLeft(DateTime? endDate) {
   if (endDate == null) return 0;
   final ms = endDate.difference(DateTime.now()).inMilliseconds;
   return (ms / (24 * 60 * 60 * 1000)).ceil().clamp(0, 1 << 30);
+}
+
+/// Matches a backend [SubscriptionPlan] to the StoreKit [ProductDetails]
+/// Apple returned, via the plan's own `appleProductId` (never a hardcoded
+/// id here) -- null if that product hasn't loaded yet or doesn't exist.
+ProductDetails? _appleProductFor(SubscriptionPlan plan, List<ProductDetails> products) {
+  if (plan.appleProductId == null) return null;
+  for (final product in products) {
+    if (product.id == plan.appleProductId) return product;
+  }
+  return null;
 }
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
@@ -119,6 +134,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final sub = subAsync.valueOrNull?.subscription;
     final isTrialing = sub?.status == 'trialing' && (subAsync.valueOrNull?.isActive ?? false);
 
+    // iOS must buy through Apple StoreKit, never Razorpay -- Android/Web
+    // below are completely untouched and still go through _subscribe.
+    // appleIapControllerProvider is only ever watched here, on iOS, so
+    // Android never opens a Play Billing connection it isn't meant to use.
+    final isIOS = Platform.isIOS;
+    final appleState = isIOS ? ref.watch(appleIapControllerProvider) : null;
+    final appleError = appleState?.error;
+
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Subscription'),
@@ -147,15 +170,40 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
                 ),
               ),
-            if (_error != null)
+            if (isIOS && isAdmin)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: appleState?.status == AppleIapStatus.restoring
+                      ? null
+                      : () => ref.read(appleIapControllerProvider.notifier).restorePurchases(),
+                  child: Text(
+                    appleState?.status == AppleIapStatus.restoring
+                        ? 'Restoring...'
+                        : 'Restore Purchases',
+                  ),
+                ),
+              ),
+            if (_error != null || appleError != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: Card(
                   color: scheme.errorContainer,
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.sm + 4),
-                    child: Text(_error!, style: TextStyle(color: scheme.onErrorContainer)),
+                    child: Text(
+                      _error ?? appleError!,
+                      style: TextStyle(color: scheme.onErrorContainer),
+                    ),
                   ),
+                ),
+              ),
+            if (isIOS && appleState?.storeUnavailable == true)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Text(
+                  'The App Store is unavailable right now. Please try again later.',
+                  style: TextStyle(color: scheme.error, fontSize: 13),
                 ),
               ),
             plansAsync.when(
@@ -166,9 +214,22 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       plan: plan,
                       isCurrentPlan: sub?.plan?.id == plan.id,
                       isAdmin: isAdmin,
-                      isActivating: _activatingKey == plan.key,
                       isRenewal: isTrialing || sub != null,
+                      isIOS: isIOS,
+                      // Android/Web: unchanged Razorpay path.
+                      isActivating: _activatingKey == plan.key,
                       onTap: () => _subscribe(plan),
+                      // iOS: Apple StoreKit path -- same card design, only
+                      // the price source and the purchase action differ.
+                      appleProduct: isIOS
+                          ? _appleProductFor(plan, appleState?.products ?? const [])
+                          : null,
+                      isApplePurchasing:
+                          isIOS &&
+                          appleState?.status == AppleIapStatus.purchasing &&
+                          appleState?.purchasingProductId == plan.appleProductId,
+                      onAppleTap: (product) =>
+                          ref.read(appleIapControllerProvider.notifier).buy(product),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
@@ -199,6 +260,12 @@ class _PlanCard extends StatelessWidget {
   final bool isActivating;
   final bool isRenewal;
   final VoidCallback onTap;
+  // iOS-only (all null/false on Android/Web, which keep using the fields
+  // above via [onTap] exactly as before):
+  final bool isIOS;
+  final ProductDetails? appleProduct;
+  final bool isApplePurchasing;
+  final ValueChanged<ProductDetails>? onAppleTap;
 
   const _PlanCard({
     required this.plan,
@@ -207,11 +274,23 @@ class _PlanCard extends StatelessWidget {
     required this.isActivating,
     required this.isRenewal,
     required this.onTap,
+    this.isIOS = false,
+    this.appleProduct,
+    this.isApplePurchasing = false,
+    this.onAppleTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // On iOS the displayed price must come from Apple's own product info
+    // (localized to the customer's storefront/currency), never from the
+    // backend's plan.price -- fall back to the backend price only while
+    // Apple's product hasn't loaded yet, so the card isn't left blank.
+    final priceText = (isIOS && appleProduct != null)
+        ? appleProduct!.price
+        : '₹${plan.price.toStringAsFixed(0)}';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -225,7 +304,7 @@ class _PlanCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
-                  '₹${plan.price.toStringAsFixed(0)}',
+                  priceText,
                   style: AppTheme.numericData(context, color: scheme.primary).copyWith(fontSize: 22),
                 ),
                 const SizedBox(width: 4),
@@ -259,16 +338,31 @@ class _PlanCard extends StatelessWidget {
               // a user may want to renew/extend it early rather than wait
               // for it to lapse. Only "not an admin" or "checkout already
               // opening" should block the tap.
-              child: ElevatedButton(
-                onPressed: (!isAdmin || isActivating) ? null : onTap,
-                child: Text(
-                  isActivating
-                      ? 'Opening checkout...'
-                      : (isCurrentPlan || isRenewal)
-                          ? 'Renew'
-                          : 'Subscribe',
-                ),
-              ),
+              child: isIOS
+                  ? ElevatedButton(
+                      onPressed: (!isAdmin || isApplePurchasing || appleProduct == null)
+                          ? null
+                          : () => onAppleTap?.call(appleProduct!),
+                      child: Text(
+                        isApplePurchasing
+                            ? 'Purchasing...'
+                            : appleProduct == null
+                                ? 'Unavailable'
+                                : (isCurrentPlan || isRenewal)
+                                    ? 'Renew'
+                                    : 'Subscribe',
+                      ),
+                    )
+                  : ElevatedButton(
+                      onPressed: (!isAdmin || isActivating) ? null : onTap,
+                      child: Text(
+                        isActivating
+                            ? 'Opening checkout...'
+                            : (isCurrentPlan || isRenewal)
+                                ? 'Renew'
+                                : 'Subscribe',
+                      ),
+                    ),
             ),
           ],
         ),

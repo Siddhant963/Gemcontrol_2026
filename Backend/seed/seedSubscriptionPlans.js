@@ -29,6 +29,8 @@ const PLANS = [
       "Excel export / backup",
     ],
     isActive: true,
+    // App Store Connect subscription group "RatnSetu Plans", Level 2.
+    appleProductId: "Ratnsetu",
   },
   {
     key: "pro",
@@ -43,6 +45,8 @@ const PLANS = [
       "Priority support",
     ],
     isActive: true,
+    // App Store Connect subscription group "RatnSetu Plans", Level 1.
+    appleProductId: "Ratnsetu1",
   },
 ];
 

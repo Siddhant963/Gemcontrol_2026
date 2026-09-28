@@ -146,6 +146,8 @@ function FirmManagement() {
     const size = String(firm.size ?? "");
 
     if (!name.trim()) errors.name = "Name is required";
+    else if (!/[A-Za-z]/.test(name))
+      errors.name = "Name must contain letters, not just numbers";
     if (!location.trim()) errors.location = "Location is required";
     else if (!/^([^0-9]*)$/.test(location))
       errors.location = "Invalid location ";

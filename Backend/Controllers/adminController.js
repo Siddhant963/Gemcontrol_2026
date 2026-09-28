@@ -18,9 +18,13 @@ const SubscriptionPlanModel = require("../Models/SubscriptionPlanModel.js");
 const {
   ensureTrialSubscription,
   activatePaidSubscription,
+  findSubscriptionByAppleOriginalTransactionId,
+  setStatusByAppleOriginalTransactionId,
   isSubscriptionCurrentlyActive,
+  AppleTransactionOwnershipConflictError,
 } = require("../Utils/subscription.js");
 const { razorpay, verifyPaymentSignature, validateWebhookSignature } = require("../Utils/razorpay.js");
+const appleIap = require("../Utils/appleIap.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -66,6 +70,31 @@ function buildInvoiceNumber(firm, date = new Date()) {
   return `${prefix}/${counter}/${fyStart}-${fyEnd}`;
 }
 
+// ============ SHARED FORM VALIDATION HELPERS ============
+// A "name" field (person, customer, firm, item, category...) must contain at
+// least one letter -- rejects garbage like "11222" while staying permissive
+// enough for real business/product names that legitimately include digits
+// (e.g. "22K Gold Ring", "Shop No. 5").
+function isValidName(name) {
+  return typeof name === "string" && /[A-Za-z]/.test(name) && name.trim().length >= 2;
+}
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const PHONE_REGEX = /^\d{10}$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+// Returns today's (or the most recent available) per-gram rate for a raw
+// material's materialType, used to auto-compute price = weight × rate when
+// the user enters a per-unit weight instead of typing a price directly.
+// Only gold (24K) and silver have a rate in Dailrate -- platinum/diamond/
+// other return null and must still be priced manually.
+async function getLatestRateForMaterial(materialType) {
+  const dailrate = await DailrateModel.findOne().sort({ date: -1 });
+  if (!dailrate) return null;
+  if (materialType === "gold") return dailrate.rate?.gold?.["24K"] || null;
+  if (materialType === "silver") return dailrate.rate?.silver || null;
+  return null;
+}
+
 // Public /register (no auth): a brand-new shop owner signing up creates
 // their own Firm and becomes its admin in one step -- there is no other
 // self-service way to get a firm today.
@@ -78,6 +107,18 @@ module.exports.RegisterUser = async (req, res) => {
 
   if (!name || !email || !contact || !password) {
     return res.status(400).json({ message: "All fields are required" });
+  }
+  if (!isValidName(name)) {
+    return res.status(400).json({ message: "Name must contain letters, not just numbers" });
+  }
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email address" });
+  }
+  if (!PHONE_REGEX.test(contact)) {
+    return res.status(400).json({ message: "Contact number must be exactly 10 digits" });
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
 
   try {
@@ -114,6 +155,9 @@ module.exports.RegisterUser = async (req, res) => {
       return res.status(400).json({
         message: "Shop name, location and size are required to sign up",
       });
+    }
+    if (!isValidName(firmName)) {
+      return res.status(400).json({ message: "Shop name must contain letters, not just numbers" });
     }
 
     const session = await mongoose.startSession();
@@ -232,7 +276,10 @@ module.exports.loginUser = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, role: user.role, firm: user.firm },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      // There is no refresh-token flow, so the session needs to comfortably
+      // outlive a normal work day/week instead of forcing a re-login every
+      // hour (that was being reported as a spurious auto-logout).
+      { expiresIn: "30d" }
     );
 
     const crossSiteCookie = process.env.NODE_ENV === "production";
@@ -241,8 +288,6 @@ module.exports.loginUser = async (req, res) => {
       sameSite: crossSiteCookie ? "none" : "lax",
       secure: crossSiteCookie,
     });
-    // TEMP DIAGNOSTIC — remove once the spurious-logout cause is found.
-    console.log(`[loginUser] issued token for userId=${user._id} dbName=${UserModel.db.name}`);
     res
       .status(200)
       .json({ message: "Login successful", token, role: user.role, firm: user.firm });
@@ -285,6 +330,12 @@ module.exports.createFirm = async (req, res) => {
     // Validate required fields
     if (!name || !location || !size) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Firm name must contain letters, not just numbers" });
+    }
+    if (email && !EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
     }
 
     const logoUrl = req.files?.logo?.[0] ? getRelativeFilePath(req.files.logo[0].path) : "";
@@ -365,6 +416,13 @@ module.exports.updateFirm = async (req, res) => {
       firmStartDate, panNo, invoicePrefix,
       cgstRate, sgstRate, igstRate, gstEnabled,
     } = req.body;
+
+    if (name && !isValidName(name)) {
+      return res.status(400).json({ message: "Firm name must contain letters, not just numbers" });
+    }
+    if (email && !EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
+    }
 
     if (name) firm.name = name;
     if (location) firm.location = location;
@@ -464,6 +522,15 @@ module.exports.AddCustomer = async (req, res) => {
     if (!name || !email || !contact || !address) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Name must contain letters, not just numbers" });
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
+    }
+    if (!PHONE_REGEX.test(contact)) {
+      return res.status(400).json({ message: "Contact number must be exactly 10 digits" });
+    }
     const existingCustomer = await CustomerModel.findOne({
       email: email,
       firm: req.user.firm,
@@ -543,6 +610,15 @@ module.exports.updateCustomer = async (req, res) => {
     if (!name || !email || !contact || !address) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Name must contain letters, not just numbers" });
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
+    }
+    if (!PHONE_REGEX.test(contact)) {
+      return res.status(400).json({ message: "Contact number must be exactly 10 digits" });
+    }
     const customer = await CustomerModel.findOne({ _id: customerId, firm: req.user.firm });
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
@@ -585,6 +661,9 @@ module.exports.createStockCategory = async (req, res) => {
     if (!name || !description) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Category name must contain letters, not just numbers" });
+    }
     // Convert absolute path to relative URL path for local storage
     const imagePath = req.file ? getRelativeFilePath(req.file.path) : "";
     if (req.file) {
@@ -610,6 +689,12 @@ module.exports.createStockCategory = async (req, res) => {
       category: newCategory,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "A category with this name already exists for your firm" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Error creating stock category:", error);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -617,12 +702,15 @@ module.exports.createStockCategory = async (req, res) => {
 
 module.exports.getAllStockCategories = async (req, res) => {
   try {
-    if (!req.user.firm) {
+    // An admin managing items across multiple firms can pass the firm they
+    // want categories for explicitly; otherwise fall back to their own firm.
+    const firm = req.query.firm || req.user.firm;
+    if (!firm) {
       return res.status(200).json([]);
     }
     const categories = await StockCategoryModel.find({
       removeAt: null,
-      firm: req.user.firm,
+      firm,
     });
     res.status(200).json(categories);
   } catch (error) {
@@ -643,6 +731,9 @@ module.exports.updateStockCategory = async (req, res) => {
     }
     if (!name || !description) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Category name must contain letters, not just numbers" });
     }
     const category = await StockCategoryModel.findOne({ _id: categoryId, firm: req.user.firm });
     if (!category) {
@@ -677,6 +768,12 @@ module.exports.updateStockCategory = async (req, res) => {
     );
     res.status(200).json({ message: "Stock category updated successfully", category });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "A category with this name already exists for your firm" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Error updating stock category:", error);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -737,15 +834,28 @@ module.exports.Addstock = async (req, res) => {
     const labourChargeValueNum = Number(labourChargeValue) || 0;
     const stoneChargeNumForValidation = Number(stoneCharge) || 0;
 
-    if (
-      !name ||
-      !materialgitType ||
-      !netWeightNum ||
-      !category ||
-      !quantity ||
-      !price
-    ) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!name) {
+      return res.status(400).json({ message: "Item name is required" });
+    }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Item name must contain letters, not just numbers" });
+    }
+    if (!materialgitType) {
+      return res.status(400).json({ message: "Material type is required" });
+    }
+    if (!category) {
+      return res.status(400).json({ message: "Category is required" });
+    }
+    const quantityNum = Number(quantity);
+    if (quantity === undefined || quantity === null || quantity === "" || Number.isNaN(quantityNum) || quantityNum <= 0) {
+      return res.status(400).json({ message: "Quantity must be greater than 0" });
+    }
+    if (!netWeightNum || netWeightNum <= 0) {
+      return res.status(400).json({ message: "Weight must be greater than 0 (gross weight must exceed less weight)" });
+    }
+    const priceNumForValidation = Number(price);
+    if (price === undefined || price === null || price === "" || Number.isNaN(priceNumForValidation) || priceNumForValidation <= 0) {
+      return res.status(400).json({ message: "Price must be greater than 0" });
     }
     if (lessWeightNum < 0) {
       return res.status(400).json({ message: "Less weight cannot be negative" });
@@ -1294,7 +1404,7 @@ module.exports.bulkImportStock = async (req, res) => {
 };
 
 module.exports.createRawMaterial = async (req, res) => {
-  const { name, materialType, quantity } = req.body;
+  const { name, materialType, quantity, weight, price } = req.body;
 
   try {
     if (!req.user.firm) {
@@ -1303,6 +1413,24 @@ module.exports.createRawMaterial = async (req, res) => {
     if (!name || !materialType || !quantity) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Name must contain letters, not just numbers" });
+    }
+    const weightNum = weight !== undefined && weight !== "" ? Number(weight) : undefined;
+    if (weightNum !== undefined && (isNaN(weightNum) || weightNum < 0)) {
+      return res.status(400).json({ message: "Weight cannot be negative" });
+    }
+    let priceNum = price !== undefined && price !== "" ? Number(price) : 0;
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({ message: "Price cannot be negative" });
+    }
+    // No explicit price given -- derive it from the per-unit weight (weight
+    // of one coin/item) × today's rate, the same way Stock's value is
+    // computed from weight, so the sale price isn't silently 0.
+    if (priceNum <= 0 && weightNum) {
+      const rate = await getLatestRateForMaterial(materialType);
+      if (rate) priceNum = Math.round(weightNum * rate * 100) / 100;
+    }
     const RawMaterialcode = `RAW-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2, 15)}`; // Generate a unique raw material code
@@ -1310,6 +1438,8 @@ module.exports.createRawMaterial = async (req, res) => {
       name,
       materialType,
       quantity,
+      ...(weightNum !== undefined ? { weight: weightNum } : {}),
+      price: priceNum,
       rawmaterialImg: req.file ? getRelativeFilePath(req.file.path) : "",
       RawMaterialcode,
       firm: req.user.firm,
@@ -1333,7 +1463,7 @@ module.exports.createRawMaterial = async (req, res) => {
 
 module.exports.updateRawMaterial = async (req, res) => {
   const { rawMaterialId } = req.params;
-  const { name, materialType, quantity } = req.body;
+  const { name, materialType, quantity, weight, price } = req.body;
   try {
     if (!req.user.firm) {
       return res.status(403).json({ message: "No firm associated with this account" });
@@ -1343,6 +1473,17 @@ module.exports.updateRawMaterial = async (req, res) => {
     }
     if (!name || !materialType || quantity === undefined || quantity === "") {
       return res.status(400).json({ message: "All fields are required" });
+    }
+    if (!isValidName(name)) {
+      return res.status(400).json({ message: "Name must contain letters, not just numbers" });
+    }
+    const weightNum = weight !== undefined && weight !== "" ? Number(weight) : undefined;
+    if (weightNum !== undefined && (isNaN(weightNum) || weightNum < 0)) {
+      return res.status(400).json({ message: "Weight cannot be negative" });
+    }
+    let priceNum = price !== undefined && price !== "" ? Number(price) : undefined;
+    if (priceNum !== undefined && (isNaN(priceNum) || priceNum < 0)) {
+      return res.status(400).json({ message: "Price cannot be negative" });
     }
     const rawMaterial = await RawMaterialModel.findOne({
       _id: rawMaterialId,
@@ -1364,6 +1505,15 @@ module.exports.updateRawMaterial = async (req, res) => {
     rawMaterial.name = name.trim();
     rawMaterial.materialType = materialType;
     rawMaterial.quantity = quantity;
+    if (weightNum !== undefined) rawMaterial.weight = weightNum;
+    if (priceNum !== undefined && priceNum > 0) {
+      rawMaterial.price = priceNum;
+    } else if ((!rawMaterial.price || rawMaterial.price <= 0) && weightNum) {
+      // Same fallback as create: no explicit price, but a weight is known --
+      // derive it from today's rate instead of leaving it at 0.
+      const rate = await getLatestRateForMaterial(materialType);
+      if (rate) rawMaterial.price = Math.round(weightNum * rate * 100) / 100;
+    }
     if (req.file) {
       if (rawMaterial.rawmaterialImg) {
         const oldImagePath = path.join(__dirname, "../../", rawMaterial.rawmaterialImg);
@@ -1386,6 +1536,87 @@ module.exports.updateRawMaterial = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating raw material:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Bulk-create raw materials from an uploaded CSV/Excel sheet (see the sample
+// downloaded from RawMaterials.jsx: name, materialType, quantity required;
+// price and weight optional). Mirrors bulkImportStock's per-row validation
+// and partial-success reporting.
+module.exports.importRawMaterials = async (req, res) => {
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "A CSV or Excel file is required" });
+    }
+    const XLSX = require("xlsx");
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: "The uploaded file has no data rows" });
+    }
+
+    const validMaterialTypes = ["gold", "silver", "platinum", "diamond", "other"];
+    const errors = [];
+    const toInsert = [];
+
+    rows.forEach((row, index) => {
+      const rowNum = index + 2; // header is row 1 in the spreadsheet
+      const name = String(row.name || "").trim();
+      const materialType = String(row.materialType || "").trim().toLowerCase();
+      const quantity = Number(row.quantity);
+      const price = row.price === "" || row.price === undefined ? 0 : Number(row.price);
+      const weight = row.weight === "" || row.weight === undefined ? undefined : Number(row.weight);
+
+      const rowErrors = [];
+      if (!name) rowErrors.push("name is required");
+      if (!validMaterialTypes.includes(materialType)) {
+        rowErrors.push(`materialType must be one of ${validMaterialTypes.join(", ")}`);
+      }
+      if (!quantity || isNaN(quantity) || quantity <= 0) rowErrors.push("quantity must be a positive number");
+      if (isNaN(price) || price < 0) rowErrors.push("price cannot be negative");
+      if (weight !== undefined && (isNaN(weight) || weight < 0)) rowErrors.push("weight cannot be negative");
+
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNum, name: name || "(blank)", message: rowErrors.join("; ") });
+        return;
+      }
+
+      toInsert.push({
+        name,
+        materialType,
+        quantity,
+        price,
+        ...(weight !== undefined ? { weight } : {}),
+        RawMaterialcode: `RAW-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 10)}`,
+        firm: req.user.firm,
+      });
+    });
+
+    let inserted = [];
+    if (toInsert.length > 0) {
+      inserted = await RawMaterialModel.insertMany(toInsert);
+      addActivity(
+        req.user._id,
+        req.user.firm,
+        "bulkImportRawMaterial",
+        `Bulk-imported ${inserted.length} raw material(s) via file upload`
+      );
+    }
+
+    res.status(errors.length > 0 && inserted.length === 0 ? 400 : 200).json({
+      message: `Imported ${inserted.length} of ${rows.length} row(s)`,
+      insertedCount: inserted.length,
+      totalRows: rows.length,
+      errors,
+    });
+  } catch (error) {
+    console.error("Error importing raw materials:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -1584,6 +1815,7 @@ module.exports.createDailrate = async (req, res) => {
     }
     const newDailrate = new DailrateModel({
       date: normalizedDate,
+      manuallySetAt: new Date(),
       rate: {
         ...rate,
         gold: deriveGoldPurities(rate.gold["24K"]),
@@ -1648,6 +1880,9 @@ module.exports.updateDailrate = async (req, res) => {
       _id,
       {
         date: normalizeToUtcDate(date), // Normalized to midnight UTC so "today" lookups match
+        // Marks this as a manual edit so the hourly live-rate cron doesn't
+        // overwrite it later today.
+        manuallySetAt: new Date(),
 
         rate: {
           gold: deriveGoldPurities(rate.gold["24K"]),
@@ -1807,8 +2042,10 @@ module.exports.createSale = async (req, res) => {
             message: `Insufficient raw material for ${rawMaterial.name}. Available: ${availableQuantity}, Required: ${item.quantity}`,
           });
         } else if (availableQuantity === item.quantity) {
-          rawMaterial.quantity = 0; // Set quantity to 0 if it matches exactly
-          rawMaterial.removeAt = new Date();
+          // Leave the record visible at 0 quantity ("out of stock") instead
+          // of soft-deleting it -- it should only disappear when the user
+          // explicitly removes it, not automatically when a sale consumes it.
+          rawMaterial.quantity = 0;
         } else {
           rawMaterial.quantity = availableQuantity - item.quantity;
         }
@@ -2535,6 +2772,9 @@ module.exports.AddGierviItem = async (req, res) => {
   ) {
     return res.status(400).json({ message: "All fields (including item image) are required" });
   }
+  if (!isValidName(itemName)) {
+    return res.status(400).json({ message: "Item name must contain letters, not just numbers" });
+  }
   try {
     if (!req.user.firm) {
       return res.status(403).json({ message: "No firm associated with this account" });
@@ -2597,6 +2837,9 @@ module.exports.updateGirviItem = async (req, res) => {
     return res
       .status(400)
       .json({ message: "Girvi item ID is required for update." });
+  }
+  if (itemName && !isValidName(itemName)) {
+    return res.status(400).json({ message: "Item name must contain letters, not just numbers" });
   }
 
   try {
@@ -3036,18 +3279,20 @@ module.exports.addGirviPayment = async (req, res) => {
       return res.status(400).json({ message: validationError.message });
     }
 
-    await girviItem.save();
-
+    // Save the payment record before persisting the mutated Girvi state, so a
+    // payment-save failure can't leave the Girvi item silently changed with
+    // no corresponding payment on record.
     const payment = new PaymentModel({
       paymentType: paymentMethod,
       paymentRefrence: paymentReference || `GIRVI-PAY-${girviId}-${Date.now()}`,
       amount: paymentEntry.amount,
       paymentDate: new Date(),
-      sale: null,
       customer: girviItem.Customer._id,
       firm: girviItem.firm
     });
     await payment.save();
+
+    await girviItem.save();
 
     addActivity(
       req.user._id,
@@ -3153,18 +3398,20 @@ module.exports.redeemGirviItem = async (req, res) => {
       reference: paymentReference || `GIRVI-REDEEM-${girviId}-${Date.now()}`,
     });
 
-    await girviItem.save();
-
+    // Save the payment record before persisting the mutated Girvi state, so a
+    // payment-save failure can't leave the Girvi item silently redeemed with
+    // no corresponding payment on record.
     const finalPayment = new PaymentModel({
       paymentType: paymentMethod,
       paymentRefrence: paymentReference || `GIRVI-REDEEM-${girviId}-${Date.now()}`,
       amount: finalAmount,
       paymentDate: new Date(),
-      sale: null,
       customer: girviItem.Customer._id,
       firm: girviItem.firm
     });
     await finalPayment.save();
+
+    await girviItem.save();
 
     addActivity(
       req.user._id,
@@ -3470,6 +3717,375 @@ module.exports.razorpayWebhook = async (req, res) => {
   }
 };
 
+// ============ APPLE IN-APP PURCHASE (iOS only) ============
+// Second payment provider alongside Razorpay above -- same entitlement
+// model (Subscription/SubscriptionPlan, activatePaidSubscription,
+// requireActiveSubscription), only the verification step differs. See
+// Utils/appleIap.js for why this never trusts the client for price, plan,
+// or expiry: only `transactionId` is taken from the client, and the
+// backend independently re-fetches + cryptographically verifies that
+// transaction from Apple's own servers before ever touching MongoDB.
+
+// Returns the calling firm's stable Apple "app account token" -- generated
+// once (Utils/appleIap.js's ensureAppleAppAccountToken) and sent by the
+// Flutter client on every purchase/restore as StoreKit's appAccountToken,
+// so a purchase can be bound to this firm rather than just inferred from
+// "whichever firm is logged in." Must stay reachable pre-subscription (see
+// AdminRoutes.js) since a firm needs this before it can make its first
+// purchase.
+module.exports.getAppleAppAccountToken = async (req, res) => {
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const appAccountToken = await appleIap.ensureAppleAppAccountToken(req.user.firm);
+    res.status(200).json({ appAccountToken });
+  } catch (error) {
+    console.error("Error getting Apple app account token:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Step 1 (and only step) of the iOS purchase flow: the client calls this
+// right after StoreKit reports EVENT_PAYMENT_SUCCESS-equivalent (a
+// `purchased`/`restored` PurchaseDetails on the purchaseStream), passing
+// only the transactionId StoreKit gave it. `productId` is accepted too but
+// purely as a sanity cross-check for a clearer error message -- the actual
+// plan mapping always comes from Apple's verified transaction, never from
+// this field.
+module.exports.verifyAppleSubscription = async (req, res) => {
+  const { transactionId, productId } = req.body;
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    if (!transactionId) {
+      return res.status(400).json({ message: "transactionId is required" });
+    }
+
+    let decoded, environment;
+    try {
+      ({ decoded, environment } = await appleIap.fetchVerifiedTransaction(String(transactionId)));
+    } catch (verifyError) {
+      console.error("Apple transaction verification failed:", verifyError);
+      return res.status(400).json({ message: "Could not verify this purchase with Apple" });
+    }
+
+    // BLOCKER FIX: a cryptographically genuine Sandbox transaction must
+    // never activate a real subscription unless this deployment has
+    // explicitly opted in (APPLE_IAP_ALLOW_SANDBOX=true, staging only).
+    // This is checked BEFORE any other logic -- nothing below this point
+    // may run for a disallowed environment.
+    if (!appleIap.isEnvironmentAllowedForEntitlement(environment)) {
+      console.warn(
+        `verifyAppleSubscription: rejected a ${environment} transaction (APPLE_IAP_ALLOW_SANDBOX=${appleIap.ALLOW_SANDBOX})`
+      );
+      return res.status(403).json({ message: "This purchase environment is not accepted" });
+    }
+
+    if (productId && decoded.productId !== productId) {
+      // Not fatal on its own (the verified transaction is still the source
+      // of truth), but worth surfacing -- a mismatch here means the client
+      // is confused about what it just bought, which is worth knowing about.
+      console.warn(
+        `verifyAppleSubscription: client-reported productId "${productId}" != verified "${decoded.productId}"`
+      );
+    }
+
+    if (appleIap.isTransactionRevoked(decoded)) {
+      return res.status(400).json({ message: "This purchase has been refunded or revoked" });
+    }
+    if (!appleIap.currentlyEntitled(decoded)) {
+      return res.status(400).json({ message: "This purchase is not currently active" });
+    }
+
+    // BLOCKER FIX: this Apple subscription must not already belong to a
+    // DIFFERENT firm. Idempotent resubmission by the SAME firm (e.g. a
+    // redelivered unfinished transaction) is fine and falls through to the
+    // normal activatePaidSubscription call below, which is itself
+    // idempotent on paymentReference.
+    const existingOwner = await findSubscriptionByAppleOriginalTransactionId(
+      decoded.originalTransactionId
+    );
+    if (appleIap.isOwnedByDifferentFirm(existingOwner?.firm, req.user.firm)) {
+      console.warn(
+        `verifyAppleSubscription: transaction ${decoded.originalTransactionId} already owned by a different firm`
+      );
+      // Deliberately vague -- do not reveal anything about the other firm.
+      return res.status(409).json({ message: "This purchase is already associated with a different account" });
+    }
+
+    // BLOCKER FIX (structural): if the transaction carries an
+    // appAccountToken (set client-side via PurchaseParam.applicationUserName
+    // -- see apple_iap_controller.dart), it must match THIS firm's own
+    // token. Absent for purchases made before this field existed or by an
+    // older client build -- not fatal on its own since the ownership
+    // lookup above is the primary, always-on guard; this is an additional
+    // layer when the data is available.
+    if (decoded.appAccountToken) {
+      const firm = await FirmModel.findById(req.user.firm).select("appleAppAccountToken");
+      if (!appleIap.appAccountTokenMatches(decoded.appAccountToken, firm?.appleAppAccountToken)) {
+        console.warn(
+          `verifyAppleSubscription: appAccountToken mismatch for firm ${req.user.firm}`
+        );
+        return res.status(403).json({ message: "This purchase is not associated with your account" });
+      }
+    }
+
+    let plan;
+    try {
+      plan = await appleIap.resolvePlanForProductId(decoded.productId);
+    } catch (mappingError) {
+      console.error("Apple product mapping failed:", mappingError);
+      return res.status(404).json({ message: "This product is not a recognized subscription plan" });
+    }
+
+    let subscription;
+    try {
+      subscription = await activatePaidSubscription({
+        firm: req.user.firm,
+        plan,
+        paymentProvider: "apple_iap",
+        paymentReference: decoded.transactionId,
+        amountPaid: plan.price,
+        startDate: new Date(decoded.purchaseDate || Date.now()),
+        endDate: new Date(decoded.expiresDate),
+        appleOriginalTransactionId: decoded.originalTransactionId,
+      });
+    } catch (activationError) {
+      // TOCTOU backstop: the in-memory ownership check above and this
+      // write aren't atomic together, so a concurrent request for a
+      // different firm could in principle slip between them -- the
+      // database's own unique index on appleOriginalTransactionId is what
+      // actually prevents that, surfaced here as this typed error.
+      if (activationError instanceof AppleTransactionOwnershipConflictError) {
+        console.warn(`verifyAppleSubscription: ${activationError.message}`);
+        return res.status(409).json({ message: "This purchase is already associated with a different account" });
+      }
+      throw activationError;
+    }
+
+    addActivity(
+      req.user._id,
+      req.user.firm,
+      "subscriptionActivated",
+      `Activated ${plan.name} plan via Apple In-App Purchase (transaction ${decoded.transactionId})`
+    );
+
+    res.status(200).json({ message: "Subscription activated", subscription });
+  } catch (error) {
+    console.error("Error verifying Apple subscription:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Server-to-server safety net, mirroring razorpayWebhook's role above --
+// keeps a firm's entitlement in sync with Apple even when the app isn't
+// open (renewals, billing retries, refunds, Family Sharing revocation).
+// Public (no isLoggedIn/JWT -- Apple calls this directly, not through the
+// app), authenticated only by Apple's own signed JWS payload. Mounted
+// directly on `app` in server.js with a raw-body parser, same pattern as
+// the Razorpay webhook, before the global express.json().
+// Notification types this handler explicitly recognizes for logging/
+// structure purposes. The actual entitlement DECISION always comes from
+// re-verifying the transaction (+ renewal info, for grace-period cases)
+// below, never from the type label alone -- Apple's own guidance is that
+// notificationType tells you *why* a notification was sent, not that you
+// should skip checking current verified state.
+const APPLE_NOTIFICATION_TYPES_HANDLED = new Set([
+  "SUBSCRIBED",
+  "DID_RENEW",
+  "DID_FAIL_TO_RENEW",
+  "GRACE_PERIOD_EXPIRED",
+  "EXPIRED",
+  "DID_CHANGE_RENEWAL_STATUS",
+  "DID_CHANGE_RENEWAL_PREF",
+  "OFFER_REDEEMED",
+  "PRICE_INCREASE",
+  "REFUND",
+  "REFUND_DECLINED",
+  "REVOKE",
+  "RENEWAL_EXTENDED",
+  "RENEWAL_EXTENSION",
+]);
+
+module.exports.appleAppStoreNotifications = async (req, res) => {
+  let decodedNotification;
+  try {
+    const rawBody = req.body; // Buffer, thanks to express.raw() on this route
+    const payload = JSON.parse(rawBody.toString());
+    if (!payload.signedPayload) {
+      return res.status(200).json({ message: "No signedPayload, ignored" });
+    }
+
+    // Apple posts to the same URL for both Sandbox and Production
+    // notifications -- try the configured environment's verifier first,
+    // then the other one, before concluding the signature is genuinely bad.
+    const primaryEnv = appleIap.DEFAULT_ENVIRONMENT;
+    const fallbackEnv =
+      primaryEnv === appleIap.Environment.PRODUCTION
+        ? appleIap.Environment.SANDBOX
+        : appleIap.Environment.PRODUCTION;
+    try {
+      decodedNotification = await appleIap
+        .getVerifier(primaryEnv)
+        .verifyAndDecodeNotification(payload.signedPayload);
+    } catch (primaryError) {
+      decodedNotification = await appleIap
+        .getVerifier(fallbackEnv)
+        .verifyAndDecodeNotification(payload.signedPayload);
+    }
+  } catch (verifyError) {
+    console.error("appleAppStoreNotifications: signature verification failed:", verifyError);
+    return res.status(400).json({ message: "Invalid notification signature" });
+  }
+
+  try {
+    const notificationType = decodedNotification.notificationType;
+    const subtype = decodedNotification.subtype;
+
+    // TEST notifications (Request a Test Notification in App Store
+    // Connect) carry no transaction data by design -- acknowledge
+    // explicitly rather than falling through to the generic "no
+    // transaction payload" branch below, so this case is never confused
+    // with an actually-malformed notification.
+    if (notificationType === "TEST") {
+      console.log("appleAppStoreNotifications: TEST notification received and acknowledged");
+      return res.status(200).json({ message: "Test notification acknowledged" });
+    }
+
+    const signedTransactionInfo = decodedNotification.data?.signedTransactionInfo;
+    if (!signedTransactionInfo) {
+      // Notification types with nothing for our entitlement model to act on
+      // (SUMMARY, CONSUMPTION_REQUEST, metadata-only updates, ...).
+      console.log(
+        `appleAppStoreNotifications: ${notificationType}${subtype ? "/" + subtype : ""} carries no transaction payload, acknowledged`
+      );
+      return res.status(200).json({ message: "No transaction payload, acknowledged" });
+    }
+
+    const dataEnv = decodedNotification.data.environment;
+    const transactionEnv = dataEnv === "Sandbox" ? appleIap.Environment.SANDBOX : appleIap.Environment.PRODUCTION;
+    const decodedTransaction = await appleIap
+      .getVerifier(transactionEnv)
+      .verifyAndDecodeTransaction(signedTransactionInfo);
+
+    // BLOCKER FIX: same Sandbox-vs-Production gate as verifyAppleSubscription
+    // -- a Sandbox notification must never mutate real entitlement.
+    if (!appleIap.isEnvironmentAllowedForEntitlement(transactionEnv)) {
+      console.warn(
+        `appleAppStoreNotifications: ignoring ${notificationType} for a ${transactionEnv} transaction (APPLE_IAP_ALLOW_SANDBOX=${appleIap.ALLOW_SANDBOX})`
+      );
+      return res.status(200).json({ message: "Sandbox notification ignored, acknowledged" });
+    }
+
+    // Grace-period/billing-retry state lives on renewal info, not the
+    // transaction -- verify it too when Apple included it, so
+    // resolveEntitlement below can tell a genuine billing-retry grace
+    // period apart from a plain expiry.
+    let decodedRenewalInfo = null;
+    if (decodedNotification.data.signedRenewalInfo) {
+      try {
+        decodedRenewalInfo = await appleIap
+          .getVerifier(transactionEnv)
+          .verifyAndDecodeRenewalInfo(decodedNotification.data.signedRenewalInfo);
+      } catch (renewalVerifyError) {
+        console.error(
+          "appleAppStoreNotifications: signedRenewalInfo verification failed, proceeding on transaction info alone:",
+          renewalVerifyError
+        );
+      }
+    }
+
+    const originalTransactionId = decodedTransaction.originalTransactionId;
+    if (!originalTransactionId) {
+      return res.status(200).json({ message: "Missing originalTransactionId, acknowledged" });
+    }
+
+    let existingSub = await findSubscriptionByAppleOriginalTransactionId(originalTransactionId);
+    let targetFirm = existingSub?.firm ?? null;
+
+    if (!targetFirm && decodedTransaction.appAccountToken) {
+      // Not associated with a firm yet (e.g. this notification raced ahead
+      // of the client's own /verifyAppleSubscription call) -- if Apple
+      // handed back the appAccountToken the client set at purchase time,
+      // we can resolve the right firm from it directly instead of waiting.
+      const firmByToken = await FirmModel.findOne({
+        appleAppAccountToken: decodedTransaction.appAccountToken,
+      }).select("_id");
+      if (firmByToken) {
+        targetFirm = firmByToken._id;
+      }
+    }
+
+    if (!targetFirm) {
+      // Still unknown -- safe to acknowledge and do nothing. StoreKit
+      // redelivers the unfinished transaction on next launch/restore,
+      // which calls /verifyAppleSubscription and establishes the link.
+      console.warn(
+        `appleAppStoreNotifications: no firm associated with originalTransactionId ${originalTransactionId}, acknowledging without action`
+      );
+      return res.status(200).json({ message: "Unknown subscription, acknowledged" });
+    }
+
+    if (!APPLE_NOTIFICATION_TYPES_HANDLED.has(notificationType)) {
+      console.log(
+        `appleAppStoreNotifications: notificationType "${notificationType}" not in the explicit handling list, still syncing from verified transaction state`
+      );
+    }
+
+    const verdict = appleIap.resolveEntitlement(decodedTransaction, decodedRenewalInfo);
+    console.log(
+      `appleAppStoreNotifications: ${notificationType}${subtype ? "/" + subtype : ""} -> ${verdict.reason} (entitled=${verdict.entitled})`
+    );
+
+    if (verdict.reason === "revoked") {
+      await setStatusByAppleOriginalTransactionId(originalTransactionId, "cancelled");
+    } else if (verdict.entitled) {
+      const plan = await appleIap.resolvePlanForProductId(decodedTransaction.productId);
+      try {
+        await activatePaidSubscription({
+          firm: targetFirm,
+          plan,
+          paymentProvider: "apple_iap",
+          // Grace-period extensions have no new transactionId of their own
+          // (it's still the same transaction, just still-retrying) --
+          // disambiguate the paymentReference so a later real renewal
+          // (a genuinely new transactionId) isn't treated as a no-op
+          // duplicate of the grace-period sync.
+          paymentReference:
+            verdict.reason === "grace_period"
+              ? `${decodedTransaction.transactionId}:grace`
+              : decodedTransaction.transactionId,
+          amountPaid: plan.price,
+          startDate: new Date(decodedTransaction.purchaseDate || Date.now()),
+          endDate: new Date(verdict.endDateMs),
+          appleOriginalTransactionId: originalTransactionId,
+        });
+      } catch (activationError) {
+        if (activationError instanceof AppleTransactionOwnershipConflictError) {
+          console.error(`appleAppStoreNotifications: ${activationError.message}`);
+          return res.status(200).json({ message: "Ownership conflict, acknowledged without action" });
+        }
+        throw activationError;
+      }
+    } else {
+      // Not revoked, not entitled (incl. not in a grace period) -- EXPIRED,
+      // GRACE_PERIOD_EXPIRED, or DID_FAIL_TO_RENEW past the retry window.
+      await setStatusByAppleOriginalTransactionId(originalTransactionId, "expired");
+    }
+
+    res.status(200).json({ message: "Processed" });
+  } catch (error) {
+    console.error("Error processing Apple notification:", error);
+    // 500 (not 200) on our own internal errors -- Apple retries on a
+    // schedule when it doesn't get a 200, which gives us another chance
+    // once whatever broke (e.g. a transient DB blip) clears, rather than
+    // silently losing a lifecycle event.
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Builds the full-data export workbook and returns it as a Buffer. Shared by the
 // manual "Export All Data to Excel" HTTP handler below and the weekly automatic
 // export cron job (Backend/Utils/cronJobs.js), so both stay in sync.
@@ -3477,9 +4093,10 @@ module.exports.razorpayWebhook = async (req, res) => {
 // -- only ever used internally (the weekly cron export in cronJobs.js), never
 // reachable via any per-tenant HTTP route. Pass { firm: <id> } to scope the
 // export to one firm, which is what the HTTP route below always does.
-async function buildFullExportWorkbook(firmFilter = {}) {
-    console.log('Starting Excel export...');
-    const XLSX = require('xlsx');
+// Fetches every collection covered by the full data export, scoped by the
+// same firmFilter convention as buildFullExportWorkbook below. Shared by
+// both the Excel export and the PDF export so they can never drift apart.
+async function fetchFullExportData(firmFilter = {}) {
     // Firms are identified by _id, not a `firm` field, so build their own
     // filter from the same firmFilter.firm value.
     const firmIdFilter = firmFilter.firm ? { _id: firmFilter.firm } : {};
@@ -3529,19 +4146,22 @@ async function buildFullExportWorkbook(firmFilter = {}) {
       .lean();
     console.log(`Fetched ${udharSettlements.length} udhar settlements`);
 
-    console.log('Creating workbook...');
-    // Create a new workbook
-    const workbook = XLSX.utils.book_new();
+    return {
+      customers, sales, stocks, rawMaterials, payments, udhar, girvi,
+      girviInterest, firms, users, categories, dailRates, udharSettlements,
+    };
+}
 
-    // Helper function to convert data to simple format
-    const prepareData = (data) => {
+// Helper to convert a Mongoose lean() document array to plain, flat rows
+// (used by both the Excel and PDF export builders below).
+function prepareExportRows(data) {
       if (!data || data.length === 0) return [];
-      
+
       return data.map(item => {
         const cleanItem = {};
         for (const key in item) {
           if (key === '__v' || key === 'removeAt') continue;
-          
+
           const value = item[key];
           if (value === null || value === undefined) {
             cleanItem[key] = '';
@@ -3559,7 +4179,27 @@ async function buildFullExportWorkbook(firmFilter = {}) {
         }
         return cleanItem;
       });
-    };
+}
+
+// Builds the full-data export workbook and returns it as a Buffer. Shared by the
+// manual "Export All Data to Excel" HTTP handler below and the weekly automatic
+// export cron job (Backend/Utils/cronJobs.js), so both stay in sync.
+// firmFilter: pass {} (the default) for a full, unscoped, system-wide backup
+// -- only ever used internally (the weekly cron export in cronJobs.js), never
+// reachable via any per-tenant HTTP route. Pass { firm: <id> } to scope the
+// export to one firm, which is what the HTTP route below always does.
+async function buildFullExportWorkbook(firmFilter = {}) {
+    console.log('Starting Excel export...');
+    const XLSX = require('xlsx');
+    const prepareData = prepareExportRows;
+    const {
+      customers, sales, stocks, rawMaterials, payments, udhar, girvi,
+      girviInterest, firms, users, categories, dailRates, udharSettlements,
+    } = await fetchFullExportData(firmFilter);
+
+    console.log('Creating workbook...');
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
 
     // Add sheets with data
     console.log('Adding Customers sheet...');
@@ -3669,6 +4309,96 @@ module.exports.exportAllDataToExcel = async (req, res) => {
     res.status(500).json({
       message: 'Failed to export data',
       error: error.message
+    });
+  }
+};
+
+// Builds the same full-data export as buildFullExportWorkbook, rendered as a
+// PDF instead of an .xlsx workbook. One section per collection; each record
+// is printed as a single "label: value" line rather than a column-aligned
+// table, since the collections have very different shapes (pdfkit has no
+// built-in table layout, and hand-picking columns per collection would risk
+// drifting from the real schema fields over time).
+async function buildFullExportPdf(firmFilter = {}) {
+  console.log('Starting PDF export...');
+  const PDFDocument = require('pdfkit');
+  const data = await fetchFullExportData(firmFilter);
+
+  const sections = [
+    ['Customers', data.customers],
+    ['Sales', data.sales],
+    ['Stock', data.stocks],
+    ['Raw Materials', data.rawMaterials],
+    ['Payments', data.payments],
+    ['Udhar', data.udhar],
+    ['Girvi (Borrow)', data.girvi],
+    ['Girvi Interest', data.girviInterest],
+    ['Firms', data.firms],
+    ['Users', data.users],
+    ['Categories', data.categories],
+    ['Daily Rates', data.dailRates],
+    ['Udhar Settlements', data.udharSettlements],
+  ];
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).text('RatnSetu — Full Data Export', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#555').text(`Generated: ${new Date().toLocaleString('en-IN')}`, { align: 'center' });
+    doc.fillColor('black');
+
+    for (const [title, rows] of sections) {
+      const cleanRows = prepareExportRows(rows);
+      doc.addPage();
+      doc.fontSize(16).text(title, { underline: true });
+      doc.fontSize(10).fillColor('#555').text(`${cleanRows.length} record(s)`);
+      doc.fillColor('black');
+      doc.moveDown(0.5);
+
+      if (cleanRows.length === 0) {
+        doc.fontSize(10).fillColor('#888').text('No records.');
+        doc.fillColor('black');
+        continue;
+      }
+
+      cleanRows.forEach((row, idx) => {
+        const line = Object.entries(row)
+          .filter(([, v]) => v !== '')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('   ');
+        doc.fontSize(8).text(`${idx + 1}. ${line}`, { width: 515 });
+        doc.moveDown(0.2);
+      });
+    }
+
+    doc.end();
+  });
+}
+
+module.exports.buildFullExportPdf = buildFullExportPdf;
+module.exports.exportAllDataToPdf = async (req, res) => {
+  try {
+    if (!req.user.firm) {
+      return res.status(403).json({ message: "No firm associated with this account" });
+    }
+    const pdfBuffer = await buildFullExportPdf({ firm: req.user.firm });
+
+    const fileName = `RatnSetu_Export_${new Date().toISOString().split('T')[0]}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+    console.log('PDF export completed successfully!');
+  } catch (error) {
+    console.error('Error exporting data to PDF:', error);
+    res.status(500).json({
+      message: 'Failed to export data',
+      error: error.message,
     });
   }
 };

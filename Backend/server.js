@@ -5,7 +5,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const adminRoutes = require("./Routes/AdminRoutes");
 const { initializeCronJobs } = require("./Utils/cronJobs");
-const { razorpayWebhook } = require("./Controllers/adminController");
+const { razorpayWebhook, appleAppStoreNotifications } = require("./Controllers/adminController");
 const path = require("path");
 
 dotenv.config();
@@ -38,6 +38,17 @@ app.post(
   "/api/admin/razorpayWebhook",
   express.raw({ type: "application/json" }),
   razorpayWebhook
+);
+
+// App Store Server Notifications V2 -- same raw-body reasoning as the
+// Razorpay webhook above (Apple's signedPayload verification needs the
+// exact bytes it signed). Configure this exact URL in App Store Connect
+// under Users and Access > Integrations > App Store Server Notifications,
+// for both the Sandbox and Production environments.
+app.post(
+  "/api/admin/apple/notifications",
+  express.raw({ type: "application/json" }),
+  appleAppStoreNotifications
 );
 
 // Middleware

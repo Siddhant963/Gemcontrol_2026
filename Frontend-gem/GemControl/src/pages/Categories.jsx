@@ -115,6 +115,8 @@ function Categories() {
   const validateForm = () => {
     const errors = {};
     if (!newCategory.name.trim()) errors.name = "Category name is required";
+    else if (!/[A-Za-z]/.test(newCategory.name))
+      errors.name = "Category name must contain letters, not just numbers";
     if (!newCategory.description.trim())
       errors.description = "Description is required";
     setFormErrors(errors);

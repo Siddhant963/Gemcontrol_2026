@@ -35,6 +35,15 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
   final _stoneChargeCtrl = TextEditingController(text: '0');
   final _hsnCtrl = TextEditingController(text: '7113');
 
+  final _grossFocus = FocusNode();
+  final _lessFocus = FocusNode();
+  final _priceFocus = FocusNode();
+  final _wastageSupplierFocus = FocusNode();
+  final _wastageCustomerFocus = FocusNode();
+  final _makingValueFocus = FocusNode();
+  final _labourValueFocus = FocusNode();
+  final _stoneChargeFocus = FocusNode();
+
   String _materialType = 'gold';
   StockType _stockType = StockType.retail;
   String? _categoryId;
@@ -68,6 +77,31 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
       _makingUnit = s.makingChargeConfig.unit;
       _labourUnit = s.labourCharge.unit;
     }
+    for (final pair in [
+      (_grossCtrl, _grossFocus),
+      (_lessCtrl, _lessFocus),
+      (_priceCtrl, _priceFocus),
+      (_wastageSupplierCtrl, _wastageSupplierFocus),
+      (_wastageCustomerCtrl, _wastageCustomerFocus),
+      (_makingValueCtrl, _makingValueFocus),
+      (_labourValueCtrl, _labourValueFocus),
+      (_stoneChargeCtrl, _stoneChargeFocus),
+    ]) {
+      _clearZeroOnFocus(pair.$1, pair.$2);
+    }
+  }
+
+  /// Clears a "0" placeholder value when the field gains focus, and restores
+  /// it if the user leaves the field empty, so users don't have to manually
+  /// delete the pre-filled zero before typing a real value.
+  void _clearZeroOnFocus(TextEditingController controller, FocusNode node) {
+    node.addListener(() {
+      if (node.hasFocus && controller.text == '0') {
+        controller.clear();
+      } else if (!node.hasFocus && controller.text.trim().isEmpty) {
+        controller.text = '0';
+      }
+    });
   }
 
   @override
@@ -88,6 +122,18 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
     ]) {
       c.dispose();
     }
+    for (final f in [
+      _grossFocus,
+      _lessFocus,
+      _priceFocus,
+      _wastageSupplierFocus,
+      _wastageCustomerFocus,
+      _makingValueFocus,
+      _labourValueFocus,
+      _stoneChargeFocus,
+    ]) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -105,10 +151,30 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
       );
       return;
     }
+    if (!RegExp(r'[A-Za-z]').hasMatch(_nameCtrl.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name must contain letters, not just numbers')),
+      );
+      return;
+    }
     final firm = ref.read(currentFirmProvider);
     if (firm == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No firm found — set up a firm in Settings first')),
+      );
+      return;
+    }
+    final grossWeight = _num(_grossCtrl);
+    final lessWeight = _num(_lessCtrl);
+    if (grossWeight - lessWeight <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a gross weight greater than the less weight')),
+      );
+      return;
+    }
+    if (_num(_priceCtrl) <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a price greater than 0')),
       );
       return;
     }
@@ -117,8 +183,8 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
       name: _nameCtrl.text.trim(),
       materialType: _materialType,
       stockType: _stockType == StockType.wholesale ? 'wholesale' : 'retail',
-      grossWeight: _num(_grossCtrl),
-      lessWeight: _num(_lessCtrl),
+      grossWeight: grossWeight,
+      lessWeight: lessWeight,
       karat: _karatCtrl.text.trim(),
       categoryId: _categoryId!,
       firmId: firm.id,
@@ -224,27 +290,48 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
             ),
             const SizedBox(height: AppSpacing.sm),
             categoriesAsync.when(
-              data: (categories) => DropdownButtonFormField<String>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: categories
-                    .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
-                    .toList(),
-                onChanged: (v) => setState(() => _categoryId = v),
-              ),
+              data: (categories) => categories.isEmpty
+                  ? Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: scheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 18, color: scheme.outline),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'No categories yet — add one from Categories before creating stock.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : DropdownButtonFormField<String>(
+                      initialValue: _categoryId,
+                      decoration: const InputDecoration(labelText: 'Category'),
+                      items: categories
+                          .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _categoryId = v),
+                    ),
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const Text('Could not load categories'),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(controller: _karatCtrl, decoration: const InputDecoration(labelText: 'Karat (e.g. 22K)')),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             Text('Weight (grams)', style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _grossCtrl,
+                    focusNode: _grossFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Gross weight'),
                   ),
@@ -253,6 +340,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: TextField(
                     controller: _lessCtrl,
+                    focusNode: _lessFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Less weight'),
                   ),
@@ -273,20 +361,22 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: TextField(
                     controller: _priceCtrl,
+                    focusNode: _priceFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Price (₹)'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             Text('Wastage %', style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _wastageSupplierCtrl,
+                    focusNode: _wastageSupplierFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'From supplier'),
                   ),
@@ -295,20 +385,22 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: TextField(
                     controller: _wastageCustomerCtrl,
+                    focusNode: _wastageCustomerFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'To customer'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             Text('Making Charge', style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _makingValueCtrl,
+                    focusNode: _makingValueFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Value'),
                   ),
@@ -317,14 +409,15 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(child: _unitDropdown(_makingUnit, (u) => setState(() => _makingUnit = u))),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             Text('Labour Charge', style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _labourValueCtrl,
+                    focusNode: _labourValueFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Value'),
                   ),
@@ -339,6 +432,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: TextField(
                     controller: _stoneChargeCtrl,
+                    focusNode: _stoneChargeFocus,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Stone charge (₹)'),
                   ),

@@ -114,21 +114,39 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   TextFormField(
                     controller: _nameCtrl,
                     decoration: const InputDecoration(labelText: 'Name'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Enter your name';
+                      if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
+                        return 'Name must contain letters, not just numbers';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your email' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Enter your email';
+                      if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
+                        return 'Enter a valid email address';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _contactCtrl,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(labelText: 'Contact'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your contact number' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Enter your contact number';
+                      if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) {
+                        return 'Contact number must be exactly 10 digits';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -143,7 +161,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-                    validator: (v) => (v == null || v.isEmpty) ? 'Enter a password' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Enter a password';
+                      if (v.length < 6) return 'Password must be at least 6 characters';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 24),
                   Divider(color: theme.extension<AppColorsExtension>()?.hairline),
@@ -156,7 +178,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   TextFormField(
                     controller: _firmNameCtrl,
                     decoration: const InputDecoration(labelText: 'Shop Name'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your shop name' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Enter your shop name';
+                      if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
+                        return 'Shop name must contain letters, not just numbers';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

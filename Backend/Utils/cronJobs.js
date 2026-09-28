@@ -218,6 +218,13 @@ const fetchAndSaveLiveRates = async () => {
       setFields[`rate.gold.${karat}`] = value;
     });
 
+    // Don't clobber a rate an admin manually set today via Settings.
+    const existingToday = await DailrateModel.findOne({ date: today });
+    if (existingToday?.manuallySetAt) {
+      console.log('Skipping live rate update: today\'s rate was manually set.');
+      return { success: true, skipped: true, dailrate: existingToday };
+    }
+
     let dailrate = await DailrateModel.findOneAndUpdate(
       { date: today },
       { $set: setFields },

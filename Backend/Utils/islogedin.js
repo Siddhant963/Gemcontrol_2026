@@ -27,10 +27,6 @@ module.exports.isLoggedIn = async (req, res, next) => {
     const user = await UserModel.findById(decoded.userId);
 
     if (!user || user.removeAt) {
-      // TEMP DIAGNOSTIC — remove once the spurious-logout cause is found.
-      console.log(
-        `[isLoggedIn 401] decoded.userId=${decoded.userId} found=${!!user} removeAt=${user?.removeAt} dbName=${UserModel.db.name}`
-      );
       return res.status(401).json({ message: "Unauthorized" });
     }
 

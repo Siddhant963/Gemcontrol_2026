@@ -65,6 +65,10 @@ function RawMaterials() {
     name: "",
     materialType: "gold",
     quantity: "",
+    // Weight of a single unit/coin (grams) -- used to auto-calculate price
+    // for gold/silver from today's rate when price is left blank.
+    weight: "",
+    price: "",
     firm: "",
     rawmaterialImg: null,
   });
@@ -135,6 +139,8 @@ function RawMaterials() {
   const validateForm = () => {
     const errors = {};
     if (!newMaterial.name.trim()) errors.name = "Material name is required";
+    else if (!/[A-Za-z]/.test(newMaterial.name))
+      errors.name = "Name must contain letters, not just numbers";
     if (!newMaterial.materialType)
       errors.materialType = "Material type is required";
     if (
@@ -143,6 +149,16 @@ function RawMaterials() {
       newMaterial.quantity <= 0
     )
       errors.quantity = "Valid quantity is required";
+    if (
+      newMaterial.weight !== "" &&
+      (isNaN(newMaterial.weight) || Number(newMaterial.weight) < 0)
+    )
+      errors.weight = "Weight cannot be negative";
+    if (
+      newMaterial.price !== "" &&
+      (isNaN(newMaterial.price) || Number(newMaterial.price) < 0)
+    )
+      errors.price = "Price cannot be negative";
     if (!newMaterial.firm) errors.firm = "Firm is required";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -180,6 +196,8 @@ function RawMaterials() {
       name: "",
       materialType: "gold",
       quantity: "",
+      weight: "",
+      price: "",
       firm: "",
       rawmaterialImg: null,
     });
@@ -204,7 +222,9 @@ function RawMaterials() {
     setNewMaterial({
       name: material.name,
       materialType: material.materialType,
-      quantity: material.quantity ?? material.weight ?? "",
+      quantity: material.quantity ?? "",
+      weight: material.weight ?? "",
+      price: material.price ?? "",
       firm: material.firm?._id || material.firm || "",
       rawmaterialImg: null,
     });
@@ -246,9 +266,13 @@ function RawMaterials() {
   };
 
   const handleDownloadSample = useCallback(() => {
+    // Mirrors the fields accepted by /importRawMaterials: name, materialType
+    // and quantity are required (same as the single-item Add Material form);
+    // price and weight are optional and default to 0 if left blank.
     const rows = [
-      ["name", "materialType", "quantity", "firmId"],
-      ["coin", "silver", "10", "<firm-id>"],
+      ["name", "materialType", "quantity", "price", "weight"],
+      ["Gold Coin 22K", "gold", "10", "6500", "10"],
+      ["Silver Bar", "silver", "5", "75", "100"],
     ];
     const csvContent = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -278,15 +302,20 @@ function RawMaterials() {
       const formData = new FormData();
       formData.append("file", importFile);
 
-      await api.post("/importRawMaterials", formData);
+      const { data } = await api.post("/importRawMaterials", formData);
       await fetchData();
       setOpenImportModal(false);
       setImportFile(null);
+      const hasErrors = Array.isArray(data.errors) && data.errors.length > 0;
       setNotificationDialog({
         open: true,
-        message: "Materials imported successfully!",
-        type: "success",
-        title: "Success",
+        message: hasErrors
+          ? `Imported ${data.insertedCount} of ${data.totalRows} row(s). Skipped rows: ${data.errors
+              .map((e) => `Row ${e.row} (${e.name}): ${e.message}`)
+              .join(" | ")}`
+          : `Imported ${data.insertedCount} of ${data.totalRows} row(s) successfully!`,
+        type: hasErrors ? "warning" : "success",
+        title: hasErrors ? "Imported with issues" : "Success",
       });
     } catch (err) {
       console.error("Import error:", {
@@ -379,6 +408,8 @@ function RawMaterials() {
     formData.append("name", newMaterial.name);
     formData.append("materialType", newMaterial.materialType);
     formData.append("quantity", newMaterial.quantity);
+    if (newMaterial.weight !== "") formData.append("weight", newMaterial.weight);
+    if (newMaterial.price !== "") formData.append("price", newMaterial.price);
     formData.append("firm", newMaterial.firm);
 
     if (newMaterial.rawmaterialImg) {
@@ -407,6 +438,8 @@ function RawMaterials() {
       name: "",
       materialType: "gold",
       quantity: "",
+      weight: "",
+      price: "",
       firm: "",
       rawmaterialImg: null,
     });
@@ -542,6 +575,8 @@ function RawMaterials() {
       name: "",
       materialType: "gold",
       quantity: "",
+      weight: "",
+      price: "",
       firm: "",
       rawmaterialImg: null,
     });
@@ -997,6 +1032,7 @@ function RawMaterials() {
                             sx={{
                               fontSize: "0.75rem",
                               px: 1,
+                              mr: 1,
                               textTransform: "none",
                             }}
                           >
@@ -1012,6 +1048,7 @@ function RawMaterials() {
                               sx={{
                                 fontSize: "0.75rem",
                                 px: 1,
+                                mr: 1,
                                 textTransform: "none",
                               }}
                             >
@@ -1025,7 +1062,6 @@ function RawMaterials() {
                             sx={{
                               fontSize: "0.75rem",
                               px: 1,
-                              mx: 2,
                               textTransform: "none",
                             }}
                           >
@@ -1240,6 +1276,52 @@ function RawMaterials() {
               },
             }}
             required
+          />
+          <TextField
+            margin="dense"
+            name="weight"
+            label="Weight per unit / coin (g)"
+            type="number"
+            fullWidth
+            value={newMaterial.weight}
+            onChange={handleInputChange}
+            error={!!formErrors.weight}
+            helperText={
+              formErrors.weight ||
+              "Weight of a single coin/item -- used to auto-fill price for gold/silver from today's rate"
+            }
+            sx={{
+              mb: { xs: 1, sm: 2 },
+              "& .MuiInputBase-input": {
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+              "& .MuiInputLabel-root": {
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+            }}
+          />
+          <TextField
+            margin="dense"
+            name="price"
+            label="Price per unit (₹)"
+            type="number"
+            fullWidth
+            value={newMaterial.price}
+            onChange={handleInputChange}
+            error={!!formErrors.price}
+            helperText={
+              formErrors.price ||
+              "Leave blank to auto-calculate from weight × today's rate (gold/silver only)"
+            }
+            sx={{
+              mb: { xs: 1, sm: 2 },
+              "& .MuiInputBase-input": {
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+              "& .MuiInputLabel-root": {
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+            }}
           />
           <Box sx={{ mb: { xs: 1, sm: 2 } }}>
             <Button

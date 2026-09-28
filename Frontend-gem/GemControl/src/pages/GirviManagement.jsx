@@ -215,6 +215,8 @@ function GirviManagement() {
   const validateForm = (girvi, isEdit = false) => {
     const errors = {};
     if (!girvi.itemName) errors.itemName = "Item name is required";
+    else if (!/[A-Za-z]/.test(girvi.itemName))
+      errors.itemName = "Item name must contain letters, not just numbers";
     if (!girvi.itemType) errors.itemType = "Item type is required";
     if (
       !girvi.itemWeight ||
@@ -1796,6 +1798,9 @@ function GirviManagement() {
                 fontSize: { xs: "0.8rem", sm: "0.9rem" },
                 width: { xs: "100%", sm: "auto" },
                 py: { xs: 0.5, sm: 1 },
+                ...((touchedFields.girviItemImg || saveAttempted) && formErrors.girviItemImg
+                  ? { border: `2px solid ${theme.palette.error.main}` }
+                  : {}),
               }}
             >
               Upload Item Image
