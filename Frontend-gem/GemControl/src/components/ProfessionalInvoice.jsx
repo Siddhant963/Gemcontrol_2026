@@ -206,6 +206,17 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
         </Grid>
       </Grid>
 
+      {/* GST INVOICE / Gold Sell heading -- comes before the bill-to block
+          now (was after it). */}
+      <Box sx={{ textAlign: 'center', mb: 1.5 }}>
+        <Typography sx={{ fontSize: '14px', fontWeight: 900, color: '#0a2540' }}>
+          GST INVOICE
+        </Typography>
+        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#000' }}>
+          {saleTypeLabel}
+        </Typography>
+      </Box>
+
       {/* Bill-to / invoice meta */}
       <Grid container sx={{ border: '1px solid #0a2540', mb: 1.5 }}>
         <Grid item xs={7} sx={{ p: 1.5, borderRight: '1px solid #0a2540' }}>
@@ -243,15 +254,6 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
           )}
         </Grid>
       </Grid>
-
-      <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-        <Typography sx={{ fontSize: '14px', fontWeight: 900, color: '#0a2540' }}>
-          GST INVOICE
-        </Typography>
-        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#000' }}>
-          {saleTypeLabel}
-        </Typography>
-      </Box>
 
       {/* Item table -- every cell gets an EXPLICIT color (never relying on
           inheritance) since this invoice can be rendered inside the app's

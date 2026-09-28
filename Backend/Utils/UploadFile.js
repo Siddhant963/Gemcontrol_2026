@@ -1,113 +1,78 @@
-// const express = require("express");
-// const multer = require("multer");
-// const cloudinary = require("cloudinary").v2;
-// const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-// const router = express.Router();
+// Cloudinary is durable, CDN-backed storage -- unlike writing to local disk,
+// uploaded files survive server restarts/redeploys. This was always the
+// intended storage backend: every consumer of an uploaded file's stored
+// path already special-cases and passes a Cloudinary URL through unchanged
+// (Controllers/adminController.js's getRelativeFilePath, the web app's
+// src/utils/imageUtils.js, Flutter's resolveUploadUrl in
+// lib/core/api/api_client.dart). At some point this was swapped for plain
+// multer.diskStorage writing into Backend/Uploads/ and never switched back
+// -- on Render (and most PaaS hosts), the filesystem is EPHEMERAL, so every
+// uploaded image (firm logos/stamps/signatures, stock/category/raw-material/
+// girvi images) was being silently wiped on every deploy or restart, which
+// is why images across the whole app were 404ing.
+cloudinary.config({
+  cloud_name: process.env.Cloudnary_CLOUD_NAME,
+  api_key: process.env.Cloudnary_API_KEY,
+  api_secret: process.env.Cloudnary_API_SECRET,
+});
 
-// // Configure Cloudinary
-// cloudinary.config({
-//   cloud_name: process.env.Cloudnary_CLOUD_NAME,
-//   api_key: process.env.Cloudnary_API_KEY,
-//   api_secret: process.env.Cloudnary_API_SECRET,
-// });
-
-// // Map fieldnames to Cloudinary folders
-// const fieldToDir = {
-//   logo: "firm",
-//   CategoryImg: "category",
-//   stockImg: "stock",
-//   rawMaterialImg: "rawMaterial",
-//   girviItemImg: "girviItem",
-// };
-
-// // Configure Cloudinary Storage
-// const storage = new CloudinaryStorage({
-//   cloudinary: cloudinary,
-//   params: async (req, file) => {
-//     // Determine folder based on fieldname
-//     const folder = fieldToDir[file.fieldname] || "others";
-
-//     // Generate unique filename
-//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     const publicId = `${file.fieldname}-${uniqueSuffix}`;
-
-//     // Store the relative path for later use (Cloudinary format)
-//     // NOTE: Don't include folder in publicId, it's separate
-//     req.uploadedFileRelativePath = `${folder}/${publicId}`;
-
-//     return {
-//       folder: folder,
-//       public_id: publicId,
-//       resource_type: "auto", // Automatically detect file type
-//       allowed_formats: ["jpg", "jpeg", "png", "gif", "pdf", "webp"], // Adjust as needed
-//     };
-//   },
-// });
-
-// const upload = multer({ storage: storage });
-
-// module.exports = { upload, cloudinary };
-
-const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
-
-// Get upload path from environment or use default inside Backend/Uploads
-const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, '../Uploads');
-
-// Map fieldnames to folders
+// Map fieldnames to Cloudinary folders -- must stay in sync with the field
+// names each upload route actually sends (see upload.fields(...)/
+// upload.single(...) calls in Routes/AdminRoutes.js).
 const fieldToFolder = {
-  logo: 'firm',
-  firmStamp: 'firm',
-  ownerSignature: 'firm',
-  secondLogo: 'firm',
-  CategoryImg: 'category',
-  stockImg: 'stock',
-  rawMaterial: 'rawMaterial',
-  rawmaterialImg: 'rawMaterial',
-  girviItemImg: 'girviItem',
+  logo: "firm",
+  firmStamp: "firm",
+  ownerSignature: "firm",
+  secondLogo: "firm",
+  CategoryImg: "category",
+  stockImg: "stock",
+  rawMaterial: "rawMaterial",
+  rawmaterialImg: "rawMaterial",
+  girviItemImg: "girviItem",
 };
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // Determine folder based on fieldname
-    const folder = fieldToFolder[file.fieldname] || 'others';
-    const dest = path.join(uploadPath, folder);
-    
-    // Ensure directory exists
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
-    }
-    
-    cb(null, dest);
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: (req, file) => {
+    const folder = fieldToFolder[file.fieldname] || "others";
+    // Deliberately NOT derived from file.originalname -- an uploaded
+    // filename is arbitrary client input. Phone-exported names in
+    // particular (e.g. "WhatsApp Image 2026-08-14 at 2.46.51 PM.jpeg")
+    // carry spaces and locale-specific Unicode space characters that, once
+    // embedded in a stored path and later URL-encoded for display, produced
+    // mangled/broken image URLs. A random, collision-free id sidesteps
+    // that whole class of bug.
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    return {
+      folder,
+      public_id: `${file.fieldname}-${uniqueSuffix}`,
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    };
   },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, `${basename}-${uniqueSuffix}${ext}`);
-  }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: function (req, file, cb) {
-    // Accept images only
+    // Accept images only -- check the extension, not just the declared
+    // mimetype (a client can lie about Content-Type, but Cloudinary's own
+    // allowed_formats above is the real backstop either way).
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const ext = (file.originalname.split(".").pop() || "").toLowerCase();
     const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
+    if (mimetype && allowedTypes.test(ext)) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
     }
-  }
+    cb(new Error("Only image files are allowed!"));
+  },
 });
 
-module.exports = { upload };
+module.exports = { upload, cloudinary };
