@@ -104,6 +104,20 @@ class AuthRepository {
   Future<void> removeUser(String userId) {
     return _client.request((dio) => dio.get('/remove/$userId'), (_) => null);
   }
+
+  /// Self-service account deletion (App Store guideline 5.1.1(v) requires
+  /// any app offering account creation to also offer in-app deletion).
+  /// [password] re-confirms it's really the account owner. See
+  /// Backend/Controllers/adminController.js's deleteMyAccount for the
+  /// actual policy: revokes login immediately; for an admin, deactivates
+  /// every staff account under the same firm too. Business records
+  /// (customers, sales, invoices, stock) are always kept, never erased.
+  Future<void> deleteMyAccount(String password) {
+    return _client.request(
+      (dio) => dio.post('/deleteAccount', data: {'password': password}),
+      (_) => null,
+    );
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

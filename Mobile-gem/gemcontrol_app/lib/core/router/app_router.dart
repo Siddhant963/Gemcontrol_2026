@@ -60,10 +60,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // redirect for an active subscription. /subscribe must stay reachable
       // voluntarily at any time (trialing, active, or expired) so a user can
       // check status, renew early, or change plans from the drawer/Settings.
+      // /settings is exempted too -- otherwise a locked-out user could never
+      // reach it at all (this redirect would fire before the screen even
+      // renders), which would make Settings' Delete Account action
+      // permanently unreachable for exactly the users most likely to want
+      // it. This is a client-side UX convenience only, not the real gate --
+      // every business route still enforces requireActiveSubscription
+      // server-side (Backend/Utils/subscription.js), same as /subscribe's.
       final subAsync = ref.read(subscriptionControllerProvider);
       if (!subAsync.isLoading) {
         final sub = subAsync.valueOrNull ?? SubscriptionSession.inactive;
-        if (!sub.isActive && loc != '/subscribe') return '/subscribe';
+        if (!sub.isActive && loc != '/subscribe' && loc != '/settings') return '/subscribe';
       }
 
       if (_adminOnlyPaths.contains(loc) && !session.isAdmin) return '/home';

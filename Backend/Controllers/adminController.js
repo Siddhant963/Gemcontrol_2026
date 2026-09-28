@@ -237,6 +237,105 @@ module.exports.removeUser = async (req, res) => {
   }
 };
 
+// Self-service account deletion -- required by Apple App Store guideline
+// 5.1.1(v) (any app that supports account creation must let the user
+// delete it from within the app), and a reasonable thing to offer on
+// Android/Web regardless.
+//
+// Policy (agreed 2026-09-28): deletion DEACTIVATES rather than erases.
+// Login is revoked immediately (reusing the existing removeAt convention
+// that isLoggedIn/loginUser already enforce), but business records
+// (customers, sales, GST invoices, stock, payments) are always kept --
+// India's GST rules require invoice/sales records to be retained for
+// several years, so an ERP cannot simply erase them on request. Only the
+// deleting user's own personal login (name/email/contact/password) is
+// scrubbed, and only after a 30-day grace period (Utils/cronJobs.js's
+// purge job), so a mis-tap or a compromised session isn't instantly
+// unrecoverable.
+//
+// - A STAFF member deleting their own account only deactivates that one
+//   User doc.
+// - An ADMIN (firm owner) deleting their own account deactivates every
+//   User under that firm (the owner and all staff lose access together,
+//   since the firm can no longer be administered) and cancels the firm's
+//   subscription. The Firm doc itself, and all business records, are left
+//   fully intact.
+const DELETION_GRACE_PERIOD_DAYS = 30;
+
+module.exports.deleteMyAccount = async (req, res) => {
+  const { password } = req.body;
+  try {
+    if (!password) {
+      return res.status(400).json({ message: "Password is required to confirm account deletion" });
+    }
+    // req.user is already the live, un-removed user doc from isLoggedIn --
+    // re-fetch with the password field explicitly, in case it's ever
+    // excluded by a default projection elsewhere.
+    const user = await UserModel.findById(req.user._id);
+    if (!user || user.removeAt) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Incorrect password" });
+    }
+
+    const now = new Date();
+
+    if (user.role === "admin" && user.firm) {
+      await UserModel.updateMany(
+        { firm: user.firm, removeAt: null },
+        { $set: { removeAt: now, deletionRequestedAt: now } }
+      );
+      await FirmModel.updateOne(
+        { _id: user.firm, removeAt: null },
+        { $set: { removeAt: now, deletionRequestedAt: now } }
+      );
+      // Best-effort: stops the firm from being treated as having active
+      // paid access going forward. This does NOT cancel a real, still
+      // auto-renewing Razorpay/Apple subscription on the payment
+      // provider's side -- there is no such "cancel" API for Razorpay's
+      // one-off orders, and Apple deliberately does not let a server
+      // cancel a customer's auto-renewable subscription; the user must do
+      // that themselves (iPhone Settings > Subscriptions, or Razorpay's
+      // own channel) to stop future charges. The frontend/Flutter UI
+      // surfaces this explicitly before confirming deletion.
+      await SubscriptionModel.updateOne({ firm: user.firm }, { $set: { status: "cancelled" } });
+      addActivity(
+        user._id,
+        user.firm,
+        "accountDeleted",
+        `Admin ${user.email} deleted their account -- firm and all staff logins deactivated`
+      );
+    } else {
+      user.removeAt = now;
+      user.deletionRequestedAt = now;
+      await user.save();
+      addActivity(
+        user._id,
+        user.firm,
+        "accountDeleted",
+        `Staff ${user.email} deleted their own account`
+      );
+    }
+
+    const crossSiteCookie = process.env.NODE_ENV === "production";
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: crossSiteCookie ? "none" : "lax",
+      secure: crossSiteCookie,
+    });
+
+    res.status(200).json({
+      message: "Your account has been deactivated and is scheduled for permanent deletion.",
+      gracePeriodDays: DELETION_GRACE_PERIOD_DAYS,
+    });
+  } catch (error) {
+    console.error("Error deleting account:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports.UpdateUser = async (req, res) => {
   const { userId } = req.query;
   const { name, contact, role } = req.body;

@@ -26,4 +26,5 @@ export const ROUTES = {
   GIRVI_MANAGEMENT: "/girvi",
   JEWELLERY_PANEL: "/jewellery-panel",
   DAY_BOOK: "/day-book",
+  ACCOUNT_SETTINGS: "/account",
 };

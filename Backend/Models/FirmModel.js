@@ -149,6 +149,19 @@ const farmSchema = mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Set when the firm's admin requests self-service account deletion
+  // (Controllers/adminController.js's deleteMyAccount) -- deliberately
+  // never triggers any purge of the firm's own business records (name,
+  // GSTIN, registration, past invoices' data): those must be retained for
+  // GST record-keeping regardless of the account's deletion. Only the
+  // deleting user's own personal login (UserModel) gets scrubbed after the
+  // grace period. This field exists purely so support can tell "removed by
+  // an admin action" (removeFirm) apart from "user-requested deletion" if
+  // that distinction ever matters.
+  deletionRequestedAt: {
+    type: Date,
+    default: null,
+  },
 });
 
 // Sparse: only firms that have made an Apple purchase get this set. Unique

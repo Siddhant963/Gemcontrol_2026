@@ -36,6 +36,7 @@ const {
   UpdateUser,
   loginUser,
   logoutUser,
+  deleteMyAccount,
   createFirm,
   updateFirm,
   getAllFirms,
@@ -131,6 +132,12 @@ router.post("/login", loginUser);
 // Always reachable even with an expired subscription -- a locked-out admin
 // must still be able to log out.
 router.get("/logout", logoutUser);
+// Self-service account deletion (App Store guideline 5.1.1(v)) -- must
+// stay reachable even with an expired/cancelled subscription, same reason
+// as logout above: a locked-out user must still be able to delete their
+// account, not just log out of it. No isAdmin gate -- staff can delete
+// their own account too (see deleteMyAccount's role branch).
+router.post("/deleteAccount", isLoggedIn, deleteMyAccount);
 
 // Subscription routes must stay reachable without an active subscription --
 // otherwise a firm whose trial expired could never see plans or resubscribe.

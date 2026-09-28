@@ -40,6 +40,7 @@ import ErrorBoundary from "./ErrorBoundary.jsx";
 import GirviManagement from "./pages/GirviManagement.jsx";
 import JewelleryPanel from "./pages/JewelleryPanel.jsx";
 import DayBook from "./pages/DayBook.jsx";
+import AccountSettings from "./pages/AccountSettings.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import SplashScreen from "./components/SplashScreen.jsx";
 import {useTheme} from "@mui/material/styles";
@@ -151,6 +152,7 @@ function MainApp() {
             <Route path={ROUTES.JEWELLERY_PANEL} element={<JewelleryPanel />} />
             <Route path={ROUTES.DAY_BOOK} element={<DayBook />} />
             <Route path={ROUTES.CATEGORIES} element={<Categories />} />
+            <Route path={ROUTES.ACCOUNT_SETTINGS} element={<AccountSettings />} />
 
             {/* Admin-only routes */}
             <Route element={<AdminRoute />}>

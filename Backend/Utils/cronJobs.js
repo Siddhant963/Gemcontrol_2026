@@ -2,10 +2,13 @@ const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const GirviModel = require('../Models/GirviModel');
 const GirviInterestModel = require('../Models/GirviInterestModel');
 const ActivityModel = require('../Models/ActivitesModel');
 const DailrateModel = require('../Models/DailrateModel');
+const UserModel = require('../Models/UserModel');
 const { buildFullExportWorkbook, deriveGoldPurities, normalizeToUtcDate } = require('../Controllers/adminController');
 
 const OROPOCKET_PRICES_URL = 'https://api.oropocket.com/public/prices';
@@ -278,12 +281,81 @@ const scheduleLiveRateUpdates = () => {
   console.log('Live gold/silver rate update cron job scheduled for every hour');
 };
 
+// Self-service account deletion (Controllers/adminController.js's
+// deleteMyAccount) sets User.deletionRequestedAt and revokes login
+// immediately, but only scrubs personal-identity fields after this grace
+// period -- long enough that an accidental tap or a compromised session
+// isn't instantly unrecoverable, short enough to actually honor the
+// deletion request. Firm/Customer/Sale/Stock/Payment records are NEVER
+// touched here (GST invoice/sales retention requirements) -- only the
+// deleted user's own name/email/contact/password are scrubbed; any
+// business record that references this userId keeps pointing at the same
+// (now-anonymized) User _id, so referential integrity/reporting isn't
+// broken by the purge.
+const ACCOUNT_DELETION_GRACE_PERIOD_DAYS = 30;
+
+const purgeDeletedAccounts = async () => {
+  try {
+    console.log('Checking for accounts past their deletion grace period...');
+    const cutoff = new Date(
+      Date.now() - ACCOUNT_DELETION_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    );
+    const dueForPurge = await UserModel.find({
+      deletionRequestedAt: { $ne: null, $lte: cutoff },
+      purgedAt: null,
+    });
+
+    let purgedCount = 0;
+    for (const user of dueForPurge) {
+      user.name = 'Deleted User';
+      user.email = `deleted-${user._id}@deleted.ratnsetu.internal`;
+      user.contact = '0000000000';
+      // Random, unusable password hash -- this account can never log in
+      // again anyway (removeAt was already set at deletion time), this
+      // just ensures no recognizable credential material lingers.
+      user.password = await bcrypt.hash(crypto.randomUUID(), 10);
+      user.purgedAt = new Date();
+      await user.save();
+      purgedCount++;
+    }
+
+    if (purgedCount > 0) {
+      await addActivity(
+        'system',
+        'accountPurge',
+        `Purged personal data for ${purgedCount} account(s) past their ${ACCOUNT_DELETION_GRACE_PERIOD_DAYS}-day deletion grace period`
+      );
+      console.log(`Purged ${purgedCount} account(s) past their deletion grace period`);
+    }
+
+    return { success: true, purgedCount };
+  } catch (error) {
+    console.error('Error purging deleted accounts:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Schedule the account-deletion purge (runs daily at 2:30 AM, clear of the
+// monthly Girvi job's 2:00 AM slot)
+const scheduleAccountPurge = () => {
+  cron.schedule('30 2 * * *', async () => {
+    console.log('Running scheduled account-deletion purge...');
+    await purgeDeletedAccounts();
+  }, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
+  });
+
+  console.log('Daily account-deletion purge cron job scheduled for 2:30 AM IST');
+};
+
 // Initialize all cron jobs
 const initializeCronJobs = () => {
   scheduleMonthlyInterestCalculation();
   scheduleOverdueCheck();
   scheduleWeeklyExport();
   scheduleLiveRateUpdates();
+  scheduleAccountPurge();
   // Run once immediately on boot too, so today's rate is populated right
   // away instead of waiting for the next hour boundary.
   fetchAndSaveLiveRates();
@@ -295,9 +367,12 @@ module.exports = {
   checkOverdueGirviItems,
   runWeeklyExport,
   fetchAndSaveLiveRates,
+  purgeDeletedAccounts,
   initializeCronJobs,
   scheduleMonthlyInterestCalculation,
   scheduleOverdueCheck,
   scheduleWeeklyExport,
-  scheduleLiveRateUpdates
+  scheduleLiveRateUpdates,
+  scheduleAccountPurge,
+  ACCOUNT_DELETION_GRACE_PERIOD_DAYS,
 };

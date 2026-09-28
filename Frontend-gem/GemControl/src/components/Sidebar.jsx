@@ -75,6 +75,7 @@ const menuItems = [
   { text: "User Management", icon: "badge", path: ROUTES.USER_MANAGEMENT, adminOnly: true, section: "System & Staff" },
   { text: "Firm Management", icon: "storefront", path: ROUTES.FIRM_MANAGEMENT, adminOnly: true, section: "System & Staff" },
   { text: "Subscription", icon: "workspace_premium", path: ROUTES.SUBSCRIBE, adminOnly: true, section: "System & Staff" },
+  { text: "Account Settings", icon: "account_circle", path: ROUTES.ACCOUNT_SETTINGS, section: "System & Staff" },
 ];
 
 function Sidebar() {
