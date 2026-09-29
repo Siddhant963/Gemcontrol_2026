@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
@@ -161,8 +162,22 @@ class AppleIapController extends StateNotifier<AppleIapState> {
   /// storefront/currency/localized price string.
   Future<void> loadProducts() async {
     state = state.copyWith(status: AppleIapStatus.loadingProducts, clearError: true);
+    // TEMPORARY diagnostic logging -- narrows down why StoreKit is
+    // returning no purchasable products (App Store Connect shows both
+    // products configured, but the app reports "Unavailable"). Logs only
+    // product ids / counts / error code+message -- never any credential,
+    // token, or transaction secret. Safe to leave in during this
+    // investigation; remove once the root cause is confirmed and fixed.
+    debugPrint('Apple IAP: Requested IDs: ${kAppleSubscriptionProductIds.toList()}');
     try {
       final response = await _iap.queryProductDetails(kAppleSubscriptionProductIds);
+      debugPrint(
+        'Apple IAP: query completed -- '
+        'returned=${response.productDetails.length} '
+        'returnedIds=${response.productDetails.map((p) => p.id).toList()} '
+        'notFoundIds=${response.notFoundIDs} '
+        'error=${response.error == null ? 'none' : '[${response.error!.source}] ${response.error!.code}: ${response.error!.message}'}',
+      );
       if (response.error != null) {
         state = state.copyWith(
           status: AppleIapStatus.idle,
@@ -171,6 +186,11 @@ class AppleIapController extends StateNotifier<AppleIapState> {
         return;
       }
       if (response.productDetails.isEmpty) {
+        debugPrint(
+          'Apple IAP: StoreKit returned ZERO products for $kAppleSubscriptionProductIds -- '
+          'this means the App Store did not recognize these product ids as available '
+          'for this app/bundle/environment right now (see notFoundIds above).',
+        );
         state = state.copyWith(
           status: AppleIapStatus.idle,
           error: 'No subscription products are available right now',
@@ -179,6 +199,7 @@ class AppleIapController extends StateNotifier<AppleIapState> {
       }
       state = state.copyWith(status: AppleIapStatus.idle, products: response.productDetails);
     } catch (e) {
+      debugPrint('Apple IAP: queryProductDetails threw: $e');
       state = state.copyWith(status: AppleIapStatus.idle, error: 'Could not load plans: $e');
     }
   }
