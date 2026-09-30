@@ -1,0 +1,115 @@
+{
+  "identifier" : "E46D89C2-9A04-47B5-A4BA-EBE180001CB7",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "N5K355S6NS",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "en_IN",
+    "_storefront" : "IND",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "22420104",
+      "localizations" : [],
+      "name" : "RatnSetu Plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "1999.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "BB2602A8-7D65-4B38-9362-9E6A58FD7AA4",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Everything in Basic, unlimited staff accounts, Girvi/pledge loan management, priority support",
+              "displayName" : "Ratnsetu Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "Ratnsetu1",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ratnsetu Pro",
+          "subscriptionGroupID" : "22420104",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "999.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "A4927B3E-BFA8-4007-ABEF-D1E7123FACEC",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Stock & raw material inventory, live rates, GST billing, customer/Udhar tracking, up to 3 staff accounts, Excel export",
+              "displayName" : "RatnSetu Basic",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "Ratnsetu",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "RatnSetu Plans",
+          "subscriptionGroupID" : "22420104",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
