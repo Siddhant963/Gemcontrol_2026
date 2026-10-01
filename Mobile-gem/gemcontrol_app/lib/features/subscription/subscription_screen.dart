@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_state.dart';
@@ -15,6 +16,23 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'apple_iap_controller.dart';
 import 'subscription_providers.dart';
+
+// Same web pages the existing RatnSetu site already serves (see
+// Frontend-gem/GemControl/src/pages/TermsPage.jsx, PrivacyPolicy.jsx, and
+// their routes in src/utils/routes.js: "/terms-and-conditions",
+// "/privacy-policy") -- reused as-is, not a new/separate legal page.
+// Required by Apple App Store Review Guideline 3.1.2: an auto-renewable
+// subscription's Terms of Use (EULA) must be reachable from the app itself.
+const _kTermsOfUseUrl = 'https://ratnsetu.com/terms-and-conditions';
+const _kPrivacyPolicyUrl = 'https://ratnsetu.com/privacy-policy';
+
+Future<void> _openLegalUrl(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open $url')));
+  }
+}
 
 final _plansProvider = FutureProvider.autoDispose<List<SubscriptionPlan>>((ref) {
   return ref.watch(subscriptionRepositoryProvider).getPlans();
@@ -253,6 +271,36 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
                   child: Text('Failed to load plans', style: TextStyle(color: scheme.error)),
                 ),
+              ),
+            ),
+            // Legal links -- required by App Store Review Guideline 3.1.2
+            // (an auto-renewable subscription's Terms of Use must be
+            // reachable from the app). Below the plans/purchase controls on
+            // purpose so it never overlaps a Subscribe/Renew button or the
+            // Restore Purchases action above.
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.lg),
+              child: Column(
+                children: [
+                  Text(
+                    'By subscribing, you agree to our Terms of Use and Privacy Policy.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                  ),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => _openLegalUrl(context, _kTermsOfUseUrl),
+                        child: const Text('Terms of Use'),
+                      ),
+                      TextButton(
+                        onPressed: () => _openLegalUrl(context, _kPrivacyPolicyUrl),
+                        child: const Text('Privacy Policy'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
