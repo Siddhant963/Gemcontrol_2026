@@ -63,6 +63,11 @@ function NotificationModal({ isOpen, onClose, title, message, type = 'info', chi
             zIndex: 1300, // Higher than MUI Dialog default
             fontFamily: theme.typography.fontFamily,
             p: 2,
+            // Keep the card clear of notches / home indicator.
+            pt: 'max(16px, env(safe-area-inset-top, 0px))',
+            pb: 'max(16px, env(safe-area-inset-bottom, 0px))',
+            pl: 'max(16px, env(safe-area-inset-left, 0px))',
+            pr: 'max(16px, env(safe-area-inset-right, 0px))',
           }}
         >
           <Box
@@ -80,7 +85,11 @@ function NotificationModal({ isOpen, onClose, title, message, type = 'info', chi
               width: '100%',
               maxWidth: 400,
               position: 'relative',
-              overflow: 'hidden',
+              overflowX: 'hidden',
+              // Long messages / short landscape screens: scroll inside the card.
+              maxHeight: '100%',
+              overflowY: 'auto',
+              overflowWrap: 'anywhere',
             }}
           >
             <IconButton

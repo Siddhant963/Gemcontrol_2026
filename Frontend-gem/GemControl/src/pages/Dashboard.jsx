@@ -846,6 +846,8 @@ function Dashboard() {
             display: "flex",
             alignItems: "center",
             width: { xs: "100%", sm: "auto" },
+            minWidth: 0,
+            maxWidth: "100%",
             justifyContent: { xs: "flex-start", sm: "flex-end" },
             position: "relative",
             gap: { xs: 1, sm: 2 },
@@ -856,6 +858,7 @@ function Dashboard() {
               p: { xs: 0.5, sm: 1 },
               display: "flex",
               alignItems: "center",
+              minWidth: 0,
               width: { xs: "100%", sm: 300 },
               border: `1px solid ${theme.palette.divider}`,
               borderRadius: 1,
@@ -1257,9 +1260,9 @@ function Dashboard() {
                   >
                     <TableCell>Date</TableCell>
                     <TableCell>Gold 24K (₹/gm)</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Gold 22K (₹/gm)</TableCell>
+                    <TableCell>Gold 22K (₹/gm)</TableCell>
                     <TableCell>Silver (₹/g)</TableCell>
-                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Diamond 1 Carat (₹/pc)</TableCell>
+                    <TableCell>Diamond 1 Carat (₹/pc)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1278,13 +1281,13 @@ function Dashboard() {
                         <TableCell sx={{ color: theme.palette.text.primary }}>
                           {rate.rate.gold?.["24K"] || "N/A"}
                         </TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, display: { xs: "none", sm: "table-cell" } }}>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>
                           {rate.rate.gold?.["22K"] || "N/A"}
                         </TableCell>
                         <TableCell sx={{ color: theme.palette.text.primary }}>
                           {rate.rate.silver || "N/A"}
                         </TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, display: { xs: "none", md: "table-cell" } }}>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>
                           {rate.rate.daimond?.["1 Carat"] || "N/A"}
                         </TableCell>
                       </TableRow>
@@ -1318,7 +1321,7 @@ function Dashboard() {
             }}
           >
             {/* Monthly Sales Chart (Bar Chart) */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Paper
                 sx={{
                   p: theme.spacing(2),
@@ -1381,7 +1384,7 @@ function Dashboard() {
             </Grid>
 
             {/* Comparison Chart for Totals (Bar Chart) */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Paper
                 sx={{
                   p: theme.spacing(2),
@@ -1446,7 +1449,7 @@ function Dashboard() {
             </Grid>
 
             {/* Historical Rates Chart (Line Chart) */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Paper
                 sx={{
                   p: theme.spacing(2),

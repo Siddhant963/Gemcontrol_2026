@@ -1001,6 +1001,7 @@ function SalesManagement() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1.5, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -1022,8 +1023,11 @@ function SalesManagement() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1.5, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -1456,7 +1460,7 @@ function SalesManagement() {
               }}
             >
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Select
                     name="saleType"
                     value={item.saleType || ""}
@@ -1471,7 +1475,7 @@ function SalesManagement() {
                     <MenuItem value="rawMaterial">Raw Material</MenuItem>
                   </Select>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Select
                     name="salematerialId"
                     value={item.salematerialId || ""}
@@ -1501,7 +1505,7 @@ function SalesManagement() {
                     ))}
                   </Select>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <TextField
                     name="quantity"
                     label="Quantity"
@@ -1534,7 +1538,7 @@ function SalesManagement() {
                     }
                   />
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <TextField
                     name="amount"
                     label="Amount"
@@ -1545,7 +1549,7 @@ function SalesManagement() {
                     helperText="Auto-calculated from price × quantity — editable if you need to override it"
                   />
                 </Grid>
-                <Grid item xs={12}>
+                <Grid size={12}>
                   <Button
                     variant="outlined"
                     color="error"
@@ -1570,7 +1574,7 @@ function SalesManagement() {
 
           {/* Total Amount */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 name="totalAmount"
                 label="Items Subtotal (before discount & GST)"
@@ -1596,7 +1600,7 @@ function SalesManagement() {
 
           {/* Discount */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6} sm={4}>
+            <Grid size={{ xs: 6, sm: 4 }}>
               <Select
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value)}
@@ -1606,7 +1610,7 @@ function SalesManagement() {
                 <MenuItem value="percent">Discount (%)</MenuItem>
               </Select>
             </Grid>
-            <Grid item xs={6} sm={4}>
+            <Grid size={{ xs: 6, sm: 4 }}>
               <TextField
                 label="Discount Value"
                 type="number"
@@ -1659,7 +1663,7 @@ function SalesManagement() {
 
           {/* Payment Details */}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 name="udharAmount"
                 label={useSplitPayment ? "Udhar Amount (auto — whatever the split payments don't cover)" : "Udhar Amount"}
@@ -1694,7 +1698,7 @@ function SalesManagement() {
             <Box sx={{ mt: 1 }}>
               {splitPayments.map((payment, index) => (
                 <Grid container spacing={1} key={index} sx={{ mb: 1 }} alignItems="center">
-                  <Grid item xs={5}>
+                  <Grid size={5}>
                     <Select
                       value={payment.method}
                       onChange={(e) =>
@@ -1709,7 +1713,7 @@ function SalesManagement() {
                       ))}
                     </Select>
                   </Grid>
-                  <Grid item xs={5}>
+                  <Grid size={5}>
                     <TextField
                       label="Amount"
                       type="number"
@@ -1721,7 +1725,7 @@ function SalesManagement() {
                       InputProps={{ inputProps: { min: 0 } }}
                     />
                   </Grid>
-                  <Grid item xs={2}>
+                  <Grid size={2}>
                     <IconButton
                       color="error"
                       onClick={() => handleRemoveSplitPaymentRow(index)}
@@ -1749,7 +1753,7 @@ function SalesManagement() {
             </Box>
           ) : (
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   name="paymentAmount"
                   label="Payment Amount"
@@ -1767,7 +1771,7 @@ function SalesManagement() {
                   ).toFixed(2)}`}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Select
                   name="paymentMethod"
                   value={newSale.paymentMethod}
@@ -1867,7 +1871,7 @@ function SalesManagement() {
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 name="name"
                 label="Customer Name"
@@ -1877,7 +1881,7 @@ function SalesManagement() {
                 required
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 name="email"
                 label="Email"
@@ -1888,7 +1892,7 @@ function SalesManagement() {
                 required
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 name="contact"
                 label="Contact"
@@ -1898,7 +1902,7 @@ function SalesManagement() {
                 required
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Select
                 name="firm"
                 value={newCustomer.firm || ""}
@@ -1916,7 +1920,7 @@ function SalesManagement() {
                 ))}
               </Select>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={12}>
               <TextField
                 name="address"
                 label="Address"

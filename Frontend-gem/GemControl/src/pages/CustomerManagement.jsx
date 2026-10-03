@@ -385,6 +385,7 @@ function CustomerManagement() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -406,8 +407,11 @@ function CustomerManagement() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -826,7 +830,6 @@ function CustomerManagement() {
                       <TableCell
                         sx={{
                           minWidth: 150,
-                          display: { xs: "none", sm: "table-cell" },
                         }}
                       >
                         Email
@@ -834,7 +837,6 @@ function CustomerManagement() {
                       <TableCell
                         sx={{
                           minWidth: 150,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Address
@@ -842,7 +844,6 @@ function CustomerManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Firm
@@ -872,19 +873,13 @@ function CustomerManagement() {
                           </Link>
                         </TableCell>
                         <TableCell>{customer.contact || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", sm: "table-cell" } }}
-                        >
+                        <TableCell>
                           {customer.email || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {customer.address || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {customer.firm?.name || "N/A"}
                         </TableCell>
                         <TableCell
@@ -994,22 +989,22 @@ function CustomerManagement() {
                 {selectedCustomer.name}
               </Typography>
               <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography sx={{ fontSize: "0.875rem" }}>
                     <strong>Contact:</strong> {selectedCustomer.contact || "N/A"}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography sx={{ fontSize: "0.875rem" }}>
                     <strong>Email:</strong> {selectedCustomer.email || "N/A"}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography sx={{ fontSize: "0.875rem" }}>
                     <strong>Firm:</strong> {selectedCustomer.firm?.name || "N/A"}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography sx={{ fontSize: "0.875rem" }}>
                     <strong>Customer Since:</strong>{" "}
                     {selectedCustomer.createdAt
@@ -1017,7 +1012,7 @@ function CustomerManagement() {
                       : "N/A"}
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid size={12}>
                   <Typography sx={{ fontSize: "0.875rem" }}>
                     <strong>Address:</strong> {selectedCustomer.address || "N/A"}
                   </Typography>
@@ -1039,7 +1034,7 @@ function CustomerManagement() {
           ) : customerDetail ? (
             <>
               <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary }}>
                     Total Purchased
                   </Typography>
@@ -1047,7 +1042,7 @@ function CustomerManagement() {
                     ₹{customerDetail.totalPurchased.toLocaleString()}
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary }}>
                     Total Paid
                   </Typography>
@@ -1055,7 +1050,7 @@ function CustomerManagement() {
                     ₹{customerDetail.totalPaid.toLocaleString()}
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary }}>
                     Udhar Issued
                   </Typography>
@@ -1063,7 +1058,7 @@ function CustomerManagement() {
                     ₹{customerDetail.totalUdharIssued.toLocaleString()}
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography sx={{ fontSize: "0.75rem", color: theme.palette.text.secondary }}>
                     Outstanding Due
                   </Typography>

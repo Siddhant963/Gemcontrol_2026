@@ -358,6 +358,7 @@ function Categories() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -379,8 +380,11 @@ function Categories() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -582,7 +586,6 @@ function Categories() {
                       <TableCell
                         sx={{
                           minWidth: 200,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Description
@@ -604,9 +607,7 @@ function Categories() {
                         }}
                       >
                         <TableCell>{category.name || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {category.description || "N/A"}
                         </TableCell>
                         <TableCell>
@@ -635,9 +636,7 @@ function Categories() {
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           <Button
                             variant="outlined"
                             size="small"

@@ -177,7 +177,7 @@ function JewelleryPanel() {
       ) : (
         <Grid container spacing={2}>
           {categorySummaries.map((cat) => (
-            <Grid item xs={6} sm={4} md={3} lg={2} key={cat._id}>
+            <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2 }} key={cat._id}>
               <Card sx={{ height: "100%" }}>
                 <CardActionArea onClick={() => setSelectedCategory(cat)}>
                   <Box

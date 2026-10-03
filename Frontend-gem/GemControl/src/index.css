@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+/* Responsive foundation: no accidental page-level horizontal scroll sources.
+   Wide content (tables) must scroll inside its own container instead. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+#root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

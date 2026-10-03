@@ -479,6 +479,7 @@ function FirmManagement() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -500,8 +501,11 @@ function FirmManagement() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -717,7 +721,6 @@ function FirmManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Size
@@ -770,9 +773,7 @@ function FirmManagement() {
                         </TableCell>
                         <TableCell>{firm.name || "N/A"}</TableCell>
                         <TableCell>{firm.location || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {firm.size || "N/A"}
                         </TableCell>
                         <TableCell>

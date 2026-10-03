@@ -395,6 +395,7 @@ function UserManagement() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -416,8 +417,11 @@ function UserManagement() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -596,7 +600,6 @@ function UserManagement() {
                       <TableCell
                         sx={{
                           minWidth: 150,
-                          display: { xs: "none", sm: "table-cell" },
                         }}
                       >
                         Email
@@ -605,7 +608,6 @@ function UserManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Role
@@ -626,15 +628,11 @@ function UserManagement() {
                         }}
                       >
                         <TableCell>{user.name || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", sm: "table-cell" } }}
-                        >
+                        <TableCell>
                           {user.email || "N/A"}
                         </TableCell>
                         <TableCell>{user.contact || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {user.role || "N/A"}
                         </TableCell>
                         <TableCell

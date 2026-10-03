@@ -1163,6 +1163,7 @@ function ItemManagement() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -1184,8 +1185,11 @@ function ItemManagement() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -1339,21 +1343,21 @@ function ItemManagement() {
             label="Search Code"
             value={columnFilters.stockcode}
             onChange={handleColumnFilterChange("stockcode")}
-            sx={{ width: 140 }}
+            sx={{ width: { xs: "100%", sm: 140 } }}
           />
           <TextField
             size="small"
             label="Search Name"
             value={columnFilters.name}
             onChange={handleColumnFilterChange("name")}
-            sx={{ width: 140 }}
+            sx={{ width: { xs: "100%", sm: 140 } }}
           />
           <TextField
             size="small"
             label="Search Karat"
             value={columnFilters.karat}
             onChange={handleColumnFilterChange("karat")}
-            sx={{ width: 120 }}
+            sx={{ width: { xs: "100%", sm: 120 } }}
           />
           <TextField
             size="small"
@@ -1361,7 +1365,7 @@ function ItemManagement() {
             type="number"
             value={columnFilters.priceMin}
             onChange={handleColumnFilterChange("priceMin")}
-            sx={{ width: 110 }}
+            sx={{ width: { xs: "calc(50% - 4px)", sm: 110 } }}
           />
           <TextField
             size="small"
@@ -1369,14 +1373,14 @@ function ItemManagement() {
             type="number"
             value={columnFilters.priceMax}
             onChange={handleColumnFilterChange("priceMax")}
-            sx={{ width: 110 }}
+            sx={{ width: { xs: "calc(50% - 4px)", sm: 110 } }}
           />
           <Box sx={{ flexGrow: 1 }} />
           <Button
             variant="outlined"
             size="small"
             onClick={handleDownloadTemplate}
-            sx={{ textTransform: "none" }}
+            sx={{ textTransform: "none", width: { xs: "100%", sm: "auto" } }}
           >
             Download Bulk Template
           </Button>
@@ -1384,7 +1388,7 @@ function ItemManagement() {
             variant="outlined"
             size="small"
             onClick={() => setBulkImportOpen(true)}
-            sx={{ textTransform: "none" }}
+            sx={{ textTransform: "none", width: { xs: "100%", sm: "auto" } }}
           >
             Bulk Import (Wholesale)
           </Button>
@@ -1392,7 +1396,7 @@ function ItemManagement() {
             variant="contained"
             size="small"
             onClick={(e) => setExportMenuAnchor(e.currentTarget)}
-            sx={{ textTransform: "none" }}
+            sx={{ textTransform: "none", width: { xs: "100%", sm: "auto" } }}
           >
             {selectedItemIds.size > 0 ? `Export (${selectedItemIds.size} selected)` : "Export"}
           </Button>
@@ -1676,7 +1680,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Stock Code
@@ -1684,7 +1687,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Category
@@ -1692,7 +1694,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", lg: "table-cell" },
                         }}
                       >
                         Material Type
@@ -1700,7 +1701,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 80,
-                          display: { xs: "none", lg: "table-cell" },
                         }}
                       >
                         Karat
@@ -1708,7 +1708,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Firm
@@ -1717,7 +1716,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", lg: "table-cell" },
                         }}
                       >
                         Making Charge (₹)
@@ -1726,7 +1724,6 @@ function ItemManagement() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", lg: "table-cell" },
                         }}
                       >
                         Total Value (₹)
@@ -1786,41 +1783,27 @@ function ItemManagement() {
                           )}
                         </TableCell>
                         <TableCell>{item.name || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {item.stockcode || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {item.category?.name || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", lg: "table-cell" } }}
-                        >
+                        <TableCell>
                           {item.materialgitType || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", lg: "table-cell" } }}
-                        >
+                        <TableCell>
                           {item.karat || "—"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {item.firm?.name || "N/A"}
                         </TableCell>
                         <TableCell>{item.waight || "N/A"}g</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", lg: "table-cell" } }}
-                        >
+                        <TableCell>
                           ₹{item.makingCharge?.toLocaleString() || "N/A"}
                         </TableCell>
                         <TableCell>{item.quantity || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", lg: "table-cell" } }}
-                        >
+                        <TableCell>
                           ₹{item.totalValue?.toLocaleString() || "N/A"}
                         </TableCell>
                         <TableCell

@@ -200,6 +200,7 @@ function DayBook() {
         sx={{
           display: "flex",
           flexDirection: { xs: "column", sm: "row" },
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: { xs: "stretch", sm: "center" },
           gap: 2,
@@ -233,34 +234,34 @@ function DayBook() {
       ) : data ? (
         <>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard label="Sales" value={data.summary.salesCount} />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard
                 label="Sales Amount"
                 value={`₹${data.summary.totalSalesAmount.toLocaleString("en-IN")}`}
                 color={theme.palette.primary.main}
               />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard
                 label="Payments Received"
                 value={`₹${data.summary.totalPaymentsReceived.toLocaleString("en-IN")}`}
                 color={theme.palette.success.main}
               />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard label="New Stock Added" value={data.summary.newStockCount} />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard
                 label="Udhar Given"
                 value={`₹${data.summary.udharGivenAmount.toLocaleString("en-IN")}`}
                 color={theme.palette.warning.main}
               />
             </Grid>
-            <Grid item xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <SummaryCard
                 label="Udhar Settled"
                 value={`₹${data.summary.udharSettledAmount.toLocaleString("en-IN")}`}
@@ -279,7 +280,7 @@ function DayBook() {
             Sales ({data.sales.length})
           </Typography>
           <TableContainer component={Paper} sx={{ mb: 3 }}>
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Invoice No</TableCell>
@@ -315,7 +316,7 @@ function DayBook() {
             Payments ({data.payments.length})
           </Typography>
           <TableContainer component={Paper} sx={{ mb: 3 }}>
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 460 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Mode</TableCell>
@@ -347,7 +348,7 @@ function DayBook() {
             New Stock Added ({data.newStock.length})
           </Typography>
           <TableContainer component={Paper}>
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>

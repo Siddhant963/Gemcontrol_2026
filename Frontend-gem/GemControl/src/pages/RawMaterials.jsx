@@ -637,6 +637,7 @@ function RawMaterials() {
           sx={{
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
+            flexWrap: "wrap",
             gap: { xs: 1, sm: 2 },
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
@@ -658,8 +659,11 @@ function RawMaterials() {
             sx={{
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
+              flexWrap: "wrap",
               gap: { xs: 1, sm: 2 },
               width: { xs: "100%", sm: "auto" },
+              maxWidth: "100%",
+              minWidth: 0,
               alignItems: { xs: "stretch", sm: "center" },
             }}
           >
@@ -941,7 +945,6 @@ function RawMaterials() {
                       <TableCell
                         sx={{
                           minWidth: 120,
-                          display: { xs: "none", sm: "table-cell" },
                         }}
                       >
                         Material Type
@@ -949,7 +952,6 @@ function RawMaterials() {
                       <TableCell
                         sx={{
                           minWidth: 120,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Firm
@@ -958,7 +960,6 @@ function RawMaterials() {
                       <TableCell
                         sx={{
                           minWidth: 100,
-                          display: { xs: "none", md: "table-cell" },
                         }}
                       >
                         Code
@@ -1005,25 +1006,17 @@ function RawMaterials() {
                           )}
                         </TableCell>
                         <TableCell>{material.name || "N/A"}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", sm: "table-cell" } }}
-                        >
+                        <TableCell>
                           {material.materialType || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {material.firm?.name || "N/A"}
                         </TableCell>
                         <TableCell>{material.quantity ?? material.weight ?? 0}</TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           {material.RawMaterialcode || "N/A"}
                         </TableCell>
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
+                        <TableCell>
                           <Button
                             variant="outlined"
                             size="small"

@@ -1,4 +1,5 @@
 import { createTheme } from "@mui/material/styles";
+import { MOBILE_MAX_MEDIA, SAFE_BOTTOM, SAFE_LEFT, SAFE_RIGHT, SAFE_TOP } from "./config/layout";
 
 // Surface container hierarchy (Material 3 roles) not natively modeled by MUI's palette.
 const surfaces = {
@@ -130,6 +131,8 @@ export const getTheme = (mode) =>
             textTransform: "none",
             borderRadius: 8,
             boxShadow: "none",
+            // Touch-friendly height on phones only; desktop sizing is unchanged.
+            [MOBILE_MAX_MEDIA]: { minHeight: 44 },
           },
           containedPrimary: {
             "&:hover": { boxShadow: "none" },
@@ -160,7 +163,65 @@ export const getTheme = (mode) =>
       },
       MuiDialog: {
         styleOverrides: {
-          paper: { borderRadius: 12 },
+          paper: {
+            borderRadius: 12,
+            // Phones: ~12px outer margin, never taller than the (dynamic)
+            // viewport -- content scrolls inside the dialog. Screen-only, so
+            // print.css (invoice printing) is unaffected.
+            [MOBILE_MAX_MEDIA]: {
+              margin: `max(12px, ${SAFE_TOP}) max(12px, ${SAFE_RIGHT}) max(12px, ${SAFE_BOTTOM}) max(12px, ${SAFE_LEFT})`,
+              maxWidth: `calc(100% - max(12px, ${SAFE_LEFT}) - max(12px, ${SAFE_RIGHT}))`,
+              maxHeight: `calc(100% - max(12px, ${SAFE_TOP}) - max(12px, ${SAFE_BOTTOM}))`,
+              "@supports (height: 100dvh)": {
+                maxHeight: `calc(100dvh - max(12px, ${SAFE_TOP}) - max(12px, ${SAFE_BOTTOM}))`,
+              },
+            },
+          },
+          paperFullWidth: {
+            [MOBILE_MAX_MEDIA]: {
+              width: `calc(100% - max(12px, ${SAFE_LEFT}) - max(12px, ${SAFE_RIGHT}))`,
+            },
+          },
+        },
+      },
+      MuiDialogContent: {
+        styleOverrides: {
+          root: { overflowWrap: "break-word" },
+        },
+      },
+      MuiDialogActions: {
+        styleOverrides: {
+          root: { flexWrap: "wrap", rowGap: 8 },
+        },
+      },
+      MuiCardContent: {
+        styleOverrides: {
+          // Long names / emails / SKUs wrap inside the card instead of clipping.
+          root: { overflowWrap: "anywhere" },
+        },
+      },
+      MuiTableContainer: {
+        styleOverrides: {
+          // Wide tables scroll inside their own container, never the page.
+          root: { maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch", overscrollBehaviorX: "contain" },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            // Phones: grow the tap area to 44x44 without changing layout size.
+            [MOBILE_MAX_MEDIA]: {
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: "max(100%, 44px)",
+                height: "max(100%, 44px)",
+                transform: "translate(-50%, -50%)",
+              },
+            },
+          },
         },
       },
       MuiOutlinedInput: {

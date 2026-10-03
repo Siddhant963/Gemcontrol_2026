@@ -15,6 +15,8 @@ import {
   Box,
   CircularProgress,
   TextField,
+  Card,
+  CardContent,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
@@ -509,9 +511,59 @@ function PaymentManagement() {
             No payments found.
           </Typography>
         ) : (
+          <>
+          {/* Mobile card list: every field the table shows, no hidden data */}
+          <Box sx={{ display: { xs: "block", sm: "none" } }}>
+            {filteredPayments.map((payment) => (
+              <Card key={payment._id} sx={{ mb: 2, borderRadius: 1, boxShadow: theme.shadows[2] }}>
+                <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                  <Typography sx={{ fontSize: "1.1rem", fontWeight: "bold", color: theme.palette.text.primary }}>
+                    ₹{payment.amount || 0}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                    {payment.customer?.name || "N/A"}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.75rem" }}>
+                    Reference: {payment.paymentRefrence}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.75rem" }}>
+                    Date: {new Date(payment.paymentDate).toLocaleDateString()}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.75rem" }}>
+                    Firm: {payment.firm?.name || "N/A"}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.75rem" }}>
+                    Payment Type: {payment.paymentType || "N/A"}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.75rem", mt: 0.5, fontWeight: 600 }}>
+                    Sale Items
+                  </Typography>
+                  {payment.sale?.items?.map((item, idx) => (
+                    <Typography key={idx} sx={{ fontSize: "0.75rem" }}>
+                      {item.saleType === "stock"
+                        ? `Stock: ${
+                            item.salematerialId?.name ||
+                            item.salematerialId ||
+                            "N/A"
+                          }`
+                        : `Raw Material: ${
+                            item.salematerialId?.name ||
+                            item.salematerialId ||
+                            "N/A"
+                          }`}
+                    </Typography>
+                  ))}
+                  <Typography sx={{ fontSize: "0.75rem" }}>
+                    Total: ₹{payment.sale?.totalAmount || 0}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
           <TableContainer
             component={Paper}
             sx={{
+              display: { xs: "none", sm: "block" },
               width: "100%",
               boxShadow: theme.shadows[4],
               "&:hover": { boxShadow: theme.shadows[8] },
@@ -534,18 +586,18 @@ function PaymentManagement() {
                   }}
                 >
                   <TableCell>Reference</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                  <TableCell>
                     Date
                   </TableCell>
                   <TableCell>Customer</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                  <TableCell>
                     Firm
                   </TableCell>
                   <TableCell>Amount</TableCell>
-                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                  <TableCell>
                     Payment Type
                   </TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                  <TableCell>
                     Sale Items
                   </TableCell>
                 </TableRow>
@@ -567,13 +619,12 @@ function PaymentManagement() {
                       },
                     }}
                   >
-                    <TableCell sx={{ color: theme.palette.text.primary }}>
+                    <TableCell sx={{ color: theme.palette.text.primary, maxWidth: 240, overflowWrap: "anywhere" }}>
                       {payment.paymentRefrence}
                     </TableCell>
                     <TableCell
                       sx={{
                         color: theme.palette.text.primary,
-                        display: { xs: "none", sm: "table-cell" },
                       }}
                     >
                       {new Date(payment.paymentDate).toLocaleDateString()}
@@ -584,7 +635,6 @@ function PaymentManagement() {
                     <TableCell
                       sx={{
                         color: theme.palette.text.primary,
-                        display: { xs: "none", sm: "table-cell" },
                       }}
                     >
                       {payment.firm?.name || "N/A"}
@@ -595,7 +645,6 @@ function PaymentManagement() {
                     <TableCell
                       sx={{
                         color: theme.palette.text.primary,
-                        display: { xs: "none", md: "table-cell" },
                       }}
                     >
                       {payment.paymentType || "N/A"}
@@ -603,7 +652,6 @@ function PaymentManagement() {
                     <TableCell
                       sx={{
                         color: theme.palette.text.primary,
-                        display: { xs: "none", sm: "table-cell" },
                       }}
                     >
                       {payment.sale?.items?.map((item, idx) => (
@@ -628,6 +676,7 @@ function PaymentManagement() {
               </TableBody>
             </Table>
           </TableContainer>
+          </>
         )}
         {filteredPayments.length > 0 && (
           <Box

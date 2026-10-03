@@ -21,8 +21,10 @@ import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/routes";
 import api from "../utils/api";
 import { useTheme } from "@mui/material/styles";
+import PropTypes from "prop-types";
+import { SAFE_LEFT, SAFE_RIGHT, SAFE_TOP } from "../config/layout";
 
-function Navbar() {
+function Navbar({ onMenuClick }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const darkMode = useSelector((state) => state.theme.darkMode);
@@ -58,15 +60,43 @@ function Navbar() {
         backgroundColor: theme.palette.surfaces.lowest,
         boxShadow: "0 1px 8px rgba(0,0,0,0.04)",
         borderBottom: `1px solid ${theme.palette.divider}`,
+        paddingTop: SAFE_TOP,
       }}
     >
       <Toolbar
         sx={{
           justifyContent: "space-between",
-          px: { xs: 1, sm: 2, md: 3 },
+          pl: {
+            xs: `max(8px, ${SAFE_LEFT})`,
+            sm: `max(16px, ${SAFE_LEFT})`,
+            md: `max(24px, ${SAFE_LEFT})`,
+          },
+          pr: {
+            xs: `max(8px, ${SAFE_RIGHT})`,
+            sm: `max(16px, ${SAFE_RIGHT})`,
+            md: `max(24px, ${SAFE_RIGHT})`,
+          },
           py: { xs: 0.5, sm: 1 },
         }}
       >
+        {isAuthenticated && onMenuClick && (
+          <IconButton
+            onClick={onMenuClick}
+            aria-label="Open navigation menu"
+            aria-haspopup="dialog"
+            sx={{
+              display: { xs: "inline-flex", lg: "none" },
+              width: 44,
+              height: 44,
+              mr: 0.5,
+              color: "text.secondary",
+              borderRadius: 2,
+              "&:hover": { bgcolor: "surfaces.high", color: "text.primary" },
+            }}
+          >
+            <SymbolIcon name="menu" size={24} />
+          </IconButton>
+        )}
         <Typography
           variant="h6"
           sx={{
@@ -101,8 +131,11 @@ function Navbar() {
             />
             <IconButton
               onClick={handleLogout}
+              aria-label="Log out"
               sx={{
                 p: { xs: 0.5, sm: 1 },
+                minWidth: { xs: 44, lg: 0 },
+                minHeight: { xs: 44, lg: 0 },
                 color: "text.secondary",
                 borderRadius: 2,
                 "&:hover": { bgcolor: "surfaces.high", color: "text.primary" },
@@ -158,5 +191,9 @@ function Navbar() {
     </AppBar>
   );
 }
+
+Navbar.propTypes = {
+  onMenuClick: PropTypes.func,
+};
 
 export default Navbar;

@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { Provider } from "react-redux";
 import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline, Box } from "@mui/material";
+import { CssBaseline } from "@mui/material";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import store from "./redux/store";
 import { getTheme } from "./theme.js";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Sidebar from "./components/Sidebar";
-import Navbar from "./components/Navbar";
+import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard.jsx";
 import UserManagement from "./pages/UserManagement";
 import FirmManagement from "./pages/FirmManagemenet";
@@ -43,7 +42,6 @@ import DayBook from "./pages/DayBook.jsx";
 import AccountSettings from "./pages/AccountSettings.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import SplashScreen from "./components/SplashScreen.jsx";
-import {useTheme} from "@mui/material/styles";
 
 const SPLASH_DURATION_MS = 2000;
 
@@ -63,7 +61,6 @@ function MainApp() {
   const darkMode = useSelector((state) => state.theme.darkMode);
   const theme = getTheme(darkMode ? "dark" : "light");
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const muiTheme = useTheme();
 
   // Splash shows once per full page load (not on in-app navigation).
   const [showSplash, setShowSplash] = useState(true);
@@ -125,22 +122,9 @@ function MainApp() {
           
           <Route
             element={
-              <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-                <Sidebar />
-                <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
-                  <Navbar />
-                  <Box
-                    component="main"
-                    sx={{
-                      flexGrow: 1,
-                      p: 2.5,
-                      pt: `${muiTheme.mixins.toolbar.minHeight + 20}px`,
-                    }}
-                  >
-                    <ProtectedRoute />
-                  </Box>
-                </Box>
-              </Box>
+              <AppLayout>
+                <ProtectedRoute />
+              </AppLayout>
             }
           >
             {/* Nested protected routes accessible to both admin and staff */}

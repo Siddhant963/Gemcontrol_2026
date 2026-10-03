@@ -1172,12 +1172,14 @@ function GirviManagement() {
                     <Box
                       sx={{
                         display: "flex",
+                        flexDirection: { xs: "column", sm: "row" },
                         justifyContent: "space-between",
-                        alignItems: "center",
+                        alignItems: { xs: "stretch", sm: "center" },
+                        gap: 1,
                       }}
                     >
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}
                       >
                         {girvi && girvi.itemImage ? (
                           <Box
@@ -1200,16 +1202,17 @@ function GirviManagement() {
                           </Box>
                         ) : (
                           <Typography
-                            sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+                            sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" }, flexShrink: 0, whiteSpace: "nowrap" }}
                           >
                             No Image
                           </Typography>
                         )}
-                        <Box>
+                        <Box sx={{ minWidth: 0 }}>
                           <Typography
                             sx={{
                               fontSize: { xs: "0.9rem", sm: "1rem" },
                               fontWeight: "bold",
+                              overflowWrap: "anywhere",
                             }}
                           >
                             {girvi?.itemName || "N/A"}
@@ -1218,6 +1221,7 @@ function GirviManagement() {
                             sx={{
                               fontSize: { xs: "0.85rem", sm: "0.9rem" },
                               color: theme.palette.text.secondary,
+                              whiteSpace: "nowrap",
                             }}
                           >
                             ₹{girvi?.itemValue || "0"}
@@ -1237,7 +1241,7 @@ function GirviManagement() {
                         </Box>
                       </Box>
                       <Box
-                        sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}
+                        sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", justifyContent: { xs: "space-between", sm: "flex-end" } }}
                       >
                         <Button
                           variant="outlined"
