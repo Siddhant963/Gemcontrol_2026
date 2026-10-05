@@ -27,4 +27,9 @@ export const ROUTES = {
   JEWELLERY_PANEL: "/jewellery-panel",
   DAY_BOOK: "/day-book",
   ACCOUNT_SETTINGS: "/account",
+  // Platform-owner panel (role "superadmin" only).
+  PLATFORM_ADMIN: "/platform-admin",
+  PLATFORM_FIRMS: "/platform-admin/firms",
+  PLATFORM_FIRM_DETAIL: "/platform-admin/firms/:id",
+  PLATFORM_USAGE: "/platform-admin/usage",
 };

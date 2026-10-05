@@ -11,6 +11,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/gc_app_bar.dart';
+import '../../shared/widgets/app_toast.dart';
+import '../subscription/subscription_presentation.dart';
 import '../subscription/subscription_providers.dart';
 import 'daily_rate_sheet.dart';
 
@@ -25,7 +27,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeControllerProvider);
     final isDark = themeMode == ThemeMode.dark;
     final subAsync = ref.watch(subscriptionControllerProvider);
-    final sub = subAsync.valueOrNull?.subscription;
+    final subPresentation = SubscriptionPresentation.from(subAsync.valueOrNull);
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -66,11 +68,14 @@ class SettingsScreen extends ConsumerWidget {
                   ListTile(
                     leading: Icon(Icons.workspace_premium_outlined, color: scheme.primary),
                     title: const Text('Subscription'),
-                    subtitle: Text(
-                      sub == null
-                          ? 'No subscription yet'
-                          : '${sub.plan?.name ?? sub.status} · ${sub.status == 'trialing' ? 'Trial' : sub.status}',
-                    ),
+                    subtitle: Text(switch (subPresentation.phase) {
+                      SubscriptionPhase.none => 'No subscription yet',
+                      SubscriptionPhase.trial => 'Trial · ${subPresentation.daysLeft} day(s) left',
+                      SubscriptionPhase.active =>
+                        '${subPresentation.planName} · Active until ${SubscriptionPresentation.formatDate(subPresentation.endDate)}',
+                      SubscriptionPhase.ended =>
+                        '${subPresentation.planName.isEmpty ? 'Subscription' : subPresentation.planName} · Ended',
+                    }),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/subscribe'),
                   ),
@@ -112,13 +117,14 @@ class SettingsScreen extends ConsumerWidget {
                     subtitle: const Text('Download .xlsx of all business data'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      messenger.showSnackBar(const SnackBar(content: Text('Preparing export...')));
+                      AppToast.show(context, 'Preparing export...', type: AppToastType.info);
                       try {
                         final file = await ref.read(exportRepositoryProvider).downloadExport();
-                        messenger.showSnackBar(SnackBar(content: Text('Saved to ${file.path}')));
+                        if (!context.mounted) return;
+                        AppToast.show(context, 'Saved to ${file.path}', type: AppToastType.success);
                       } on ApiException catch (e) {
-                        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                        if (!context.mounted) return;
+                        AppToast.show(context, e.message, type: AppToastType.error);
                       }
                     },
                   ),

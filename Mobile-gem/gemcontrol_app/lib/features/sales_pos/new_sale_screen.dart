@@ -15,6 +15,7 @@ import '../../shared/widgets/gold_divider.dart';
 import '../customers/customers_providers.dart';
 import '../sales_history/sales_history_providers.dart';
 import 'item_picker_sheet.dart';
+import '../../shared/widgets/app_toast.dart';
 
 const _paymentMethods = ['cash', 'card', 'online', 'bankTransfer', 'Upi', 'cheque'];
 
@@ -280,16 +281,12 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   ) async {
     final firm = ref.read(currentFirmProvider);
     if (_cart.isEmpty || _customer == null || firm == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add a customer and at least one item')),
-      );
+      AppToast.show(context, 'Add a customer and at least one item', type: AppToastType.warning);
       return;
     }
     final remaining = totalAmount - _paymentsTotal - _udharAmount;
     if (remaining.abs() > 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payments + udhar must add up to the total amount')),
-      );
+      AppToast.show(context, 'Payments + udhar must add up to the total amount', type: AppToastType.warning);
       return;
     }
     setState(() => _submitting = true);
@@ -325,7 +322,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       if (mounted) context.pushReplacement('/sales/${sale.id}', extra: sale);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _submitting = false);

@@ -8,6 +8,10 @@ import api from "../utils/api";
 function ProtectedRoute() {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const isAuthChecked = useSelector((state) => state.auth.isAuthChecked);
+  const user = useSelector((state) => state.auth.user);
+  // The platform owner has no firm and no subscription: skip the shop
+  // subscription gate entirely and keep them on the platform panel.
+  const isPlatformOwner = user?.role?.toLowerCase() === "superadmin";
   const dispatch = useDispatch();
   const location = useLocation();
   // Account Settings (self-service deletion) must stay reachable even with
@@ -31,7 +35,7 @@ function ProtectedRoute() {
   }, [dispatch, isAuthChecked]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isPlatformOwner) return;
     let cancelled = false;
     api
       .get("/getMySubscription")
@@ -44,7 +48,7 @@ function ProtectedRoute() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isPlatformOwner]);
 
   if (!isAuthChecked) {
     return null;
@@ -52,6 +56,14 @@ function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} />;
+  }
+
+  if (isPlatformOwner) {
+    return location.pathname.startsWith(ROUTES.PLATFORM_ADMIN) ? (
+      <Outlet />
+    ) : (
+      <Navigate to={ROUTES.PLATFORM_ADMIN} />
+    );
   }
 
   if (subscriptionActive === "unknown" && !isExemptFromSubscriptionGate) {

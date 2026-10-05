@@ -9,6 +9,7 @@ import '../../core/utils/currency.dart';
 import '../../shared/widgets/gold_divider.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'girvi_providers.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class GirviDetailSheet extends ConsumerStatefulWidget {
   final Girvi girvi;
@@ -203,7 +204,7 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
                   if (mounted) Navigator.pop(context);
                 } on ApiException catch (e) {
                   if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+                    AppToast.show(ctx, e.message, type: AppToastType.error);
                   }
                 }
               },
@@ -264,7 +265,7 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
                   if (mounted) Navigator.pop(context);
                 } on ApiException catch (e) {
                   if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+                    AppToast.show(ctx, e.message, type: AppToastType.error);
                   }
                 }
               },

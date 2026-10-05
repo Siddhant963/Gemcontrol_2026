@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/models/subscription.dart';
 import '../../core/repositories/subscription_repository.dart';
 import 'subscription_providers.dart';
 
@@ -40,6 +41,11 @@ class AppleIapState {
   // True if the most recent getAppleAppAccountToken() call failed. Drives
   // the UI's retry affordance; buy() refuses to start while this is true.
   final bool appAccountTokenFailed;
+  // Set when a purchase/restore was verified by the backend and the
+  // subscription refreshed. [successSeq] increments each time so the screen
+  // can show the message exactly once per success (ref.listen on the change).
+  final String? successMessage;
+  final int successSeq;
 
   const AppleIapState({
     this.status = AppleIapStatus.idle,
@@ -50,6 +56,8 @@ class AppleIapState {
     this.appAccountToken,
     this.appAccountTokenLoading = true,
     this.appAccountTokenFailed = false,
+    this.successMessage,
+    this.successSeq = 0,
   });
 
   AppleIapState copyWith({
@@ -63,6 +71,8 @@ class AppleIapState {
     String? appAccountToken,
     bool? appAccountTokenLoading,
     bool? appAccountTokenFailed,
+    String? successMessage,
+    int? successSeq,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -75,6 +85,8 @@ class AppleIapState {
       appAccountToken: appAccountToken ?? this.appAccountToken,
       appAccountTokenLoading: appAccountTokenLoading ?? this.appAccountTokenLoading,
       appAccountTokenFailed: appAccountTokenFailed ?? this.appAccountTokenFailed,
+      successMessage: successMessage ?? this.successMessage,
+      successSeq: successSeq ?? this.successSeq,
     );
   }
 }
@@ -110,7 +122,7 @@ bool canStartApplePurchase(AppleIapState state) {
 class AppleIapController extends StateNotifier<AppleIapState> {
   final InAppPurchase _iap;
   final SubscriptionRepository _subscriptionRepository;
-  final Future<void> Function() _onEntitlementChanged;
+  final Future<void> Function(Subscription verified) _onEntitlementChanged;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
 
   AppleIapController(this._iap, this._subscriptionRepository, this._onEntitlementChanged)
@@ -340,12 +352,21 @@ class AppleIapController extends StateNotifier<AppleIapState> {
       return;
     }
     try {
-      await _subscriptionRepository.verifyApplePurchase(
+      final verified = await _subscriptionRepository.verifyApplePurchase(
         transactionId: transactionId,
         productId: purchase.productID,
       );
-      await _onEntitlementChanged();
-      state = state.copyWith(status: AppleIapStatus.idle, clearPurchasingProductId: true);
+      // Backend-verified -> show the active subscription right away, then
+      // reconcile with a fresh read (see SubscriptionController.activated).
+      await _onEntitlementChanged(verified);
+      state = state.copyWith(
+        status: AppleIapStatus.idle,
+        clearPurchasingProductId: true,
+        successMessage: purchase.status == PurchaseStatus.restored
+            ? 'Subscription restored successfully.'
+            : 'Subscription activated successfully.',
+        successSeq: state.successSeq + 1,
+      );
     } on ApiException catch (e) {
       state = state.copyWith(
         status: AppleIapStatus.idle,
@@ -380,6 +401,6 @@ final appleIapControllerProvider = StateNotifierProvider<AppleIapController, App
   return AppleIapController(
     InAppPurchase.instance,
     repo,
-    () => ref.read(subscriptionControllerProvider.notifier).refresh(),
+    (verified) => ref.read(subscriptionControllerProvider.notifier).activated(verified),
   );
 });

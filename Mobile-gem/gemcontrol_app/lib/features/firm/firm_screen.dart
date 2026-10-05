@@ -12,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class FirmScreen extends ConsumerWidget {
   const FirmScreen({super.key});
@@ -236,11 +237,11 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+        AppToast.show(context, 'Could not save: $e', type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

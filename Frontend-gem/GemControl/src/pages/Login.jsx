@@ -6,6 +6,7 @@ import { useTheme } from "@mui/material/styles";
 import { motion } from "framer-motion";
 import { loginSuccess, setError } from "../redux/authSlice";
 import { ROUTES } from "../utils/routes";
+import { homeRouteFor } from "../utils/roles";
 import api from "../utils/api";
 import { jwtDecode } from "jwt-decode";
 import NotificationModal from "../components/NotificationModal";
@@ -50,7 +51,7 @@ function Login() {
 
       dispatch(loginSuccess({ user, token }));
       setNotificationDialog({ open: true, message: "Login successful!", type: "success", title: "Success" });
-      setTimeout(() => navigate(ROUTES.DASHBOARD), 500);
+      setTimeout(() => navigate(homeRouteFor(user)), 500);
     } catch (err) {
       let errorMessage = "Login failed. Please try again.";
       let errorTitle = "Login Error";

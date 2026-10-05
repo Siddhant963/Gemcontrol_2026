@@ -11,6 +11,7 @@ import '../../core/repositories/girvi_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../customers/customers_providers.dart';
 import 'girvi_providers.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class AddGirviSheet extends ConsumerStatefulWidget {
   const AddGirviSheet({super.key});
@@ -39,15 +40,11 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
   Future<void> _save() async {
     final firm = ref.read(currentFirmProvider);
     if (_itemNameCtrl.text.trim().isEmpty || _customer == null || _image == null || firm == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Item name, customer and photo are required')),
-      );
+      AppToast.show(context, 'Item name, customer and photo are required', type: AppToastType.warning);
       return;
     }
     if (!RegExp(r'[A-Za-z]').hasMatch(_itemNameCtrl.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Item name must contain letters, not just numbers')),
-      );
+      AppToast.show(context, 'Item name must contain letters, not just numbers', type: AppToastType.warning);
       return;
     }
     setState(() => _saving = true);
@@ -68,7 +65,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

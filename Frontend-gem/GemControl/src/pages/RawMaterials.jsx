@@ -36,6 +36,21 @@ import { setError as setAuthError } from "../redux/authSlice";
 import { ROUTES } from "../utils/routes";
 import api, { BASE_URL } from "../utils/api";
 import NotificationModal from "../components/NotificationModal";
+import useToast from "../hooks/useToast";
+import {
+  mapServerErrorToField,
+  useRevalidateOnChange,
+  useUserInteracted,
+  validateFieldOnBlur,
+} from "../utils/validation/formValidation";
+import {
+  RAW_MATERIAL_FORM_FIELDS,
+  RAW_MATERIAL_SERVER_ERROR_RULES,
+  RAW_STOCK_FORM_FIELDS,
+  RAW_STOCK_SERVER_ERROR_RULES,
+  getRawMaterialErrors,
+  getRawStockErrors,
+} from "../utils/validation/rawMaterialRules";
 
 function RawMaterials() {
   const theme = useTheme();
@@ -60,6 +75,7 @@ function RawMaterials() {
     type: "info",
     title: "",
   });
+  const toast = useToast();
   const [formErrors, setFormErrors] = useState({});
   const [newMaterial, setNewMaterial] = useState({
     name: "",
@@ -137,46 +153,27 @@ function RawMaterials() {
   }, [fetchData]);
 
   const validateForm = () => {
-    const errors = {};
-    if (!newMaterial.name.trim()) errors.name = "Material name is required";
-    else if (!/[A-Za-z]/.test(newMaterial.name))
-      errors.name = "Name must contain letters, not just numbers";
-    if (!newMaterial.materialType)
-      errors.materialType = "Material type is required";
-    if (
-      !newMaterial.quantity ||
-      isNaN(newMaterial.quantity) ||
-      newMaterial.quantity <= 0
-    )
-      errors.quantity = "Valid quantity is required";
-    if (
-      newMaterial.weight !== "" &&
-      (isNaN(newMaterial.weight) || Number(newMaterial.weight) < 0)
-    )
-      errors.weight = "Weight cannot be negative";
-    if (
-      newMaterial.price !== "" &&
-      (isNaN(newMaterial.price) || Number(newMaterial.price) < 0)
-    )
-      errors.price = "Price cannot be negative";
-    if (!newMaterial.firm) errors.firm = "Firm is required";
+    const errors = getRawMaterialErrors(newMaterial);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const validateStockForm = () => {
-    const errors = {};
-    if (!stockUpdate.rawMaterialId)
-      errors.rawMaterialId = "Material selection is required";
-    if (
-      !stockUpdate.quantity ||
-      isNaN(stockUpdate.quantity) ||
-      stockUpdate.quantity <= 0
-    )
-      errors.quantity = "Valid quantity is required";
+    const errors = getRawStockErrors(stockUpdate);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  // Live validation: a field that already shows an error is re-checked on
+  // every edit; leaving a field validates it right away.
+  useRevalidateOnChange(newMaterial, getRawMaterialErrors, setFormErrors, RAW_MATERIAL_FORM_FIELDS);
+  useRevalidateOnChange(stockUpdate, getRawStockErrors, setFormErrors, RAW_STOCK_FORM_FIELDS);
+  const materialInteracted = useUserInteracted(openAddModal);
+  const stockInteracted = useUserInteracted(openStockModal);
+  const handleMaterialBlur = (e) =>
+    validateFieldOnBlur(e.target.name, newMaterial, getRawMaterialErrors, setFormErrors, RAW_MATERIAL_FORM_FIELDS, materialInteracted);
+  const handleStockBlur = (e) =>
+    validateFieldOnBlur(e.target.name, stockUpdate, getRawStockErrors, setFormErrors, RAW_STOCK_FORM_FIELDS, stockInteracted);
 
   const handleAddMaterial = () => {
     if (!currentUser) {
@@ -347,13 +344,13 @@ function RawMaterials() {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewMaterial({ ...newMaterial, [name]: value });
-    setFormErrors({ ...formErrors, [name]: null, submit: null });
+    setFormErrors((prev) => ({ ...prev, submit: null }));
   };
 
   const handleStockInputChange = (e) => {
     const { name, value } = e.target;
     setStockUpdate({ ...stockUpdate, [name]: value });
-    setFormErrors({ ...formErrors, [name]: null, submit: null });
+    setFormErrors((prev) => ({ ...prev, submit: null }));
   };
 
   const handleFileChange = (e) => {
@@ -366,12 +363,7 @@ function RawMaterials() {
 
  const handleSaveMaterial = useCallback(async () => {
   if (!validateForm()) {
-    setNotificationDialog({
-      open: true,
-      message: "Please correct the form errors.",
-      type: "error",
-      title: "Validation Error",
-    });
+    toast.warning("Please correct the form errors.");
     return;
   }
 
@@ -391,13 +383,8 @@ function RawMaterials() {
   });
 
   if (isDuplicate) {
-    setFormErrors({ name: "Material with this name already exists." });
-    setNotificationDialog({
-      open: true,
-      message: "Material with this name already exists.",
-      type: "error",
-      title: "Validation Error",
-    });
+    setFormErrors((prev) => ({ ...prev, name: "Material with this name already exists." }));
+    toast.error("Material with this name already exists.");
     return;
   }
 
@@ -445,12 +432,7 @@ function RawMaterials() {
     });
     setFormErrors({});
 
-    setNotificationDialog({
-      open: true,
-      message: `Material ${editingId ? "updated" : "added"} successfully!`,
-      type: "success",
-      title: "Success",
-    });
+    toast.success(`Material ${editingId ? "updated" : "added"} successfully!`);
   } catch (err) {
     console.error("CreateMaterial error:", {
       status: err.response?.status,
@@ -466,29 +448,26 @@ function RawMaterials() {
         : err.response?.data?.message ||
           `Failed to ${editingId ? "update" : "add"} material.`;
 
-    setFormErrors({ submit: errorMessage });
-    setNotificationDialog({
-      open: true,
-      message: errorMessage,
-      type: "error",
-      title: "Error",
-    });
+    // Put a server message on the exact field when we can tell which one
+    // it is; otherwise show it as the form-level error.
+    const field = mapServerErrorToField(errorMessage, RAW_MATERIAL_SERVER_ERROR_RULES);
+    setFormErrors((prev) => ({
+      ...prev,
+      ...(field ? { [field]: errorMessage } : {}),
+      submit: field ? null : errorMessage,
+    }));
+    toast.error(errorMessage);
 
     dispatch(setAuthError(errorMessage));
   } finally {
     setLoading(false);
   }
-}, [newMaterial, fetchData, dispatch, materials, editingId]);
+}, [newMaterial, fetchData, dispatch, materials, editingId, toast]);
 
 
   const handleSaveStock = useCallback(async () => {
     if (!validateStockForm()) {
-      setNotificationDialog({
-        open: true,
-        message: "Please correct the form errors.",
-        type: "error",
-        title: "Validation Error",
-      });
+      toast.warning("Please correct the form errors.");
       return;
     }
 
@@ -502,12 +481,7 @@ function RawMaterials() {
       setOpenStockModal(false);
       setStockUpdate({ rawMaterialId: "", quantity: "" });
       setFormErrors({});
-      setNotificationDialog({
-        open: true,
-        message: "Stock updated successfully!",
-        type: "success",
-        title: "Success",
-      });
+      toast.success("Stock updated successfully!");
     } catch (err) {
       console.error("AddStock error:", {
         status: err.response?.status,
@@ -520,18 +494,18 @@ function RawMaterials() {
           : err.response?.status === 403
           ? "Admin access required to update stock."
           : err.response?.data?.message || "Failed to update stock.";
-      setFormErrors({ submit: errorMessage });
-      setNotificationDialog({
-        open: true,
-        message: errorMessage,
-        type: "error",
-        title: "Error",
-      });
+      const field = mapServerErrorToField(errorMessage, RAW_STOCK_SERVER_ERROR_RULES);
+      setFormErrors((prev) => ({
+        ...prev,
+        ...(field ? { [field]: errorMessage } : {}),
+        submit: field ? null : errorMessage,
+      }));
+      toast.error(errorMessage);
       dispatch(setAuthError(errorMessage));
     } finally {
       setLoading(false);
     }
-  }, [stockUpdate, fetchData, dispatch]);
+  }, [stockUpdate, fetchData, dispatch, toast]);
 
   const handleRemoveMaterial = async (rawMaterialId) => {
     if (!window.confirm("Are you sure you want to remove this material?"))
@@ -1160,6 +1134,7 @@ function RawMaterials() {
             fullWidth
             value={newMaterial.name}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             error={!!formErrors.name}
             helperText={formErrors.name}
             sx={{
@@ -1177,6 +1152,7 @@ function RawMaterials() {
             name="materialType"
             value={newMaterial.materialType}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             fullWidth
             sx={{
               mb: { xs: 1, sm: 2 },
@@ -1222,6 +1198,7 @@ function RawMaterials() {
             name="firm"
             value={newMaterial.firm}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             fullWidth
             sx={{
               mb: { xs: 1, sm: 2 },
@@ -1249,6 +1226,11 @@ function RawMaterials() {
               </MenuItem>
             ))}
           </Select>
+          {formErrors.firm && (
+            <Typography variant="caption" color="error" sx={{ display: "block", mb: 1 }}>
+              {formErrors.firm}
+            </Typography>
+          )}
           <TextField
             margin="dense"
             name="quantity"
@@ -1257,6 +1239,7 @@ function RawMaterials() {
             fullWidth
             value={newMaterial.quantity}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             error={!!formErrors.quantity}
             helperText={formErrors.quantity}
             sx={{
@@ -1278,6 +1261,7 @@ function RawMaterials() {
             fullWidth
             value={newMaterial.weight}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             error={!!formErrors.weight}
             helperText={
               formErrors.weight ||
@@ -1301,6 +1285,7 @@ function RawMaterials() {
             fullWidth
             value={newMaterial.price}
             onChange={handleInputChange}
+            onBlur={handleMaterialBlur}
             error={!!formErrors.price}
             helperText={
               formErrors.price ||
@@ -1473,6 +1458,7 @@ function RawMaterials() {
             name="rawMaterialId"
             value={stockUpdate.rawMaterialId}
             onChange={handleStockInputChange}
+            onBlur={handleStockBlur}
             fullWidth
             sx={{
               mb: { xs: 1, sm: 2 },
@@ -1499,6 +1485,7 @@ function RawMaterials() {
             fullWidth
             value={stockUpdate.quantity}
             onChange={handleStockInputChange}
+            onBlur={handleStockBlur}
             error={!!formErrors.quantity}
             helperText={formErrors.quantity}
             sx={{

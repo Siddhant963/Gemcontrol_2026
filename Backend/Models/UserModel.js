@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ["admin", "staff", "user"], // Added "user" to the enum
+    // "superadmin" = the platform owner (no firm). Never assignable through
+    // any API -- see Utils/roles.js and seed/createSuperAdmin.js.
+    enum: ["admin", "staff", "user", "superadmin"],
   },
   firm: {
     type: mongoose.Schema.Types.ObjectId,

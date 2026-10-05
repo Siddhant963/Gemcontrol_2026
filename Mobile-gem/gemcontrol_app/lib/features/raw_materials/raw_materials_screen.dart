@@ -14,6 +14,8 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'raw_materials_providers.dart';
+import '../../shared/widgets/app_toast.dart';
+import '../../shared/forms/live_validation.dart';
 
 class RawMaterialsScreen extends ConsumerWidget {
   const RawMaterialsScreen({super.key});
@@ -156,14 +158,44 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
   XFile? _image;
   bool _saving = false;
 
+  // Field-level validation (see LiveValidation); same rules as the web form.
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+
+  Map<String, String> _rules() {
+    final errors = <String, String>{};
+    final name = _nameCtrl.text;
+    if (name.trim().isEmpty) {
+      errors['name'] = 'Material name is required';
+    } else if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
+      errors['name'] = 'Name must contain letters, not just numbers';
+    }
+    if ((double.tryParse(_qtyCtrl.text) ?? 0) <= 0) {
+      errors['quantity'] = 'Valid quantity is required';
+    }
+    return errors;
+  }
+
   Future<void> _pickImage() async {
     final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (img != null) setState(() => _image = img);
   }
 
   Future<void> _save() async {
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      return;
+    }
     final firm = ref.read(currentFirmProvider);
-    if (_nameCtrl.text.trim().isEmpty || firm == null) return;
+    if (firm == null) {
+      AppToast.show(
+        context,
+        'No firm found — set up a firm in Settings first',
+        type: AppToastType.warning,
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(rawMaterialRepositoryProvider).createRawMaterial(
@@ -177,7 +209,13 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        final m = e.message.toLowerCase();
+        if (m.contains('name')) {
+          _v.setServerError('name', e.message);
+        } else if (m.contains('quantity')) {
+          _v.setServerError('quantity', e.message);
+        }
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -217,7 +255,14 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+          _v.wrap(
+            'name',
+            TextField(
+              controller: _nameCtrl,
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+            ),
+          ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
             initialValue: _materialType,
@@ -228,10 +273,17 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
             onChanged: (v) => setState(() => _materialType = v!),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _qtyCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Initial quantity (grams)'),
+          _v.wrap(
+            'quantity',
+            TextField(
+              controller: _qtyCtrl,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(
+                labelText: 'Initial quantity (grams)',
+                errorText: _v.errorFor('quantity'),
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           ElevatedButton(

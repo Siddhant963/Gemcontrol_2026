@@ -37,7 +37,8 @@ function NavList({ variant = "full", animated = false, onNavigate }) {
   const theme = useTheme();
   const user = useSelector((state) => state.auth.user);
   const isAdmin = user?.role?.toLowerCase() === "admin";
-  const items = getVisibleMenuItems(isAdmin);
+  const isSuperAdmin = user?.role?.toLowerCase() === "superadmin";
+  const items = getVisibleMenuItems(isAdmin, isSuperAdmin);
   const isRail = variant === "rail";
 
   const [ready, setReady] = useState(!animated);

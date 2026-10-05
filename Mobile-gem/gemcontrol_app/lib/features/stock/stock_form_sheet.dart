@@ -10,6 +10,8 @@ import '../../core/models/stock.dart';
 import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/stock_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/forms/live_validation.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../categories/categories_providers.dart';
 import 'stock_providers.dart';
 
@@ -51,6 +53,44 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
   ChargeUnit _labourUnit = ChargeUnit.fixed;
   XFile? _image;
   bool _saving = false;
+
+  // Field-level validation (see LiveValidation): errors show on blur / submit
+  // and re-check live once visible. Same rules the form always enforced.
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+  final _fieldKeys = <String, GlobalKey>{
+    'name': GlobalKey(),
+    'category': GlobalKey(),
+    'gross': GlobalKey(),
+    'price': GlobalKey(),
+  };
+
+  Map<String, String> _rules() {
+    final errors = <String, String>{};
+    final name = _nameCtrl.text;
+    if (name.trim().isEmpty) {
+      errors['name'] = 'Item name is required';
+    } else if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
+      errors['name'] = 'Name must contain letters, not just numbers';
+    }
+    if (_categoryId == null) errors['category'] = 'Category is required';
+    if (_num(_grossCtrl) - _num(_lessCtrl) <= 0) {
+      errors['gross'] = 'Enter a gross weight greater than the less weight';
+    }
+    if (_num(_priceCtrl) <= 0) errors['price'] = 'Enter a price greater than 0';
+    return errors;
+  }
+
+  // The backend replies with a message only; map the known ones to a field.
+  String? _fieldForServerMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('name')) return 'name';
+    if (m.contains('category')) return 'category';
+    if (m.contains('weight')) return 'gross';
+    if (m.contains('price')) return 'price';
+    return null;
+  }
 
   bool get _isEdit => widget.existing != null;
 
@@ -145,39 +185,26 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _categoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and category are required')),
-      );
-      return;
-    }
-    if (!RegExp(r'[A-Za-z]').hasMatch(_nameCtrl.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name must contain letters, not just numbers')),
-      );
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      final first = _v.firstErrorField(['name', 'category', 'gross', 'price']);
+      final ctx = first == null ? null : _fieldKeys[first]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 200), alignment: 0.1);
+      }
       return;
     }
     final firm = ref.read(currentFirmProvider);
     if (firm == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No firm found — set up a firm in Settings first')),
+      AppToast.show(
+        context,
+        'No firm found — set up a firm in Settings first',
+        type: AppToastType.warning,
       );
       return;
     }
     final grossWeight = _num(_grossCtrl);
     final lessWeight = _num(_lessCtrl);
-    if (grossWeight - lessWeight <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a gross weight greater than the less weight')),
-      );
-      return;
-    }
-    if (_num(_priceCtrl) <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a price greater than 0')),
-      );
-      return;
-    }
     setState(() => _saving = true);
     final fields = StockFields(
       name: _nameCtrl.text.trim(),
@@ -210,7 +237,9 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        final field = _fieldForServerMessage(e.message);
+        if (field != null) _v.setServerError(field, e.message);
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -260,7 +289,15 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Item name')),
+            _v.wrap(
+              'name',
+              TextField(
+                key: _fieldKeys['name'],
+                controller: _nameCtrl,
+                onChanged: (_) => _v.changed(),
+                decoration: InputDecoration(labelText: 'Item name', errorText: _v.errorFor('name')),
+              ),
+            ),
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
@@ -310,13 +347,23 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                         ],
                       ),
                     )
-                  : DropdownButtonFormField<String>(
-                      initialValue: _categoryId,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: categories
-                          .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _categoryId = v),
+                  : _v.wrap(
+                      'category',
+                      DropdownButtonFormField<String>(
+                        key: _fieldKeys['category'],
+                        initialValue: _categoryId,
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          errorText: _v.errorFor('category'),
+                        ),
+                        items: categories
+                            .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() => _categoryId = v);
+                          _v.changed();
+                        },
+                      ),
                     ),
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const Text('Could not load categories'),
@@ -329,11 +376,20 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _grossCtrl,
-                    focusNode: _grossFocus,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Gross weight'),
+                  child: _v.wrap(
+                    'gross',
+                    TextField(
+                      key: _fieldKeys['gross'],
+                      controller: _grossCtrl,
+                      focusNode: _grossFocus,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => _v.changed(),
+                      decoration: InputDecoration(
+                        labelText: 'Gross weight',
+                        errorText: _v.errorFor('gross'),
+                        errorMaxLines: 3,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -342,6 +398,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                     controller: _lessCtrl,
                     focusNode: _lessFocus,
                     keyboardType: TextInputType.number,
+                    onChanged: (_) => _v.changed(),
                     decoration: const InputDecoration(labelText: 'Less weight'),
                   ),
                 ),
@@ -359,11 +416,19 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: TextField(
-                    controller: _priceCtrl,
-                    focusNode: _priceFocus,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Price (₹)'),
+                  child: _v.wrap(
+                    'price',
+                    TextField(
+                      key: _fieldKeys['price'],
+                      controller: _priceCtrl,
+                      focusNode: _priceFocus,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => _v.changed(),
+                      decoration: InputDecoration(
+                        labelText: 'Price (₹)',
+                        errorText: _v.errorFor('price'),
+                      ),
+                    ),
                   ),
                 ),
               ],

@@ -60,7 +60,14 @@ export const menuItems = [
   { text: "Firm Management", icon: "storefront", path: ROUTES.FIRM_MANAGEMENT, adminOnly: true, section: "System & Staff" },
   { text: "Subscription", icon: "workspace_premium", path: ROUTES.SUBSCRIBE, adminOnly: true, section: "System & Staff" },
   { text: "Account Settings", icon: "account_circle", path: ROUTES.ACCOUNT_SETTINGS, section: "System & Staff" },
+  // Platform-owner panel: shown ONLY to the "superadmin" role (and that role
+  // sees nothing else -- it has no firm).
+  { text: "Overview", icon: "insights", path: ROUTES.PLATFORM_ADMIN, platformOnly: true, section: "Platform" },
+  { text: "Firms & Subscribers", icon: "apartment", path: ROUTES.PLATFORM_FIRMS, platformOnly: true, section: "Platform" },
+  { text: "App Usage", icon: "bar_chart", path: ROUTES.PLATFORM_USAGE, platformOnly: true, section: "Platform" },
 ];
 
-export const getVisibleMenuItems = (isAdmin) =>
-  menuItems.filter((item) => !item.adminOnly || isAdmin);
+export const getVisibleMenuItems = (isAdmin, isSuperAdmin = false) =>
+  isSuperAdmin
+    ? menuItems.filter((item) => item.platformOnly)
+    : menuItems.filter((item) => !item.platformOnly && (!item.adminOnly || isAdmin));

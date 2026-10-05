@@ -13,8 +13,10 @@ import '../../core/models/subscription.dart';
 import '../../core/repositories/subscription_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_drawer.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'apple_iap_controller.dart';
+import 'subscription_presentation.dart';
 import 'subscription_providers.dart';
 
 // Same web pages the existing RatnSetu site already serves (see
@@ -30,19 +32,13 @@ Future<void> _openLegalUrl(BuildContext context, String url) async {
   final uri = Uri.parse(url);
   final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!launched && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open $url')));
+    AppToast.show(context, 'Could not open $url', type: AppToastType.error);
   }
 }
 
 final _plansProvider = FutureProvider.autoDispose<List<SubscriptionPlan>>((ref) {
   return ref.watch(subscriptionRepositoryProvider).getPlans();
 });
-
-int _daysLeft(DateTime? endDate) {
-  if (endDate == null) return 0;
-  final ms = endDate.difference(DateTime.now()).inMilliseconds;
-  return (ms / (24 * 60 * 60 * 1000)).ceil().clamp(0, 1 << 30);
-}
 
 /// Matches a backend [SubscriptionPlan] to the StoreKit [ProductDetails]
 /// Apple returned, via the plan's own `appleProductId` (never a hardcoded
@@ -115,16 +111,26 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final planKey = _pendingPlanKey;
     if (planKey == null) return;
     try {
-      await ref.read(subscriptionRepositoryProvider).verifyPayment(
+      final verified = await ref.read(subscriptionRepositoryProvider).verifyPayment(
             orderId: response.orderId ?? '',
             paymentId: response.paymentId ?? '',
             signature: response.signature ?? '',
             planKey: planKey,
           );
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
-      if (mounted) context.go('/home');
+      // Backend-verified: show the active subscription immediately, then
+      // reconcile with a fresh read (never rely on the pre-purchase state).
+      await ref.read(subscriptionControllerProvider.notifier).activated(verified);
+      if (mounted) {
+        AppToast.show(context, 'Subscription activated successfully.', type: AppToastType.success);
+        context.go('/home');
+      }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() => _error = e.message);
+        AppToast.show(context, e.message, type: AppToastType.error);
+        // The server may still have activated it (webhook safety net).
+        await ref.read(subscriptionControllerProvider.notifier).refresh();
+      }
     } finally {
       if (mounted) setState(() => _activatingKey = null);
     }
@@ -149,8 +155,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final subAsync = ref.watch(subscriptionControllerProvider);
     final plansAsync = ref.watch(_plansProvider);
 
-    final sub = subAsync.valueOrNull?.subscription;
-    final isTrialing = sub?.status == 'trialing' && (subAsync.valueOrNull?.isActive ?? false);
+    final presentation = SubscriptionPresentation.from(subAsync.valueOrNull);
 
     // iOS must buy through Apple StoreKit, never Razorpay -- Android/Web
     // below are completely untouched and still go through _subscribe.
@@ -159,6 +164,16 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final isIOS = Platform.isIOS;
     final appleState = isIOS ? ref.watch(appleIapControllerProvider) : null;
     final appleError = appleState?.error;
+
+    // One success toast per verified purchase/restore (iOS). Razorpay shows
+    // its own in _onPaymentSuccess.
+    if (isIOS) {
+      ref.listen<AppleIapState>(appleIapControllerProvider, (previous, next) {
+        if (next.successSeq != (previous?.successSeq ?? 0) && next.successMessage != null) {
+          AppToast.show(context, next.successMessage!, type: AppToastType.success);
+        }
+      });
+    }
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -171,14 +186,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
-            Text(
-              isTrialing
-                  ? 'Your free trial is active — ${_daysLeft(sub?.endDate)} day(s) left.'
-                  : sub != null
-                      ? 'Your subscription has ended. Pick a plan below to keep using RatnSetu.'
-                      : 'Pick a plan below to start using RatnSetu.',
-              style: TextStyle(color: scheme.onSurfaceVariant),
-            ),
+            _StatusBanner(presentation: presentation, updating: subAsync.isLoading),
             const SizedBox(height: AppSpacing.md),
             if (!isAdmin)
               Padding(
@@ -230,9 +238,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   for (final plan in plans) ...[
                     _PlanCard(
                       plan: plan,
-                      isCurrentPlan: sub?.plan?.id == plan.id,
+                      isCurrentPlan: presentation.isCurrentPlan(plan.id),
                       isAdmin: isAdmin,
-                      isRenewal: isTrialing || sub != null,
+                      actionLabel: presentation.actionLabel(plan.id),
                       isIOS: isIOS,
                       // Android/Web: unchanged Razorpay path.
                       isActivating: _activatingKey == plan.key,
@@ -310,12 +318,63 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 }
 
+/// Shows the backend-verified subscription state: a success banner for an
+/// active plan, a warning when it has ended, plain info otherwise. While a
+/// refresh is in flight the last known state stays visible with a small
+/// "Updating subscription..." note (never a wrong flash).
+class _StatusBanner extends StatelessWidget {
+  final SubscriptionPresentation presentation;
+  final bool updating;
+
+  const _StatusBanner({required this.presentation, required this.updating});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<AppColorsExtension>();
+    final kind = presentation.bannerKind;
+    final Color? bg = switch (kind) {
+      SubscriptionBannerKind.success => extra?.successContainer ?? scheme.secondaryContainer,
+      SubscriptionBannerKind.warning => extra?.transitContainer ?? scheme.tertiaryContainer,
+      SubscriptionBannerKind.info => null,
+    };
+    final Color fg = switch (kind) {
+      SubscriptionBannerKind.success => extra?.onSuccessContainer ?? scheme.onSecondaryContainer,
+      SubscriptionBannerKind.warning => extra?.onTransitContainer ?? scheme.onTertiaryContainer,
+      SubscriptionBannerKind.info => scheme.onSurfaceVariant,
+    };
+    final text = Text(presentation.message, style: TextStyle(color: fg));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (bg == null)
+          text
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm + 4),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadii.md)),
+            child: text,
+          ),
+        if (updating)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            child: Text(
+              'Updating subscription...',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _PlanCard extends StatelessWidget {
   final SubscriptionPlan plan;
   final bool isCurrentPlan;
   final bool isAdmin;
   final bool isActivating;
-  final bool isRenewal;
+  final String actionLabel;
   final VoidCallback onTap;
   // iOS-only (all null/false on Android/Web, which keep using the fields
   // above via [onTap] exactly as before):
@@ -332,7 +391,7 @@ class _PlanCard extends StatelessWidget {
     required this.isCurrentPlan,
     required this.isAdmin,
     required this.isActivating,
-    required this.isRenewal,
+    required this.actionLabel,
     required this.onTap,
     this.isIOS = false,
     this.appleProduct,
@@ -426,9 +485,7 @@ class _PlanCard extends StatelessWidget {
                                     ? 'Purchasing...'
                                     : appleProduct == null
                                         ? 'Unavailable'
-                                        : (isCurrentPlan || isRenewal)
-                                            ? 'Renew'
-                                            : 'Subscribe',
+                                        : actionLabel,
                           ),
                         ))
                   : ElevatedButton(
@@ -436,9 +493,7 @@ class _PlanCard extends StatelessWidget {
                       child: Text(
                         isActivating
                             ? 'Opening checkout...'
-                            : (isCurrentPlan || isRenewal)
-                                ? 'Renew'
-                                : 'Subscribe',
+                            : actionLabel,
                       ),
                     ),
             ),

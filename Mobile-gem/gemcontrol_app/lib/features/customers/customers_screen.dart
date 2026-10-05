@@ -11,6 +11,7 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'customers_providers.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -165,9 +166,7 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty || firm == null) return;
     if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name must contain letters, not just numbers')),
-      );
+      AppToast.show(context, 'Name must contain letters, not just numbers', type: AppToastType.warning);
       return;
     }
     setState(() => _saving = true);
@@ -183,7 +182,7 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

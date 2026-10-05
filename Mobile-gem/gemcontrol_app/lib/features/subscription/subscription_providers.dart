@@ -20,7 +20,12 @@ class SubscriptionSession {
 /// explicit fetch here.
 class SubscriptionController extends AsyncNotifier<SubscriptionSession> {
   @override
-  Future<SubscriptionSession> build() async {
+  Future<SubscriptionSession> build() => _fetch();
+
+  /// [fallback] is what to keep showing if the fetch fails mid-session (a
+  /// refresh after a purchase). Only the very first load, with nothing known
+  /// yet, fails OPEN.
+  Future<SubscriptionSession> _fetch({SubscriptionSession? fallback}) async {
     final authSession = await ref.watch(authControllerProvider.future);
     ref.read(apiClientProvider).onSubscriptionRequired = () {
       state = const AsyncData(SubscriptionSession.inactive);
@@ -36,14 +41,29 @@ class SubscriptionController extends AsyncNotifier<SubscriptionSession> {
       // inactive, which flips this via onSubscriptionRequired above). This
       // client-side flag is only a UX convenience redirect, so a transient
       // network error on just this status fetch shouldn't hard-lock out a
-      // user whose subscription may well still be active.
-      return const SubscriptionSession(isActive: true);
+      // user whose subscription may well still be active. If we already
+      // know something (e.g. the backend-verified purchase result), keep it
+      // rather than replacing it with "no subscription".
+      return fallback ?? const SubscriptionSession(isActive: true);
     }
   }
 
+  /// Re-reads the subscription from the backend (the source of truth). The
+  /// last known state stays visible while loading ([AsyncLoading] carries the
+  /// previous value) so the screen never flashes a wrong "no subscription" /
+  /// "ended" message mid-refresh.
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = AsyncData(await build());
+    final previous = state.valueOrNull;
+    state = const AsyncLoading<SubscriptionSession>().copyWithPrevious(state);
+    state = AsyncData(await _fetch(fallback: previous));
+  }
+
+  /// A purchase/restore was just verified by the backend, which returned the
+  /// now-active subscription: show it immediately (instead of the stale
+  /// pre-purchase state), then reconcile with a fresh read.
+  Future<void> activated(Subscription verified) async {
+    state = AsyncData(SubscriptionSession(isActive: true, subscription: verified));
+    await refresh();
   }
 }
 

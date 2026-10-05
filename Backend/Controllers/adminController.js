@@ -25,6 +25,7 @@ const {
 } = require("../Utils/subscription.js");
 const { razorpay, verifyPaymentSignature, validateWebhookSignature } = require("../Utils/razorpay.js");
 const appleIap = require("../Utils/appleIap.js");
+const { isAssignableRole } = require("../Utils/roles.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -135,6 +136,10 @@ module.exports.RegisterUser = async (req, res) => {
           .json({ message: "Your account has no firm associated with it" });
       }
       const role = req.body.role || "staff";
+      // A firm admin may only hand out firm roles -- never "superadmin".
+      if (!isAssignableRole(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
       const newUser = new UserModel({
         name,
         email,
@@ -352,7 +357,12 @@ module.exports.UpdateUser = async (req, res) => {
     }
     if (name) user.name = name;
     if (contact) user.contact = contact;
-    if (role) user.role = role;
+    if (role) {
+      if (!isAssignableRole(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      user.role = role;
+    }
     await user.save();
     res.status(200).json({ message: "User updated successfully", user });
   } catch (error) {

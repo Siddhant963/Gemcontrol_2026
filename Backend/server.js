@@ -4,6 +4,7 @@ const connectDB = require("./Config/DbConnection");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const adminRoutes = require("./Routes/AdminRoutes");
+const platformRoutes = require("./Routes/platformRoutes");
 const { initializeCronJobs } = require("./Utils/cronJobs");
 const { razorpayWebhook, appleAppStoreNotifications } = require("./Controllers/adminController");
 const path = require("path");
@@ -99,6 +100,9 @@ app.use("/Uploads", express.static(path.join(__dirname, "Uploads")));
 app.use("/Uploads", express.static(path.join(__dirname, "../Uploads")));
 
 // API Routes
+// Platform-owner panel (read-only, superadmin only). Must be mounted BEFORE
+// the main admin router -- see Routes/platformRoutes.js.
+app.use("/api/admin/platform", platformRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Health check endpoint

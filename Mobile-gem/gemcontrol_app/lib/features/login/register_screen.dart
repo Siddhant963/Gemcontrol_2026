@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_client.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_toast.dart';
 
 /// Self-signup: creates a brand-new shop (Firm) and its admin account
 /// together in one step, mirroring the web app's "Set Up Your Shop" page --
@@ -59,9 +60,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             firmSize: _firmSizeCtrl.text.trim(),
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shop created — please log in.')),
-      );
+      AppToast.show(context, 'Shop created — please log in.', type: AppToastType.success);
       context.go('/login');
     } on ApiException catch (e) {
       setState(() => _error = e.message);

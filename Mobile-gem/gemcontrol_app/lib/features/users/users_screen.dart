@@ -9,6 +9,7 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../../shared/widgets/app_toast.dart';
 
 final allUsersProvider = FutureProvider.autoDispose<List<AppUser>>((ref) {
   return ref.watch(authRepositoryProvider).getAllUsers();
@@ -99,7 +100,7 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -10,6 +10,7 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
+import '../../shared/widgets/app_toast.dart';
 
 final allUdharProvider = FutureProvider.autoDispose<List<Udhar>>((ref) {
   return ref.watch(udharRepositoryProvider).getAllUdhar();
@@ -377,7 +378,7 @@ class _UdharEntryTile extends ConsumerWidget {
                 ref.invalidate(allUdharSettlementsProvider);
               } on ApiException catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+                  AppToast.show(ctx, e.message, type: AppToastType.error);
                 }
               }
               if (ctx.mounted) Navigator.pop(ctx);

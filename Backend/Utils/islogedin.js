@@ -48,6 +48,17 @@ module.exports.isAdmin = (req, res, next) => {
 };
 
 
+// Platform-owner gate for /api/admin/platform/* (Routes/platformRoutes.js).
+// Checked against the live DB role loaded by isLoggedIn, never the JWT claim.
+module.exports.isSuperAdmin = (req, res, next) => {
+  if (req.user && req.user.role?.toLowerCase() === "superadmin") {
+    next();
+  } else {
+    res.status(403).json({ message: "Forbidden: Platform admin access required" });
+  }
+};
+
+
 module.exports.isStaff = (req, res, next) => {
   if (req.user && req.user.role?.toLowerCase() === "staff") {
     next();

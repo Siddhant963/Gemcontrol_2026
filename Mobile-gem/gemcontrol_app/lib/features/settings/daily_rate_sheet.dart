@@ -6,6 +6,7 @@ import '../../core/models/daily_rate.dart';
 import '../../core/repositories/daily_rate_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_providers.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class DailyRateSheet extends ConsumerStatefulWidget {
   final DailyRate? existing;
@@ -76,7 +77,7 @@ class _DailyRateSheetState extends ConsumerState<DailyRateSheet> {
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.show(context, e.message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -40,6 +40,18 @@ import { ROUTES } from "../utils/routes";
 import api, { BASE_URL } from "../utils/api";
 import JsBarcode from "jsbarcode";
 import NotificationModal from "../components/NotificationModal";
+import useToast from "../hooks/useToast";
+import {
+  mapServerErrorToField,
+  useRevalidateOnChange,
+  useUserInteracted,
+  validateFieldOnBlur,
+} from "../utils/validation/formValidation";
+import {
+  STOCK_FORM_FIELDS,
+  STOCK_SERVER_ERROR_RULES,
+  getStockFormErrors,
+} from "../utils/validation/stockRules";
 
 const GOLD_KARATS = ["24K", "23K", "22K", "20K", "18K"];
 const DIAMOND_CARATS = ["0.5 Carat", "1 Carat", "1.5 Carat", "2 Carat", "2.5 Carat", "3 Carat"];
@@ -102,6 +114,7 @@ function ItemManagement() {
   const [firms, setFirms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const toast = useToast();
   const [formErrors, setFormErrors] = useState({});
   const [newItem, setNewItem] = useState({
     name: "",
@@ -244,45 +257,7 @@ function ItemManagement() {
   }, [newItem.firm, editItem.firm]);
 
   const validateForm = useCallback(() => {
-    const errors = {};
-    if (!newItem.name.trim()) errors.name = "Item name is required";
-    else if (!/[A-Za-z]/.test(newItem.name))
-      errors.name = "Item name must contain letters, not just numbers";
-    if (!newItem.materialgitType)
-      errors.materialgitType = "Material type is required"; // Fixed typo
-    if (!newItem.waight || isNaN(newItem.waight) || newItem.waight <= 0)
-      errors.waight = "Valid waight is required"; // Fixed typo
-    if (
-      (newItem.materialgitType === "gold" || newItem.materialgitType === "diamond") &&
-      !newItem.karat
-    )
-      errors.karat = "Karat is required for gold and diamond items";
-    if (newItem.lessWeight !== "" && newItem.lessWeight !== undefined) {
-      if (isNaN(newItem.lessWeight) || Number(newItem.lessWeight) < 0)
-        errors.lessWeight = "Less weight cannot be negative";
-      else if (Number(newItem.lessWeight) > (Number(newItem.waight) || 0))
-        errors.lessWeight = "Less weight cannot exceed gross weight";
-    }
-    if (!newItem.category) errors.category = "Category is required";
-    if (!newItem.firm) errors.firm = "Firm is required";
-    if (!newItem.quantity || isNaN(newItem.quantity) || newItem.quantity <= 0)
-      errors.quantity = "Valid quantity is required";
-    if (!newItem.price || isNaN(newItem.price) || newItem.price <= 0)
-      errors.price = "Valid price is required";
-    if (
-      !newItem.makingCharge ||
-      isNaN(newItem.makingCharge) ||
-      newItem.makingCharge < 0
-    )
-      errors.makingCharge = "Valid making charge is required";
-    if (newItem.labourChargeValue !== "" && newItem.labourChargeValue !== undefined) {
-      if (isNaN(newItem.labourChargeValue) || Number(newItem.labourChargeValue) < 0)
-        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
-    }
-    if (newItem.stoneCharge !== "" && newItem.stoneCharge !== undefined) {
-      if (isNaN(newItem.stoneCharge) || Number(newItem.stoneCharge) < 0)
-        errors.stoneCharge = "Stone charge cannot be negative";
-    }
+    const errors = getStockFormErrors(newItem);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [newItem]);
@@ -332,7 +307,7 @@ function ItemManagement() {
       if (name === "materialgitType" && value === "silver") updated.karat = "";
       return updated;
     });
-    setFormErrors((prev) => ({ ...prev, [name]: null, submit: null }));
+    setFormErrors((prev) => ({ ...prev, submit: null }));
   }, []);
 
   // Net weight is what the customer actually pays metal-rate on — gross
@@ -423,12 +398,7 @@ function ItemManagement() {
       });
       setFormErrors({});
       setError(null);
-      setNotificationDialog({
-        open: true,
-        message: "Item added successfully!",
-        type: "success",
-        title: "Success",
-      });
+      toast.success("Item added successfully!");
     } catch (err) {
       console.error("AddStock error:", {
         status: err.response?.status,
@@ -441,11 +411,19 @@ function ItemManagement() {
           : err.response?.status === 403
           ? "Admin access required to add items."
           : err.response?.data?.message || "Failed to add item.";
-      setFormErrors((prev) => ({ ...prev, submit: errorMessage }));
+      // Put a server message on the exact field when we can tell which one
+      // it is; otherwise show it as the form-level error.
+      const field = mapServerErrorToField(errorMessage, STOCK_SERVER_ERROR_RULES);
+      setFormErrors((prev) => ({
+        ...prev,
+        ...(field ? { [field]: errorMessage } : {}),
+        submit: field ? null : errorMessage,
+      }));
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [newItem, generateStockCode, validateForm]);
+  }, [newItem, generateStockCode, validateForm, toast]);
 
   const handleRemoveItem = useCallback(async (stockId) => {
     if (!window.confirm("Are you sure you want to remove this item?")) return;
@@ -669,7 +647,7 @@ function ItemManagement() {
     if (name === "karat" || name === "waight" || name === "lessWeight" || name === "materialgitType") {
       setEditPriceTouched(false);
     }
-    setFormErrors((prev) => ({ ...prev, [name]: null, submit: null }));
+    setFormErrors((prev) => ({ ...prev, submit: null }));
   }, []);
 
   // Net weight is what the customer actually pays metal-rate on.
@@ -701,52 +679,25 @@ function ItemManagement() {
   }, []);
 
   const validateEditForm = useCallback(() => {
-    const errors = {};
-    if (!editItem.name.trim()) errors.name = "Item name is required";
-    else if (!/[A-Za-z]/.test(editItem.name))
-      errors.name = "Item name must contain letters, not just numbers";
-    if (!editItem.materialgitType)
-      errors.materialgitType = "Material type is required";
-    if (!editItem.waight || isNaN(editItem.waight) || editItem.waight <= 0)
-      errors.waight = "Valid weight is required";
-    if (
-      (editItem.materialgitType === "gold" || editItem.materialgitType === "diamond") &&
-      !editItem.karat
-    )
-      errors.karat = "Karat is required for gold and diamond items";
-    if (editItem.lessWeight !== "" && editItem.lessWeight !== undefined) {
-      if (isNaN(editItem.lessWeight) || Number(editItem.lessWeight) < 0)
-        errors.lessWeight = "Less weight cannot be negative";
-      else if (Number(editItem.lessWeight) > (Number(editItem.waight) || 0))
-        errors.lessWeight = "Less weight cannot exceed gross weight";
-    }
-    if (!editItem.category) errors.category = "Category is required";
-    if (!editItem.firm) errors.firm = "Firm is required";
-    if (
-      !editItem.quantity ||
-      isNaN(editItem.quantity) ||
-      editItem.quantity <= 0
-    )
-      errors.quantity = "Valid quantity is required";
-    if (!editItem.price || isNaN(editItem.price) || editItem.price <= 0)
-      errors.price = "Valid price is required";
-    if (
-      !editItem.makingCharge ||
-      isNaN(editItem.makingCharge) ||
-      editItem.makingCharge < 0
-    )
-      errors.makingCharge = "Valid making charge is required";
-    if (editItem.labourChargeValue !== "" && editItem.labourChargeValue !== undefined) {
-      if (isNaN(editItem.labourChargeValue) || Number(editItem.labourChargeValue) < 0)
-        errors.labourChargeValue = "Labour/Polishing charge cannot be negative";
-    }
-    if (editItem.stoneCharge !== "" && editItem.stoneCharge !== undefined) {
-      if (isNaN(editItem.stoneCharge) || Number(editItem.stoneCharge) < 0)
-        errors.stoneCharge = "Stone charge cannot be negative";
-    }
+    const errors = getStockFormErrors(editItem);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [editItem]);
+
+  // Live validation: a field that already shows an error is re-checked on
+  // every edit; leaving a field validates it right away.
+  useRevalidateOnChange(newItem, getStockFormErrors, setFormErrors, STOCK_FORM_FIELDS);
+  useRevalidateOnChange(editItem, getStockFormErrors, setFormErrors, STOCK_FORM_FIELDS);
+  const addInteracted = useUserInteracted(openAddModal);
+  const editInteracted = useUserInteracted(openEditModal);
+  const handleAddBlur = useCallback(
+    (e) => validateFieldOnBlur(e.target.name, newItem, getStockFormErrors, setFormErrors, STOCK_FORM_FIELDS, addInteracted),
+    [newItem, addInteracted]
+  );
+  const handleEditBlur = useCallback(
+    (e) => validateFieldOnBlur(e.target.name, editItem, getStockFormErrors, setFormErrors, STOCK_FORM_FIELDS, editInteracted),
+    [editItem, editInteracted]
+  );
 
   const handleUpdateItem = useCallback(async () => {
     if (!validateEditForm()) {
@@ -817,12 +768,7 @@ function ItemManagement() {
       setEditPriceTouched(true);
       setFormErrors({});
       setError(null);
-      setNotificationDialog({
-        open: true,
-        message: "Item updated successfully!",
-        type: "success",
-        title: "Success",
-      });
+      toast.success("Item updated successfully!");
     } catch (err) {
       console.error("UpdateStock error:", {
         status: err.response?.status,
@@ -835,11 +781,17 @@ function ItemManagement() {
           : err.response?.status === 403
           ? "Admin access required to update items."
           : err.response?.data?.message || "Failed to update item.";
-      setFormErrors((prev) => ({ ...prev, submit: errorMessage }));
+      const field = mapServerErrorToField(errorMessage, STOCK_SERVER_ERROR_RULES);
+      setFormErrors((prev) => ({
+        ...prev,
+        ...(field ? { [field]: errorMessage } : {}),
+        submit: field ? null : errorMessage,
+      }));
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [editItem, editingItem, validateEditForm]);
+  }, [editItem, editingItem, validateEditForm, toast]);
 
   const handleEditCancel = useCallback(() => {
     setOpenEditModal(false);
@@ -1935,6 +1887,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.name}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.name}
             helperText={formErrors.name}
             sx={{
@@ -1952,6 +1905,7 @@ function ItemManagement() {
             name="materialgitType" // Fixed typo
             value={newItem.materialgitType}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             fullWidth
             sx={{
               mb: 1,
@@ -1996,6 +1950,7 @@ function ItemManagement() {
               name="karat"
               value={newItem.karat}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
               fullWidth
               displayEmpty
               sx={{ mb: 1, fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
@@ -2023,6 +1978,7 @@ function ItemManagement() {
             name="firm"
             value={newItem.firm}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             fullWidth
             sx={{
               mb: { xs: 1, sm: 2 },
@@ -2050,10 +2006,16 @@ function ItemManagement() {
               </MenuItem>
             ))}
           </Select>
+          {formErrors.firm && (
+            <Typography variant="caption" color="error" sx={{ display: "block", mb: 1 }}>
+              {formErrors.firm}
+            </Typography>
+          )}
           <Select
             name="category"
             value={newItem.category}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             fullWidth
             sx={{
               mb: { xs: 1, sm: 2 },
@@ -2081,10 +2043,16 @@ function ItemManagement() {
               </MenuItem>
             ))}
           </Select>
+          {formErrors.category && (
+            <Typography variant="caption" color="error" sx={{ display: "block", mb: 1 }}>
+              {formErrors.category}
+            </Typography>
+          )}
           <Select
             name="stockType"
             value={newItem.stockType}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             fullWidth
             displayEmpty
             sx={{ mb: { xs: 1, sm: 2 }, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
@@ -2100,6 +2068,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.waight}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.waight}
             helperText={formErrors.waight}
             sx={{
@@ -2121,6 +2090,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.lessWeight}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.lessWeight}
             helperText={formErrors.lessWeight}
             InputProps={{ inputProps: { min: 0 } }}
@@ -2148,6 +2118,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.quantity}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.quantity}
             helperText={formErrors.quantity}
             sx={{
@@ -2169,6 +2140,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.hsnCode}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             sx={{ mb: { xs: 1, sm: 2 } }}
           />
           <TextField
@@ -2179,6 +2151,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.price}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.price}
             helperText={formErrors.price}
             sx={{
@@ -2201,6 +2174,7 @@ function ItemManagement() {
               fullWidth
               value={newItem.wastageSupplier}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
             />
             <TextField
               margin="dense"
@@ -2210,6 +2184,7 @@ function ItemManagement() {
               fullWidth
               value={newItem.wastageCustomer}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
             />
           </Box>
           <Box sx={{ display: "flex", gap: 1, mb: { xs: 1, sm: 2 } }}>
@@ -2221,6 +2196,7 @@ function ItemManagement() {
               fullWidth
               value={newItem.makingCharge}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
               error={!!formErrors.makingCharge}
               helperText={formErrors.makingCharge}
               required
@@ -2229,6 +2205,7 @@ function ItemManagement() {
               name="makingChargeUnit"
               value={newItem.makingChargeUnit}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
               sx={{ minWidth: 130 }}
             >
               <MenuItem value="fixed">Fixed (₹)</MenuItem>
@@ -2247,6 +2224,7 @@ function ItemManagement() {
               fullWidth
               value={newItem.labourChargeValue}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
               error={!!formErrors.labourChargeValue}
               helperText={formErrors.labourChargeValue}
               InputProps={{ inputProps: { min: 0 } }}
@@ -2255,6 +2233,7 @@ function ItemManagement() {
               name="labourChargeUnit"
               value={newItem.labourChargeUnit}
               onChange={handleInputChange}
+              onBlur={handleAddBlur}
               sx={{ minWidth: 130 }}
             >
               <MenuItem value="fixed">Fixed (₹)</MenuItem>
@@ -2272,6 +2251,7 @@ function ItemManagement() {
             fullWidth
             value={newItem.stoneCharge}
             onChange={handleInputChange}
+            onBlur={handleAddBlur}
             error={!!formErrors.stoneCharge}
             helperText={formErrors.stoneCharge}
             InputProps={{ inputProps: { min: 0 } }}
@@ -2419,6 +2399,7 @@ function ItemManagement() {
               name="name"
               value={editItem.name}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.name}
               helperText={formErrors.name}
               size="small"
@@ -2433,6 +2414,7 @@ function ItemManagement() {
               name="materialgitType"
               value={editItem.materialgitType}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               displayEmpty
               size="small"
               sx={{ mb: 1 }}
@@ -2462,6 +2444,7 @@ function ItemManagement() {
                 name="karat"
                 value={editItem.karat}
                 onChange={handleEditInputChange}
+                onBlur={handleEditBlur}
                 displayEmpty
                 size="small"
                 sx={{ mb: 1 }}
@@ -2489,6 +2472,7 @@ function ItemManagement() {
               name="stockType"
               value={editItem.stockType}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               size="small"
               sx={{ mb: 1 }}
             >
@@ -2505,6 +2489,7 @@ function ItemManagement() {
               type="number"
               value={editItem.waight}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.waight}
               helperText={formErrors.waight}
               size="small"
@@ -2517,6 +2502,7 @@ function ItemManagement() {
               type="number"
               value={editItem.lessWeight}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.lessWeight}
               helperText={formErrors.lessWeight}
               InputProps={{ inputProps: { min: 0 } }}
@@ -2535,6 +2521,7 @@ function ItemManagement() {
               name="firm"
               value={editItem.firm}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               displayEmpty
               size="small"
               sx={{ mb: 1 }}
@@ -2563,6 +2550,7 @@ function ItemManagement() {
               name="category"
               value={editItem.category}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               displayEmpty
               size="small"
               sx={{ mb: 1 }}
@@ -2593,6 +2581,7 @@ function ItemManagement() {
               type="number"
               value={editItem.quantity}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.quantity}
               helperText={formErrors.quantity}
               size="small"
@@ -2605,6 +2594,7 @@ function ItemManagement() {
               type="text"
               value={editItem.hsnCode}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               size="small"
             />
           </Box>
@@ -2617,6 +2607,7 @@ function ItemManagement() {
               type="number"
               value={editItem.price}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.price}
               helperText={formErrors.price}
               size="small"
@@ -2630,6 +2621,7 @@ function ItemManagement() {
                 type="number"
                 value={editItem.wastageSupplier}
                 onChange={handleEditInputChange}
+                onBlur={handleEditBlur}
                 size="small"
               />
               <TextField
@@ -2639,6 +2631,7 @@ function ItemManagement() {
                 type="number"
                 value={editItem.wastageCustomer}
                 onChange={handleEditInputChange}
+                onBlur={handleEditBlur}
                 size="small"
               />
             </Box>
@@ -2652,6 +2645,7 @@ function ItemManagement() {
               type="number"
               value={editItem.makingCharge}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.makingCharge}
               helperText={formErrors.makingCharge}
               size="small"
@@ -2660,6 +2654,7 @@ function ItemManagement() {
               name="makingChargeUnit"
               value={editItem.makingChargeUnit}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               size="small"
               sx={{ minWidth: 130 }}
             >
@@ -2679,6 +2674,7 @@ function ItemManagement() {
               type="number"
               value={editItem.labourChargeValue}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.labourChargeValue}
               helperText={formErrors.labourChargeValue}
               InputProps={{ inputProps: { min: 0 } }}
@@ -2688,6 +2684,7 @@ function ItemManagement() {
               name="labourChargeUnit"
               value={editItem.labourChargeUnit}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               size="small"
               sx={{ minWidth: 130 }}
             >
@@ -2707,6 +2704,7 @@ function ItemManagement() {
               type="number"
               value={editItem.stoneCharge}
               onChange={handleEditInputChange}
+              onBlur={handleEditBlur}
               error={!!formErrors.stoneCharge}
               helperText={formErrors.stoneCharge}
               InputProps={{ inputProps: { min: 0 } }}

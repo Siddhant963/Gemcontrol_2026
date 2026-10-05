@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Box, Typography, Button, Paper, Chip, CircularProgress, Alert } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
@@ -7,12 +7,13 @@ import api from "../utils/api";
 import { ROUTES } from "../utils/routes";
 import { logout } from "../redux/authSlice";
 import SymbolIcon from "../components/SymbolIcon";
-
-function daysLeft(endDate) {
-  if (!endDate) return 0;
-  const ms = new Date(endDate).getTime() - Date.now();
-  return Math.max(Math.ceil(ms / (24 * 60 * 60 * 1000)), 0);
-}
+import useToast from "../hooks/useToast";
+import {
+  SUBSCRIPTION_PHASE,
+  getPlanAction,
+  getSubscriptionCopy,
+  getSubscriptionPresentation,
+} from "../utils/subscriptionState";
 
 function SubscribePage() {
   const theme = useTheme();
@@ -21,9 +22,14 @@ function SubscribePage() {
   const user = useSelector((state) => state.auth.user);
   const isAdmin = user?.role === "admin";
 
+  const toast = useToast();
   const [plans, setPlans] = useState([]);
   const [mySubscription, setMySubscription] = useState(null);
   const [loading, setLoading] = useState(true);
+  // True while re-reading the subscription after a purchase / on tab focus.
+  // The page keeps showing the last known state (no spinner swap) and says
+  // "Updating subscription..." until the backend answer arrives.
+  const [refreshing, setRefreshing] = useState(false);
   const [activatingKey, setActivatingKey] = useState(null);
   const [error, setError] = useState("");
 
@@ -43,9 +49,35 @@ function SubscribePage() {
     }
   }, []);
 
+  // Re-read ONLY the current subscription from the backend (the source of
+  // truth). Returns true on success so callers can tell a real refresh from
+  // a failed one and keep whatever state they already have.
+  const refreshSubscription = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await api.get("/getMySubscription");
+      setMySubscription(data);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Coming back to this tab (e.g. after paying in another window) must not
+  // show a stale subscription.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshSubscription();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshSubscription]);
 
   const handleActivate = async (planKey) => {
     if (!isAdmin) return;
@@ -68,10 +100,23 @@ function SubscribePage() {
         theme: { color: theme.palette.primary.main },
         handler: async (response) => {
           try {
-            await api.post("/verifySubscriptionPayment", { ...response, planKey });
-            navigate(ROUTES.DASHBOARD);
+            const { data } = await api.post("/verifySubscriptionPayment", { ...response, planKey });
+            // Seed from the backend-verified response immediately so the
+            // screen never shows the old (pre-purchase) state, then
+            // reconcile with a fresh read of the current subscription.
+            if (data?.subscription) {
+              setMySubscription({ subscription: data.subscription, isActive: true });
+            }
+            setError("");
+            toast.success("Subscription activated successfully.");
+            await refreshSubscription();
           } catch (err) {
-            setError(err.response?.data?.message || "Payment verification failed");
+            const message = err.response?.data?.message || "Payment verification failed";
+            setError(message);
+            toast.error(message);
+            // The server may still have activated it (webhook safety net).
+            await refreshSubscription();
+          } finally {
             setActivatingKey(null);
           }
         },
@@ -80,7 +125,9 @@ function SubscribePage() {
         },
       });
       rzp.on("payment.failed", (response) => {
-        setError(response.error?.description || "Payment failed");
+        const message = response.error?.description || "Payment failed";
+        setError(message);
+        toast.error(message);
         setActivatingKey(null);
       });
       rzp.open();
@@ -95,8 +142,9 @@ function SubscribePage() {
     navigate(ROUTES.LOGIN);
   };
 
-  const sub = mySubscription?.subscription;
-  const isTrialing = sub?.status === "trialing" && mySubscription?.isActive;
+  const presentation = useMemo(() => getSubscriptionPresentation(mySubscription), [mySubscription]);
+  const copy = getSubscriptionCopy(presentation);
+  const isActivePlan = presentation.phase === SUBSCRIPTION_PHASE.ACTIVE;
 
   return (
     <Box sx={{ bgcolor: theme.palette.background.default, minHeight: "100vh", py: { xs: 4, sm: 6 } }}>
@@ -114,15 +162,30 @@ function SubscribePage() {
         </Box>
 
         <Typography variant="h4" sx={{ fontWeight: 700, textAlign: "center", mb: 1 }}>
-          {isTrialing ? "Choose a Plan Anytime" : "Subscribe to Continue"}
+          {copy.heading}
         </Typography>
-        <Typography sx={{ textAlign: "center", color: theme.palette.text.secondary, mb: 1 }}>
-          {isTrialing
-            ? `Your free trial is active — ${daysLeft(sub.endDate)} day(s) left.`
-            : sub
-            ? "Your subscription has ended. Pick a plan below to keep using RatnSetu."
-            : "Pick a plan below to start using RatnSetu."}
-        </Typography>
+        {loading ? null : isActivePlan ? (
+          <Alert
+            severity="success"
+            sx={{ mb: 2, alignItems: "center" }}
+            action={
+              <Button color="inherit" size="small" onClick={() => navigate(ROUTES.DASHBOARD)} sx={{ textTransform: "none" }}>
+                Go to Dashboard
+              </Button>
+            }
+          >
+            {copy.message}
+          </Alert>
+        ) : (
+          <Typography sx={{ textAlign: "center", color: theme.palette.text.secondary, mb: 1 }}>
+            {copy.message}
+          </Typography>
+        )}
+        {refreshing && (
+          <Typography sx={{ textAlign: "center", fontSize: "0.85rem", color: theme.palette.text.secondary, mb: 1 }}>
+            Updating subscription...
+          </Typography>
+        )}
         {!isAdmin && (
           <Typography sx={{ textAlign: "center", fontSize: "0.85rem", color: theme.palette.text.secondary, mb: 4 }}>
             Only your shop's admin can subscribe or renew. Please contact them.
@@ -155,7 +218,7 @@ function SubscribePage() {
             }}
           >
             {plans.map((plan, index) => {
-              const isCurrentPlan = sub?.plan?._id === plan._id || sub?.plan === plan._id;
+              const action = getPlanAction(presentation, plan._id, { activating: activatingKey === plan.key });
               const highlighted = index === plans.length - 1 && plans.length > 1;
               return (
                 <Paper
@@ -206,7 +269,7 @@ function SubscribePage() {
                   <Button
                     fullWidth
                     variant={highlighted ? "contained" : "outlined"}
-                    disabled={!isAdmin || activatingKey === plan.key || isCurrentPlan}
+                    disabled={!isAdmin || action.disabled}
                     onClick={() => handleActivate(plan.key)}
                     sx={{
                       mt: "auto",
@@ -217,13 +280,7 @@ function SubscribePage() {
                       }),
                     }}
                   >
-                    {isCurrentPlan
-                      ? "Current Plan"
-                      : activatingKey === plan.key
-                      ? "Opening checkout..."
-                      : isTrialing || sub
-                      ? "Renew"
-                      : "Subscribe"}
+                    {action.label}
                   </Button>
                 </Paper>
               );

@@ -35,13 +35,20 @@ import TermsPage from "./pages/TermsPage.jsx";
 import NotFound from "./pages/NotFound";
 import AnalyticsRouteListener from "./components/AnalyticsRouteListener.jsx";
 import { ROUTES } from "./utils/routes";
+import { homeRouteFor } from "./utils/roles";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GirviManagement from "./pages/GirviManagement.jsx";
 import JewelleryPanel from "./pages/JewelleryPanel.jsx";
 import DayBook from "./pages/DayBook.jsx";
 import AccountSettings from "./pages/AccountSettings.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
+import PlatformRoute from "./components/PlatformRoute.jsx";
+import PlatformOverview from "./pages/platform/PlatformOverview.jsx";
+import PlatformFirms from "./pages/platform/PlatformFirms.jsx";
+import PlatformFirmDetail from "./pages/platform/PlatformFirmDetail.jsx";
+import PlatformUsage from "./pages/platform/PlatformUsage.jsx";
 import SplashScreen from "./components/SplashScreen.jsx";
+import ToastProvider from "./components/ToastProvider.jsx";
 
 const SPLASH_DURATION_MS = 2000;
 
@@ -61,6 +68,7 @@ function MainApp() {
   const darkMode = useSelector((state) => state.theme.darkMode);
   const theme = getTheme(darkMode ? "dark" : "light");
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const authUser = useSelector((state) => state.auth.user);
 
   // Splash shows once per full page load (not on in-app navigation).
   const [showSplash, setShowSplash] = useState(true);
@@ -73,6 +81,7 @@ function MainApp() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <SplashScreen visible={showSplash} />
+      <ToastProvider>
       <BrowserRouter>
         <AnalyticsRouteListener />
         <Routes>
@@ -99,13 +108,13 @@ function MainApp() {
           <Route
             path={ROUTES.LOGIN}
             element={
-              isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Login />
+              isAuthenticated ? <Navigate to={homeRouteFor(authUser)} /> : <Login />
             }
           />
           <Route
             path={ROUTES.REGISTER}
             element={
-              isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} /> : <Register />
+              isAuthenticated ? <Navigate to={homeRouteFor(authUser)} /> : <Register />
             }
           />
 
@@ -138,6 +147,14 @@ function MainApp() {
             <Route path={ROUTES.CATEGORIES} element={<Categories />} />
             <Route path={ROUTES.ACCOUNT_SETTINGS} element={<AccountSettings />} />
 
+            {/* Platform-owner panel: superadmin only (read-only) */}
+            <Route element={<PlatformRoute />}>
+              <Route path={ROUTES.PLATFORM_ADMIN} element={<PlatformOverview />} />
+              <Route path={ROUTES.PLATFORM_FIRMS} element={<PlatformFirms />} />
+              <Route path={ROUTES.PLATFORM_FIRM_DETAIL} element={<PlatformFirmDetail />} />
+              <Route path={ROUTES.PLATFORM_USAGE} element={<PlatformUsage />} />
+            </Route>
+
             {/* Admin-only routes */}
             <Route element={<AdminRoute />}>
               <Route path={ROUTES.USER_MANAGEMENT} element={<UserManagement />} />
@@ -152,6 +169,7 @@ function MainApp() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
