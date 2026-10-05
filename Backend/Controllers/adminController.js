@@ -26,6 +26,7 @@ const {
 const { razorpay, verifyPaymentSignature, validateWebhookSignature } = require("../Utils/razorpay.js");
 const appleIap = require("../Utils/appleIap.js");
 const { isAssignableRole } = require("../Utils/roles.js");
+const { staffLimitViolation, describeEntitlements } = require("../Utils/planAccess.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -139,6 +140,12 @@ module.exports.RegisterUser = async (req, res) => {
       // A firm admin may only hand out firm roles -- never "superadmin".
       if (!isAssignableRole(role)) {
         return res.status(400).json({ message: "Invalid role" });
+      }
+      // The plan's staff-account limit (Basic: 3). Existing accounts are
+      // never removed; this only stops adding MORE past the limit.
+      const limitHit = await staffLimitViolation(req.user.firm);
+      if (limitHit) {
+        return res.status(403).json(limitHit);
       }
       const newUser = new UserModel({
         name,
@@ -3612,6 +3619,9 @@ module.exports.getMySubscription = async (req, res) => {
     res.status(200).json({
       subscription,
       isActive: isSubscriptionCurrentlyActive(subscription),
+      // What the current plan actually allows (backend is the authority; the
+      // apps only use this to show the right UI).
+      entitlements: await describeEntitlements(req.user.firm, subscription),
     });
   } catch (error) {
     console.error("Error fetching subscription:", error);

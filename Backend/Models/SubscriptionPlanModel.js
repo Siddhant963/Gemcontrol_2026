@@ -29,10 +29,12 @@ const subscriptionPlanSchema = mongoose.Schema({
     enum: ["month", "year"],
     default: "month",
   },
-  // Null/0 means unlimited staff.
+  // Max staff accounts besides the owner. 0 means UNLIMITED. Deliberately no
+  // default: a plan row that never stored a value must not silently read as
+  // "unlimited" -- Utils/planAccess.js falls back per plan key instead
+  // (Basic = 3). Seeded plans always set it explicitly.
   maxStaff: {
     type: Number,
-    default: 0,
   },
   features: {
     type: [String],
@@ -51,6 +53,12 @@ const subscriptionPlanSchema = mongoose.Schema({
   // is the single source of truth for the Apple productId -> internal plan
   // mapping; see Utils/appleIap.js, which looks plans up by this field
   // rather than hardcoding the mapping in controller code.
+  // Whether this plan includes Girvi / Borrows management. Deliberately has
+  // NO default: plan rows created before this field existed fall back to a
+  // per-key default in Utils/planAccess.js (so Pro never loses it by accident).
+  includesGirvi: {
+    type: Boolean,
+  },
   appleProductId: {
     type: String,
     default: undefined,

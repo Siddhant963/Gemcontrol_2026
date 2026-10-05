@@ -67,19 +67,43 @@ class Subscription {
   }
 }
 
+/// What the current plan allows, as reported by the backend (the backend
+/// ENFORCES these; the app only uses them to explain a limit up front).
+/// [staffLimit] 0 = unlimited. Null entitlements (older backend / failed
+/// lookup) must be treated as "don't block".
+class PlanEntitlements {
+  final bool girvi;
+  final int staffLimit;
+  final int staffUsed;
+
+  const PlanEntitlements({required this.girvi, required this.staffLimit, required this.staffUsed});
+
+  bool get staffLimitReached => staffLimit > 0 && staffUsed >= staffLimit;
+
+  factory PlanEntitlements.fromJson(Map<String, dynamic> json) => PlanEntitlements(
+    girvi: json['girvi'] ?? true,
+    staffLimit: (json['staffLimit'] as num?)?.toInt() ?? 0,
+    staffUsed: (json['staffUsed'] as num?)?.toInt() ?? 0,
+  );
+}
+
 /// Response shape of GET /getMySubscription -- `subscription` is null for a
 /// firm-less account, non-null but possibly inactive otherwise.
 class MySubscription {
   final Subscription? subscription;
   final bool isActive;
+  final PlanEntitlements? entitlements;
 
-  MySubscription({required this.subscription, required this.isActive});
+  MySubscription({required this.subscription, required this.isActive, this.entitlements});
 
   factory MySubscription.fromJson(Map<String, dynamic> json) => MySubscription(
     subscription: json['subscription'] is Map<String, dynamic>
         ? Subscription.fromJson(json['subscription'])
         : null,
     isActive: json['isActive'] ?? false,
+    entitlements: json['entitlements'] is Map<String, dynamic>
+        ? PlanEntitlements.fromJson(json['entitlements'])
+        : null,
   );
 }
 

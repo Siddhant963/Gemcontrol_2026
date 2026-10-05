@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
+import '../../shared/widgets/brand_banner.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'dashboard_providers.dart';
 
@@ -71,6 +72,10 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: AppSpacing.lg),
+            // Brand banner fills the space below the charts. It does not depend
+            // on the data above, so it shows even while that is loading/failed.
+            const BrandBanner(),
             const SizedBox(height: AppSpacing.xl),
           ],
         ),

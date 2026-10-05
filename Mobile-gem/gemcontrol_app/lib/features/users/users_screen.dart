@@ -10,6 +10,7 @@ import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../subscription/subscription_providers.dart';
 
 final allUsersProvider = FutureProvider.autoDispose<List<AppUser>>((ref) {
   return ref.watch(authRepositoryProvider).getAllUsers();
@@ -26,11 +27,24 @@ class UsersScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'User Management'),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => const _AddUserSheet(),
-        ),
+        onPressed: () {
+          // The plan's staff-account limit (Basic: 3). The server enforces it;
+          // this just explains it up front instead of failing on submit.
+          final ent = ref.read(subscriptionControllerProvider).valueOrNull?.entitlements;
+          if (ent != null && ent.staffLimitReached) {
+            AppToast.show(
+              context,
+              'Your plan allows up to ${ent.staffLimit} staff accounts (${ent.staffUsed} in use). Upgrade to Pro for unlimited staff.',
+              type: AppToastType.warning,
+            );
+            return;
+          }
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const _AddUserSheet(),
+          );
+        },
         child: const Icon(Icons.person_add_alt_1_outlined),
       ),
       body: AsyncValueWidget<List<AppUser>>(

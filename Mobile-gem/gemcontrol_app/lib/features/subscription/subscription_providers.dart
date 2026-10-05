@@ -8,8 +8,9 @@ import '../../core/repositories/subscription_repository.dart';
 class SubscriptionSession {
   final bool isActive;
   final Subscription? subscription;
+  final PlanEntitlements? entitlements;
 
-  const SubscriptionSession({required this.isActive, this.subscription});
+  const SubscriptionSession({required this.isActive, this.subscription, this.entitlements});
 
   static const inactive = SubscriptionSession(isActive: false);
 }
@@ -34,7 +35,11 @@ class SubscriptionController extends AsyncNotifier<SubscriptionSession> {
 
     try {
       final mySub = await ref.read(subscriptionRepositoryProvider).getMySubscription();
-      return SubscriptionSession(isActive: mySub.isActive, subscription: mySub.subscription);
+      return SubscriptionSession(
+        isActive: mySub.isActive,
+        subscription: mySub.subscription,
+        entitlements: mySub.entitlements,
+      );
     } on ApiException {
       // Fail OPEN, not closed: the real enforcement is server-side (every
       // business route still 402s if the subscription is actually

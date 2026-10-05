@@ -35,6 +35,8 @@ import { useState, useEffect } from "react";
 import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import PlanLimitNotice from "../components/PlanLimitNotice";
+import useEntitlements from "../hooks/useEntitlements";
 import { setError as setAuthError } from "../redux/authSlice";
 import { ROUTES } from "../utils/routes";
 import api from "../utils/api";
@@ -46,6 +48,10 @@ function GirviManagement() {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const entitlements = useEntitlements();
+  // Creating NEW Girvi entries is a Pro feature (the server enforces it);
+  // existing loans stay fully visible and serviceable on any plan.
+  const girviLocked = entitlements !== null && entitlements.girvi === false;
   const { user: currentUser } = useSelector((state) => state.auth);
   const [girvis, setGirvis] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -805,7 +811,7 @@ function GirviManagement() {
               width: { xs: "100%", sm: "auto" },
               fontSize: { xs: "0.85rem", sm: "0.9rem" },
             }}
-            disabled={!customers.length || !firms.length}
+            disabled={!customers.length || !firms.length || girviLocked}
           >
             Add Girvi
           </Button>
@@ -920,6 +926,12 @@ function GirviManagement() {
         </Box>
       </Box>
 
+      {girviLocked && (
+        <PlanLimitNotice>
+          Adding new Borrows (Girvi) entries is part of the Pro plan. Your existing entries stay available and you can keep
+          collecting payments and redeeming them.
+        </PlanLimitNotice>
+      )}
       <motion.div variants={sectionVariants} initial="hidden" animate="visible">
         {loading ? (
           <Box

@@ -9,7 +9,9 @@ import '../../core/utils/currency.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../subscription/subscription_providers.dart';
 import 'add_girvi_sheet.dart';
 import 'girvi_detail_sheet.dart';
 import 'girvi_providers.dart';
@@ -27,12 +29,25 @@ class GirviScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       appBar: GcAppBar(title: 'Girvi Management'),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          builder: (_) => const AddGirviSheet(),
-        ),
+        onPressed: () {
+          // New Girvi entries need a plan that includes Girvi (Pro or a running
+          // trial). The server enforces it; this just explains it up front.
+          final ent = ref.read(subscriptionControllerProvider).valueOrNull?.entitlements;
+          if (ent != null && !ent.girvi) {
+            AppToast.show(
+              context,
+              'Adding new Girvi entries is part of the Pro plan. Your existing entries stay available.',
+              type: AppToastType.warning,
+            );
+            return;
+          }
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            builder: (_) => const AddGirviSheet(),
+          );
+        },
         child: const Icon(Icons.add),
       ),
       body: RefreshIndicator(

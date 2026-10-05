@@ -20,6 +20,7 @@ const PLANS = [
     price: 999,
     billingInterval: "month",
     maxStaff: 3,
+    includesGirvi: false,
     features: [
       "Stock & raw material inventory",
       "Live gold / silver / diamond rates",
@@ -38,6 +39,7 @@ const PLANS = [
     price: 1999,
     billingInterval: "month",
     maxStaff: 0, // unlimited
+    includesGirvi: true,
     features: [
       "Everything in Basic",
       "Unlimited staff accounts",

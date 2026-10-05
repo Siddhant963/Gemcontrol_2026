@@ -34,6 +34,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import SymbolIcon from "../components/SymbolIcon";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import PlanLimitNotice from "../components/PlanLimitNotice";
+import useEntitlements from "../hooks/useEntitlements";
 import { setError as setAuthError } from "../redux/authSlice";
 import { ROUTES } from "../utils/routes";
 import api from "../utils/api";
@@ -43,6 +45,11 @@ function UserManagement() {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const entitlements = useEntitlements();
+  // The plan's staff-account limit (Basic: 3; 0 = unlimited). Enforced by the
+  // server; this only explains it and disables the button.
+  const staffLimitReached =
+    entitlements !== null && entitlements.staffLimit > 0 && entitlements.staffUsed >= entitlements.staffLimit;
   const { user: currentUser } = useSelector((state) => state.auth);
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState([]);
@@ -429,6 +436,7 @@ function UserManagement() {
               variant="contained"
               startIcon={<SymbolIcon name="add" />}
               onClick={handleAddUser}
+              disabled={staffLimitReached}
               sx={{
                 bgcolor: theme.palette.primary.main,
                 color: theme.palette.getContrastText(
@@ -474,6 +482,12 @@ function UserManagement() {
         </Box>
       </Box>
 
+      {staffLimitReached && (
+        <PlanLimitNotice>
+          Your plan allows up to {entitlements.staffLimit} staff accounts ({entitlements.staffUsed} in use). Upgrade to Pro for
+          unlimited staff.
+        </PlanLimitNotice>
+      )}
       <Box sx={{ flexGrow: 1, overflow: "auto" }}>
         <motion.div variants={tableVariants} initial="hidden" animate="visible">
           {loading ? (

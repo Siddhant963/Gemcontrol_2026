@@ -4,6 +4,7 @@ const multer = require("multer");
 const { upload } = require("../Utils/UploadFile.js");
 const { isLoggedIn, isAdmin, isStaff } = require("../Utils/islogedin");
 const { requireActiveSubscription } = require("../Utils/subscription");
+const { requirePlanFeature } = require("../Utils/planAccess");
 
 // Bulk stock Excel uploads are parsed in memory (not saved to disk like
 // product images) since they're read once and discarded.
@@ -277,10 +278,15 @@ router.get(
 router.get("/getUdharSetelmentByDate", isLoggedIn, getUdharsetelmentBydate);
 router.get("/getFiveMonthlySales", isLoggedIn, getFiveMonthlySales);
 router.get("/getDayBook", isLoggedIn, getDayBook);
+// Creating NEW Girvi entries needs a plan that includes Girvi (Pro, or a
+// running trial). Existing loans stay fully readable/serviceable on any
+// plan, so only this route is gated. The guard runs BEFORE the upload so a
+// rejected request never writes an image to disk.
 router.post(
   "/AddGirviItem",
   isLoggedIn,
   isAdmin,
+  requirePlanFeature("girvi"),
   upload.single("girviItemImg"),
   AddGierviItem
 );

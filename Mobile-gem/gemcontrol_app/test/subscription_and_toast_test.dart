@@ -204,6 +204,50 @@ void main() {
     });
   });
 
+  group('PlanEntitlements (what the plan allows)', () {
+    test('Basic: no Girvi, 3 staff; limit reached at 3 used', () {
+      final e = PlanEntitlements.fromJson({'girvi': false, 'staffLimit': 3, 'staffUsed': 3});
+      expect(e.girvi, false);
+      expect(e.staffLimitReached, true);
+      expect(PlanEntitlements.fromJson({'girvi': false, 'staffLimit': 3, 'staffUsed': 2}).staffLimitReached, false);
+    });
+
+    test('Pro / trial: Girvi on, 0 = unlimited never reaches a limit', () {
+      final e = PlanEntitlements.fromJson({'girvi': true, 'staffLimit': 0, 'staffUsed': 99});
+      expect(e.girvi, true);
+      expect(e.staffLimitReached, false);
+    });
+
+    test('missing/odd values do not block anyone (fail open on the client)', () {
+      final e = PlanEntitlements.fromJson({});
+      expect(e.girvi, true);
+      expect(e.staffLimitReached, false);
+    });
+
+    test('MySubscription parses entitlements, and tolerates an older backend without them', () {
+      final withEnt = MySubscription.fromJson({
+        'subscription': null,
+        'isActive': true,
+        'entitlements': {'girvi': false, 'staffLimit': 3, 'staffUsed': 1},
+      });
+      expect(withEnt.entitlements?.staffLimit, 3);
+      final without = MySubscription.fromJson({'subscription': null, 'isActive': true});
+      expect(without.entitlements, isNull);
+    });
+
+    test('the controller keeps entitlements from the backend', () async {
+      final repo = _FakeRepo(() => MySubscription(
+            subscription: _sub('active', _basic),
+            isActive: true,
+            entitlements: const PlanEntitlements(girvi: false, staffLimit: 3, staffUsed: 3),
+          ));
+      final c = _container(repo);
+      final s = await c.read(subscriptionControllerProvider.future);
+      expect(s.entitlements?.girvi, false);
+      expect(s.entitlements?.staffLimitReached, true);
+    });
+  });
+
   group('LiveValidation', () {
     late Map<String, String> rules;
     late int rebuilds;
