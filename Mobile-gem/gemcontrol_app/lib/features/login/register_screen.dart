@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_client.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
 
 /// Self-signup: creates a brand-new shop (Firm) and its admin account
@@ -64,6 +65,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       context.go('/login');
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Could not reach the server. Check your connection and try again.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -85,6 +88,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -112,45 +116,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: lengthLimit(kNameMax),
                     decoration: const InputDecoration(labelText: 'Name'),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Enter your name';
-                      if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
-                        return 'Name must contain letters, not just numbers';
-                      }
-                      return null;
-                    },
+                    validator: (v) => nameRule(v ?? '', label: 'Name'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
+                    inputFormatters: lengthLimit(kEmailMax),
                     decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Enter your email';
-                      if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
-                        return 'Enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: (v) => emailRule(v ?? ''),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _contactCtrl,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'Contact'),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Enter your contact number';
-                      if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) {
-                        return 'Contact number must be exactly 10 digits';
-                      }
-                      return null;
-                    },
+                    inputFormatters: phoneFormatters,
+                    decoration: const InputDecoration(
+                      labelText: 'Contact',
+                      helperText: '10 digit mobile number',
+                    ),
+                    validator: (v) => phoneRule(v ?? '', label: 'Contact'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordCtrl,
                     obscureText: _obscure,
+                    inputFormatters: lengthLimit(kPasswordMax),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       suffixIcon: IconButton(
@@ -160,11 +154,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Enter a password';
-                      if (v.length < 6) return 'Password must be at least 6 characters';
-                      return null;
-                    },
+                    validator: (v) => passwordRule(v ?? ''),
                   ),
                   const SizedBox(height: 24),
                   Divider(color: theme.extension<AppColorsExtension>()?.hairline),
@@ -176,27 +166,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _firmNameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: lengthLimit(kNameMax),
                     decoration: const InputDecoration(labelText: 'Shop Name'),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Enter your shop name';
-                      if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
-                        return 'Shop name must contain letters, not just numbers';
-                      }
-                      return null;
-                    },
+                    validator: (v) => nameRule(v ?? '', label: 'Shop name'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _firmLocationCtrl,
+                    inputFormatters: lengthLimit(kAddressMax),
                     decoration: const InputDecoration(labelText: 'Shop Location'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your shop location' : null,
+                    validator: (v) => textRule(v ?? '', 'Shop location', max: kAddressMax),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _firmSizeCtrl,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: decimalFormatters(decimals: 2, maxLength: 9),
                     decoration: const InputDecoration(labelText: 'Shop Size (sq. ft.)'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your shop size' : null,
+                    validator: (v) => positiveNumberRule(v ?? '', 'Shop size', max: 10000000),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),

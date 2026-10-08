@@ -15,6 +15,7 @@ import '../../shared/widgets/gold_divider.dart';
 import '../customers/customers_providers.dart';
 import '../sales_history/sales_history_providers.dart';
 import 'item_picker_sheet.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
 
 const _paymentMethods = ['cash', 'card', 'online', 'bankTransfer', 'Upi', 'cheque'];
@@ -146,7 +147,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 Expanded(
                   child: TextField(
                     controller: _discountCtrl,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
                     decoration: const InputDecoration(labelText: 'Value'),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -211,7 +213,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                         Expanded(
                           child: TextField(
                             controller: _payments[i].amountCtrl,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
                             decoration: const InputDecoration(labelText: '₹'),
                             onChanged: (_) => setState(() {}),
                           ),
@@ -226,7 +229,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                   ),
                 TextField(
                   controller: _udharCtrl,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
                   decoration: const InputDecoration(labelText: 'Udhar (credit) amount'),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -320,9 +324,13 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       final sale = await ref.read(saleRepositoryProvider).createSale(request);
       ref.invalidate(allSalesProvider);
       if (mounted) context.pushReplacement('/sales/${sale.id}', extra: sale);
-    } on ApiException catch (e) {
+    } catch (e) {
       if (mounted) {
-        AppToast.show(context, e.message, type: AppToastType.error);
+        AppToast.show(
+          context,
+          e is ApiException ? e.message : 'Could not create the sale. Check your connection and try again.',
+          type: AppToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -455,6 +463,7 @@ class _CartRowState extends State<_CartRow> {
                 child: TextField(
                   controller: _qtyCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: digitsFormatters(6),
                   decoration: const InputDecoration(labelText: 'Qty', isDense: true),
                   onChanged: (_) => _update(),
                 ),
@@ -464,7 +473,8 @@ class _CartRowState extends State<_CartRow> {
                 flex: 2,
                 child: TextField(
                   controller: _amountCtrl,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
                   decoration: const InputDecoration(labelText: 'Amount per unit (₹)', isDense: true),
                   onChanged: (_) => _update(),
                 ),

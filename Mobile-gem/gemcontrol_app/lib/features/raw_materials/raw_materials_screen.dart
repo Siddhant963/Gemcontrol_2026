@@ -16,6 +16,8 @@ import '../../shared/widgets/gc_app_bar.dart';
 import 'raw_materials_providers.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/forms/live_validation.dart';
+import '../../shared/forms/validators.dart';
+import '../../shared/widgets/form_error_banner.dart';
 
 class RawMaterialsScreen extends ConsumerWidget {
   const RawMaterialsScreen({super.key});
@@ -117,31 +119,56 @@ class _RawMaterialCard extends ConsumerWidget {
 
   void _showAddStockDialog(BuildContext context, WidgetRef ref, RawMaterial material) {
     final ctrl = TextEditingController();
+    String? error;
+    bool busy = false;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Add stock to ${material.name}'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Quantity to add (grams)'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              final qty = double.tryParse(ctrl.text) ?? 0;
-              if (qty > 0) {
-                await ref.read(rawMaterialRepositoryProvider).addStock(material.id, qty);
-                ref.invalidate(rawMaterialsProvider);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Add stock to ${material.name}'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: decimalFormatters(decimals: 3, maxLength: 12),
+            onChanged: (_) {
+              if (error != null) setState(() => error = positiveNumberRule(ctrl.text, 'Quantity', max: 1000000));
             },
-            child: const Text('Add'),
+            decoration: InputDecoration(labelText: 'Quantity to add (grams)', errorText: error),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final problem = positiveNumberRule(ctrl.text, 'Quantity', max: 1000000);
+                      if (problem != null) {
+                        setState(() => error = problem);
+                        return;
+                      }
+                      setState(() => busy = true);
+                      try {
+                        await ref
+                            .read(rawMaterialRepositoryProvider)
+                            .addStock(material.id, double.parse(ctrl.text.trim()));
+                        ref.invalidate(rawMaterialsProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setState(() {
+                            busy = false;
+                            error = e is ApiException ? e.message : 'Could not add stock. Try again.';
+                          });
+                        }
+                      }
+                    },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
       ),
-    );
+    ).whenComplete(ctrl.dispose);
   }
 }
 
@@ -153,7 +180,7 @@ class _AddRawMaterialSheet extends ConsumerStatefulWidget {
 
 class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
   final _nameCtrl = TextEditingController();
-  final _qtyCtrl = TextEditingController(text: '0');
+  final _qtyCtrl = TextEditingController();
   String _materialType = 'gold';
   XFile? _image;
   bool _saving = false;
@@ -163,18 +190,23 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
     if (mounted) setState(() {});
   });
 
-  Map<String, String> _rules() {
-    final errors = <String, String>{};
-    final name = _nameCtrl.text;
-    if (name.trim().isEmpty) {
-      errors['name'] = 'Material name is required';
-    } else if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
-      errors['name'] = 'Name must contain letters, not just numbers';
-    }
-    if ((double.tryParse(_qtyCtrl.text) ?? 0) <= 0) {
-      errors['quantity'] = 'Valid quantity is required';
-    }
-    return errors;
+  Map<String, String> _rules() => errorsOf({
+    'name': nameRule(_nameCtrl.text, label: 'Material name'),
+    'quantity': positiveNumberRule(_qtyCtrl.text, 'Quantity', max: 1000000),
+  });
+
+  String? _fieldForServerMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('name')) return 'name';
+    if (m.contains('quantity')) return 'quantity';
+    return null;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _qtyCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
@@ -201,21 +233,16 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
       await ref.read(rawMaterialRepositoryProvider).createRawMaterial(
             name: _nameCtrl.text.trim(),
             materialType: _materialType,
-            quantity: double.tryParse(_qtyCtrl.text) ?? 0,
+            quantity: double.parse(_qtyCtrl.text.trim()),
             firmId: firm.id,
             imagePath: _image?.path,
           );
       ref.invalidate(rawMaterialsProvider);
       if (mounted) Navigator.pop(context);
-    } on ApiException catch (e) {
+    } catch (e) {
       if (mounted) {
-        final m = e.message.toLowerCase();
-        if (m.contains('name')) {
-          _v.setServerError('name', e.message);
-        } else if (m.contains('quantity')) {
-          _v.setServerError('quantity', e.message);
-        }
-        AppToast.show(context, e.message, type: AppToastType.error);
+        final message = _v.describeError(e, fieldFor: _fieldForServerMessage);
+        AppToast.show(context, message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -225,7 +252,7 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
@@ -238,6 +265,7 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
         children: [
           Text('New Raw Material', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.md),
+          FormErrorBanner(_v.formError),
           GestureDetector(
             onTap: _pickImage,
             child: Container(
@@ -259,6 +287,8 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
             'name',
             TextField(
               controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: lengthLimit(kNameMax),
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
             ),
@@ -277,7 +307,8 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
             'quantity',
             TextField(
               controller: _qtyCtrl,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: decimalFormatters(decimals: 3, maxLength: 12),
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(
                 labelText: 'Initial quantity (grams)',

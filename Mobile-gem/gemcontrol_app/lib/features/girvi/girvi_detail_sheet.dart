@@ -6,6 +6,7 @@ import '../../core/models/girvi.dart';
 import '../../core/repositories/girvi_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/gold_divider.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'girvi_providers.dart';
@@ -163,6 +164,8 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
   void _showPaymentDialog(BuildContext context) {
     final ctrl = TextEditingController();
     String method = 'cash';
+    String? error;
+    bool busy = false;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -173,8 +176,15 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
             children: [
               TextField(
                 controller: ctrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount (₹)'),
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
+                onChanged: (_) {
+                  if (error != null) {
+                    setDialogState(() => error = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000));
+                  }
+                },
+                decoration: InputDecoration(labelText: 'Amount (₹)', errorText: error),
               ),
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<String>(
@@ -190,9 +200,16 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             TextButton(
-              onPressed: () async {
-                final amount = double.tryParse(ctrl.text) ?? 0;
-                if (amount <= 0) return;
+              onPressed: busy
+                  ? null
+                  : () async {
+                final problem = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000);
+                if (problem != null) {
+                  setDialogState(() => error = problem);
+                  return;
+                }
+                final amount = double.parse(ctrl.text.trim());
+                setDialogState(() => busy = true);
                 try {
                   await ref.read(girviRepositoryProvider).addPayment(
                         girviId: widget.girvi.id,
@@ -202,9 +219,12 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
                   ref.invalidate(girviItemsProvider);
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) Navigator.pop(context);
-                } on ApiException catch (e) {
+                } catch (e) {
                   if (ctx.mounted) {
-                    AppToast.show(ctx, e.message, type: AppToastType.error);
+                    setDialogState(() {
+                      busy = false;
+                      error = e is ApiException ? e.message : 'Could not add payment. Try again.';
+                    });
                   }
                 }
               },

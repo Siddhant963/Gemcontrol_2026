@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/models/customer.dart';
 import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/customer_repository.dart';
@@ -11,7 +10,10 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'customers_providers.dart';
+import '../../shared/forms/live_validation.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/form_error_banner.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -36,7 +38,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
           ),
-          builder: (_) => const _AddCustomerSheet(),
+          builder: (_) => const AddCustomerSheet(),
         ),
         child: const Icon(Icons.person_add_alt_1_outlined),
       ),
@@ -148,25 +150,60 @@ class _CustomerCard extends ConsumerWidget {
   }
 }
 
-class _AddCustomerSheet extends ConsumerStatefulWidget {
-  const _AddCustomerSheet();
+class AddCustomerSheet extends ConsumerStatefulWidget {
+  const AddCustomerSheet({super.key});
   @override
-  ConsumerState<_AddCustomerSheet> createState() => _AddCustomerSheetState();
+  ConsumerState<AddCustomerSheet> createState() => _AddCustomerSheetState();
 }
 
-class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
+class _AddCustomerSheetState extends ConsumerState<AddCustomerSheet> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   bool _saving = false;
 
+  static const _order = ['name', 'contact', 'email', 'address'];
+
+  // Errors show as the user leaves a box, all at once on Save, and clear the
+  // moment the value is valid. The backend requires ALL four fields.
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+
+  Map<String, String> _rules() => errorsOf({
+    'name': nameRule(_nameCtrl.text, label: 'Name'),
+    'contact': phoneRule(_contactCtrl.text),
+    'email': emailRule(_emailCtrl.text),
+    'address': textRule(_addressCtrl.text, 'Address', max: kAddressMax),
+  });
+
+  String? _fieldForServerMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('email')) return 'email';
+    if (m.contains('contact') || m.contains('10 digits')) return 'contact';
+    if (m.contains('name')) return 'name';
+    return null;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _contactCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _save() async {
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      _v.scrollToFirstError(_order);
+      return;
+    }
     final firm = ref.read(currentFirmProvider);
-    final name = _nameCtrl.text.trim();
-    if (name.isEmpty || firm == null) return;
-    if (!RegExp(r'[A-Za-z]').hasMatch(name)) {
-      AppToast.show(context, 'Name must contain letters, not just numbers', type: AppToastType.warning);
+    if (firm == null) {
+      AppToast.show(context, 'No firm found — set up a firm in Settings first', type: AppToastType.warning);
       return;
     }
     setState(() => _saving = true);
@@ -180,9 +217,10 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
           );
       ref.invalidate(customersProvider);
       if (mounted) Navigator.pop(context);
-    } on ApiException catch (e) {
+    } catch (e) {
       if (mounted) {
-        AppToast.show(context, e.message, type: AppToastType.error);
+        final message = _v.describeError(e, fieldFor: _fieldForServerMessage);
+        AppToast.show(context, message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -191,7 +229,7 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
@@ -204,21 +242,58 @@ class _AddCustomerSheetState extends ConsumerState<_AddCustomerSheet> {
         children: [
           Text('New Customer', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.md),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _contactCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Contact number'),
+          FormErrorBanner(_v.formError),
+          _v.wrap(
+            'name',
+            TextField(
+              key: _v.keyFor('name'),
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: lengthLimit(kNameMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
+          _v.wrap(
+            'contact',
+            TextField(
+              key: _v.keyFor('contact'),
+              controller: _contactCtrl,
+              keyboardType: TextInputType.phone,
+              inputFormatters: phoneFormatters,
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(
+                labelText: 'Contact number',
+                helperText: '10 digit mobile number',
+                errorText: _v.errorFor('contact'),
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Address')),
+          _v.wrap(
+            'email',
+            TextField(
+              key: _v.keyFor('email'),
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              inputFormatters: lengthLimit(kEmailMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Email', errorText: _v.errorFor('email')),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _v.wrap(
+            'address',
+            TextField(
+              key: _v.keyFor('address'),
+              controller: _addressCtrl,
+              textCapitalization: TextCapitalization.sentences,
+              inputFormatters: lengthLimit(kAddressMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Address', errorText: _v.errorFor('address')),
+            ),
+          ),
           const SizedBox(height: AppSpacing.md),
           ElevatedButton(
             onPressed: _saving ? null : _save,

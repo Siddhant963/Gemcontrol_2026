@@ -78,9 +78,15 @@ function buildInvoiceNumber(firm, date = new Date()) {
 // enough for real business/product names that legitimately include digits
 // (e.g. "22K Gold Ring", "Shop No. 5").
 function isValidName(name) {
-  return typeof name === "string" && /[A-Za-z]/.test(name) && name.trim().length >= 2;
+  return (
+    typeof name === "string" &&
+    /[A-Za-z]/.test(name) &&
+    name.trim().length >= 2 &&
+    name.trim().length <= MAX_NAME_LENGTH
+  );
 }
-const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const MAX_NAME_LENGTH = 60; // keep in step with kNameMax in the Flutter/web forms
+const EMAIL_REGEX = /^(?=.{1,100}$)\S+@\S+\.\S+$/;
 const PHONE_REGEX = /^\d{10}$/;
 const MIN_PASSWORD_LENGTH = 6;
 

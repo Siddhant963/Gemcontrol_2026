@@ -1,6 +1,6 @@
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -9,7 +9,10 @@ import '../../core/models/firm.dart';
 import '../../core/providers/firm_provider.dart';
 import '../../core/repositories/firm_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/forms/live_validation.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_drawer.dart';
+import '../../shared/widgets/form_error_banner.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/app_toast.dart';
@@ -171,6 +174,92 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
     super.dispose();
   }
 
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+
+  static const _order = [
+    'name', 'shopName', 'description', 'location', 'proprietor', 'address', 'city', 'pincode',
+    'registration', 'pan', 'gst', 'prefix', 'cgst', 'sgst', 'igst', 'email', 'contact',
+    'bankName', 'branch', 'accountNo', 'ifsc',
+  ];
+
+  // Only the firm name is required (as before); every other box is checked
+  // for format/length when it is filled in.
+  static String? _format(String value, RegExp re, String message) {
+    final v = value.trim();
+    return v.isEmpty || re.hasMatch(v) ? null : message;
+  }
+
+  Map<String, String> _rules() => errorsOf({
+    'name': nameRule(_nameCtrl.text, label: 'Firm name'),
+    'shopName': textRule(_shopNameCtrl.text, 'Shop name', max: kNameMax, required: false),
+    'description': textRule(_descriptionCtrl.text, 'Description', max: kDescriptionMax, required: false),
+    'location': textRule(_locationCtrl.text, 'Location', max: kAddressMax, required: false),
+    'proprietor': textRule(_proprietorNameCtrl.text, 'Proprietor name', max: kNameMax, required: false),
+    'address': textRule(_addressCtrl.text, 'Address', max: kAddressMax, required: false),
+    'city': textRule(_cityCtrl.text, 'City', max: kShortTextMax, required: false),
+    'pincode': _format(_pincodeCtrl.text, RegExp(r'^\d{6}$'), 'Pincode must be 6 digits'),
+    'registration': textRule(_registrationNoCtrl.text, 'Registration no.', max: 30, required: false),
+    'pan': _format(_panNoCtrl.text.toUpperCase(), RegExp(r'^[A-Z]{5}\d{4}[A-Z]$'), 'PAN must look like ABCDE1234F'),
+    'gst': _format(
+      _gstCtrl.text.toUpperCase(),
+      RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$'),
+      'GSTIN must be 15 characters, e.g. 22ABCDE1234F1Z5',
+    ),
+    'prefix': textRule(_invoicePrefixCtrl.text, 'Invoice prefix', max: 10, required: false),
+    'cgst': nonNegativeNumberRule(_cgstCtrl.text, 'CGST', max: 100),
+    'sgst': nonNegativeNumberRule(_sgstCtrl.text, 'SGST', max: 100),
+    'igst': nonNegativeNumberRule(_igstCtrl.text, 'IGST', max: 100),
+    'email': _emailCtrl.text.trim().isEmpty ? null : emailRule(_emailCtrl.text),
+    'contact': _contactCtrl.text.trim().isEmpty ? null : phoneRule(_contactCtrl.text, label: 'Contact'),
+    'bankName': textRule(_bankNameCtrl.text, 'Bank name', max: kShortTextMax, required: false),
+    'branch': textRule(_branchCtrl.text, 'Branch', max: kShortTextMax, required: false),
+    'accountNo': _format(_accountNoCtrl.text, RegExp(r'^\d{9,18}$'), 'Account number must be 9 to 18 digits'),
+    'ifsc': _format(
+      _ifscCodeCtrl.text.toUpperCase(),
+      RegExp(r'^[A-Z]{4}0[A-Z\d]{6}$'),
+      'IFSC must be 11 characters, e.g. SBIN0001234',
+    ),
+  });
+
+  Widget _field(
+    String key,
+    TextEditingController ctrl,
+    String label, {
+    int max = kShortTextMax,
+    int maxLines = 1,
+    TextInputType? keyboard,
+    List<TextInputFormatter>? formatters,
+    TextCapitalization caps = TextCapitalization.none,
+    String? helper,
+  }) => _v.wrap(
+    key,
+    TextField(
+      key: _v.keyFor(key),
+      controller: ctrl,
+      maxLines: maxLines,
+      keyboardType: keyboard,
+      textCapitalization: caps,
+      inputFormatters: formatters ?? lengthLimit(max),
+      onChanged: (_) => _v.changed(),
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: helper,
+        errorText: _v.errorFor(key),
+        errorMaxLines: 2,
+      ),
+    ),
+  );
+
+  Widget _pct(String key, TextEditingController ctrl, String label) => _field(
+    key,
+    ctrl,
+    label,
+    keyboard: const TextInputType.numberWithOptions(decimal: true),
+    formatters: decimalFormatters(decimals: 2, maxLength: 6),
+  );
+
   Future<void> _pickImage(_FirmImageField field) async {
     final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (img == null) return;
@@ -192,7 +281,11 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty) return;
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      _v.scrollToFirstError(_order);
+      return;
+    }
     setState(() => _saving = true);
     final fields = {
       'name': _nameCtrl.text.trim(),
@@ -205,10 +298,10 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
       'city': _cityCtrl.text.trim(),
       'pincode': _pincodeCtrl.text.trim(),
       'registrationNo': _registrationNoCtrl.text.trim(),
-      'panNo': _panNoCtrl.text.trim(),
-      'gst': _gstCtrl.text.trim(),
+      'panNo': _panNoCtrl.text.trim().toUpperCase(),
+      'gst': _gstCtrl.text.trim().toUpperCase(),
       'invoicePrefix': _invoicePrefixCtrl.text.trim(),
-      'cgstRate': double.tryParse(_cgstCtrl.text) ?? 1.5,
+      'cgstRate': double.tryParse(_cgstCtrl.text.trim()) ?? 1.5,
       'sgstRate': double.tryParse(_sgstCtrl.text) ?? 1.5,
       'igstRate': double.tryParse(_igstCtrl.text) ?? 0,
       'gstEnabled': true,
@@ -217,7 +310,7 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
       'bankName': _bankNameCtrl.text.trim(),
       'branch': _branchCtrl.text.trim(),
       'accountNo': _accountNoCtrl.text.trim(),
-      'ifscCode': _ifscCodeCtrl.text.trim(),
+      'ifscCode': _ifscCodeCtrl.text.trim().toUpperCase(),
       if (_firmStartDate != null) 'firmStartDate': _firmStartDate!.toIso8601String(),
     };
     final images = {
@@ -235,13 +328,9 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
       }
       ref.invalidate(firmsProvider);
       if (mounted) Navigator.pop(context);
-    } on ApiException catch (e) {
-      if (mounted) {
-        AppToast.show(context, e.message, type: AppToastType.error);
-      }
     } catch (e) {
       if (mounted) {
-        AppToast.show(context, 'Could not save: $e', type: AppToastType.error);
+        AppToast.show(context, _v.describeError(e), type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -295,41 +384,40 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
           children: [
             Text(_isEdit ? 'Edit Firm' : 'New Firm', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Firm name')),
+            FormErrorBanner(_v.formError),
+            _field('name', _nameCtrl, 'Firm name', max: kNameMax, caps: TextCapitalization.words),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop name')),
+            _field('shopName', _shopNameCtrl, 'Shop name', max: kNameMax, caps: TextCapitalization.words),
             const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _descriptionCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Firm description'),
-            ),
+            _field('description', _descriptionCtrl, 'Firm description', max: kDescriptionMax, maxLines: 2),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _locationCtrl, decoration: const InputDecoration(labelText: 'Location')),
+            _field('location', _locationCtrl, 'Location', max: kAddressMax),
             const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _proprietorNameCtrl,
-              decoration: const InputDecoration(labelText: 'Proprietor name (printed on invoices)'),
-            ),
+            _field('proprietor', _proprietorNameCtrl, 'Proprietor name (printed on invoices)',
+                max: kNameMax, caps: TextCapitalization.words),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Address')),
+            _field('address', _addressCtrl, 'Address', max: kAddressMax),
             const SizedBox(height: AppSpacing.sm),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: TextField(controller: _cityCtrl, decoration: const InputDecoration(labelText: 'City'))),
+                Expanded(child: _field('city', _cityCtrl, 'City')),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(child: TextField(controller: _pincodeCtrl, decoration: const InputDecoration(labelText: 'Pincode'))),
+                Expanded(
+                  child: _field('pincode', _pincodeCtrl, 'Pincode',
+                      keyboard: TextInputType.number, formatters: digitsFormatters(6)),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _registrationNoCtrl,
-              decoration: const InputDecoration(labelText: 'Registration No.'),
-            ),
+            _field('registration', _registrationNoCtrl, 'Registration No.', max: 30),
             const SizedBox(height: AppSpacing.sm),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: TextField(controller: _panNoCtrl, decoration: const InputDecoration(labelText: 'PAN No.'))),
+                Expanded(
+                  child: _field('pan', _panNoCtrl, 'PAN No.', max: 10, caps: TextCapitalization.characters),
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: InkWell(
@@ -347,60 +435,38 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _gstCtrl, decoration: const InputDecoration(labelText: 'GSTIN')),
+            _field('gst', _gstCtrl, 'GSTIN', max: 15, caps: TextCapitalization.characters),
             const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _invoicePrefixCtrl,
-              decoration: const InputDecoration(labelText: 'Invoice prefix (e.g. IS)'),
-            ),
+            _field('prefix', _invoicePrefixCtrl, 'Invoice prefix (e.g. IS)', max: 10, caps: TextCapitalization.characters),
             const SizedBox(height: AppSpacing.md),
             Text('GST Configuration', style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: AppSpacing.sm),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _cgstCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'CGST %'),
-                  ),
-                ),
+                Expanded(child: _pct('cgst', _cgstCtrl, 'CGST %')),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    controller: _sgstCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'SGST %'),
-                  ),
-                ),
+                Expanded(child: _pct('sgst', _sgstCtrl, 'SGST %')),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    controller: _igstCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'IGST %'),
-                  ),
-                ),
+                Expanded(child: _pct('igst', _igstCtrl, 'IGST %')),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(child: TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'Email'))),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(child: TextField(controller: _contactCtrl, decoration: const InputDecoration(labelText: 'Contact'))),
-              ],
-            ),
+            _field('email', _emailCtrl, 'Email', max: kEmailMax, keyboard: TextInputType.emailAddress),
+            const SizedBox(height: AppSpacing.sm),
+            _field('contact', _contactCtrl, 'Contact',
+                keyboard: TextInputType.phone, formatters: phoneFormatters, helper: '10 digit mobile number'),
             const SizedBox(height: AppSpacing.md),
             Text('Bank Details', style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _bankNameCtrl, decoration: const InputDecoration(labelText: 'Bank name')),
+            _field('bankName', _bankNameCtrl, 'Bank name'),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _branchCtrl, decoration: const InputDecoration(labelText: 'Branch')),
+            _field('branch', _branchCtrl, 'Branch'),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _accountNoCtrl, decoration: const InputDecoration(labelText: 'Account No.')),
+            _field('accountNo', _accountNoCtrl, 'Account No.',
+                keyboard: TextInputType.number, formatters: digitsFormatters(18)),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: _ifscCodeCtrl, decoration: const InputDecoration(labelText: 'IFSC code')),
+            _field('ifsc', _ifscCodeCtrl, 'IFSC code', max: 11, caps: TextCapitalization.characters),
             const SizedBox(height: AppSpacing.md),
             Text('Branding (shown on invoices)', style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: AppSpacing.sm),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/models/user.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
@@ -9,7 +8,10 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../../shared/forms/live_validation.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/form_error_banner.dart';
 import '../subscription/subscription_providers.dart';
 
 final allUsersProvider = FutureProvider.autoDispose<List<AppUser>>((ref) {
@@ -42,7 +44,7 @@ class UsersScreen extends ConsumerWidget {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
-            builder: (_) => const _AddUserSheet(),
+            builder: (_) => const AddUserSheet(),
           );
         },
         child: const Icon(Icons.person_add_alt_1_outlined),
@@ -85,22 +87,58 @@ class UsersScreen extends ConsumerWidget {
   }
 }
 
-class _AddUserSheet extends ConsumerStatefulWidget {
-  const _AddUserSheet();
+class AddUserSheet extends ConsumerStatefulWidget {
+  const AddUserSheet({super.key});
   @override
-  ConsumerState<_AddUserSheet> createState() => _AddUserSheetState();
+  ConsumerState<AddUserSheet> createState() => _AddUserSheetState();
 }
 
-class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
+class _AddUserSheetState extends ConsumerState<AddUserSheet> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   String _role = 'staff';
   bool _saving = false;
+  bool _obscure = true;
+
+  static const _order = ['name', 'email', 'contact', 'password'];
+
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+
+  Map<String, String> _rules() => errorsOf({
+    'name': nameRule(_nameCtrl.text, label: 'Name'),
+    'email': emailRule(_emailCtrl.text),
+    'contact': phoneRule(_contactCtrl.text, label: 'Contact'),
+    'password': passwordRule(_passwordCtrl.text),
+  });
+
+  String? _fieldForServerMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('already exists') || m.contains('email')) return 'email';
+    if (m.contains('contact') || m.contains('10 digits')) return 'contact';
+    if (m.contains('password')) return 'password';
+    if (m.contains('name')) return 'name';
+    return null;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _contactCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) return;
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      _v.scrollToFirstError(_order);
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(authRepositoryProvider).register(
@@ -111,10 +149,15 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
             role: _role,
           );
       ref.invalidate(allUsersProvider);
-      if (mounted) Navigator.pop(context);
-    } on ApiException catch (e) {
       if (mounted) {
-        AppToast.show(context, e.message, type: AppToastType.error);
+        AppToast.show(context, 'User created.', type: AppToastType.success);
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      // includes the plan's staff-account limit message (shown in the form)
+      if (mounted) {
+        final message = _v.describeError(e, fieldFor: _fieldForServerMessage);
+        AppToast.show(context, message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -123,7 +166,7 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
@@ -136,24 +179,66 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
         children: [
           Text('New User', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.md),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
+          FormErrorBanner(_v.formError),
+          _v.wrap(
+            'name',
+            TextField(
+              key: _v.keyFor('name'),
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: lengthLimit(kNameMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _contactCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Contact'),
+          _v.wrap(
+            'email',
+            TextField(
+              key: _v.keyFor('email'),
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              inputFormatters: lengthLimit(kEmailMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Email', errorText: _v.errorFor('email')),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _passwordCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
+          _v.wrap(
+            'contact',
+            TextField(
+              key: _v.keyFor('contact'),
+              controller: _contactCtrl,
+              keyboardType: TextInputType.phone,
+              inputFormatters: phoneFormatters,
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(
+                labelText: 'Contact',
+                helperText: '10 digit mobile number',
+                errorText: _v.errorFor('contact'),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _v.wrap(
+            'password',
+            TextField(
+              key: _v.keyFor('password'),
+              controller: _passwordCtrl,
+              obscureText: _obscure,
+              inputFormatters: lengthLimit(kPasswordMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                helperText: 'At least $kPasswordMin characters',
+                errorText: _v.errorFor('password'),
+                suffixIcon: IconButton(
+                  tooltip: _obscure ? 'Show password' : 'Hide password',
+                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(

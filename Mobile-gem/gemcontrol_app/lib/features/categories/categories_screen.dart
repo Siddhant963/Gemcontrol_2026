@@ -9,7 +9,10 @@ import '../../core/api/api_client.dart';
 import '../../core/models/stock_category.dart';
 import '../../core/repositories/stock_category_repository.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/forms/live_validation.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_drawer.dart';
+import '../../shared/widgets/form_error_banner.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'categories_providers.dart';
@@ -171,13 +174,38 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
   XFile? _image;
   bool _saving = false;
 
+  late final LiveValidation _v = LiveValidation(_rules, () {
+    if (mounted) setState(() {});
+  });
+
+  Map<String, String> _rules() => errorsOf({
+    'name': nameRule(_nameCtrl.text, label: 'Category name'),
+    'description': textRule(_descCtrl.text, 'Description', max: kDescriptionMax, required: false),
+  });
+
+  String? _fieldForServerMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('name') || m.contains('already exists')) return 'name';
+    return null;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickImage() async {
     final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (img != null) setState(() => _image = img);
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty) return;
+    if (!_v.validateAll()) {
+      AppToast.show(context, 'Please fix the highlighted fields.', type: AppToastType.warning);
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref.read(stockCategoryRepositoryProvider).createCategory(
@@ -187,9 +215,10 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
           );
       ref.invalidate(categoriesProvider);
       if (mounted) Navigator.pop(context);
-    } on ApiException catch (e) {
+    } catch (e) {
       if (mounted) {
-        AppToast.show(context, e.message, type: AppToastType.error);
+        final message = _v.describeError(e, fieldFor: _fieldForServerMessage);
+        AppToast.show(context, message, type: AppToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -199,7 +228,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
@@ -212,6 +241,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
         children: [
           Text('New Category', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.md),
+          FormErrorBanner(_v.formError),
           GestureDetector(
             onTap: _pickImage,
             child: Container(
@@ -234,14 +264,26 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _nameCtrl,
-            decoration: const InputDecoration(labelText: 'Category name'),
+          _v.wrap(
+            'name',
+            TextField(
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: lengthLimit(kNameMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Category name', errorText: _v.errorFor('name')),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _descCtrl,
-            decoration: const InputDecoration(labelText: 'Description'),
+          _v.wrap(
+            'description',
+            TextField(
+              controller: _descCtrl,
+              textCapitalization: TextCapitalization.sentences,
+              inputFormatters: lengthLimit(kDescriptionMax),
+              onChanged: (_) => _v.changed(),
+              decoration: InputDecoration(labelText: 'Description', errorText: _v.errorFor('description')),
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           ElevatedButton(

@@ -6,11 +6,11 @@ import '../../core/models/udhar.dart';
 import '../../core/repositories/payment_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency.dart';
+import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
-import '../../shared/widgets/app_toast.dart';
 
 final allUdharProvider = FutureProvider.autoDispose<List<Udhar>>((ref) {
   return ref.watch(udharRepositoryProvider).getAllUdhar();
@@ -355,37 +355,59 @@ class _UdharEntryTile extends ConsumerWidget {
 
   void _showSettleDialog(BuildContext context, WidgetRef ref, Udhar udhar) {
     final ctrl = TextEditingController(text: udhar.amount.toStringAsFixed(2));
+    String? error;
+    bool busy = false;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Settle ${udhar.invoiceNumber?.isNotEmpty == true ? udhar.invoiceNumber! : "udhar"}',
-        ),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Amount received (₹)'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              final amount = double.tryParse(ctrl.text) ?? 0;
-              if (amount <= 0) return;
-              try {
-                await ref.read(udharRepositoryProvider).settleUdhar(udhar.id, amount);
-                ref.invalidate(allUdharProvider);
-                ref.invalidate(allUdharSettlementsProvider);
-              } on ApiException catch (e) {
-                if (ctx.mounted) {
-                  AppToast.show(ctx, e.message, type: AppToastType.error);
-                }
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Settle'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(
+            'Settle ${udhar.invoiceNumber?.isNotEmpty == true ? udhar.invoiceNumber! : "udhar"}',
           ),
-        ],
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
+            onChanged: (_) {
+              if (error != null) {
+                setDialogState(() => error = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000));
+              }
+            },
+            decoration: InputDecoration(labelText: 'Amount received (₹)', errorText: error),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final problem = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000);
+                      if (problem != null) {
+                        setDialogState(() => error = problem);
+                        return;
+                      }
+                      setDialogState(() => busy = true);
+                      try {
+                        await ref
+                            .read(udharRepositoryProvider)
+                            .settleUdhar(udhar.id, double.parse(ctrl.text.trim()));
+                        ref.invalidate(allUdharProvider);
+                        ref.invalidate(allUdharSettlementsProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setDialogState(() {
+                            busy = false;
+                            error = e is ApiException ? e.message : 'Could not settle. Try again.';
+                          });
+                        }
+                      }
+                    },
+              child: const Text('Settle'),
+            ),
+          ],
+        ),
       ),
     );
   }
