@@ -1,0 +1,69 @@
+/* Golden cursor sparkle: a 4-point star. */
+.rs-sparkle {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  pointer-events: none;
+  clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+  will-change: transform, opacity;
+}
+
+/* Blurred colour orbs sit behind the page so glass panels have something to blur. */
+.rs-orbs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rs-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.35;
+  will-change: transform;
+}
+.rs-orb-gold { width: 420px; height: 420px; top: 8%; left: -6%; background: #d4af37; }
+.rs-orb-blue { width: 520px; height: 520px; top: 38%; right: -10%; background: #3b6fb6; }
+.rs-orb-gold2 { width: 360px; height: 360px; bottom: 4%; left: 30%; background: #e0c298; }
+
+/* Content sits above the orbs. The page wrapper background is made transparent
+   so the orbs show through; the body keeps the theme background colour. */
+body.marketing-site #root > div { background: transparent !important; position: relative; z-index: 1; }
+
+/* Glassmorphism for cards/panels and the header on marketing pages. */
+body.marketing-site main .MuiCard-root,
+body.marketing-site main .MuiPaper-root {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  box-shadow: 0 8px 32px rgba(10, 37, 64, 0.1) !important;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+body.marketing-site main .MuiCard-root.rs-card-hover,
+body.marketing-site main .MuiPaper-root.rs-card-hover {
+  border-color: rgba(212, 175, 55, 0.7) !important;
+  box-shadow: 0 16px 44px rgba(212, 175, 55, 0.25), 0 8px 32px rgba(10, 37, 64, 0.14) !important;
+}
+body.marketing-site header.MuiAppBar-root {
+  background: rgba(250, 248, 255, 0.6) !important;
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+/* Dark mode glass */
+body.marketing-site[data-dark="true"] main .MuiCard-root,
+body.marketing-site[data-dark="true"] main .MuiPaper-root {
+  background: rgba(19, 27, 46, 0.55) !important;
+  border-color: rgba(224, 194, 152, 0.18) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+}
+body.marketing-site[data-dark="true"] header.MuiAppBar-root {
+  background: rgba(11, 15, 26, 0.6) !important;
+}
+
+@media (max-width: 600px) {
+  .rs-orb { filter: blur(60px); opacity: 0.28; }
+}

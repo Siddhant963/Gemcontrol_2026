@@ -16,7 +16,7 @@ function SectionHeading({ eyebrow, title, subtitle, align = "center", sx }) {
       <Typography
         variant="h4"
         component="h2"
-        sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: { xs: "1.5rem", sm: "2rem" } }}
+        sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: { xs: "1.6rem", sm: "2.2rem" }, lineHeight: 1.25 }}
       >
         {title}
       </Typography>

@@ -41,6 +41,8 @@ const tertiary = {
   },
 };
 
+const HEADING_FONT = '"Playfair Display", Georgia, "Times New Roman", serif';
+
 export const getTheme = (mode) =>
   createTheme({
     palette: {
@@ -103,12 +105,14 @@ export const getTheme = (mode) =>
     },
     typography: {
       fontFamily: "Plus Jakarta Sans, sans-serif",
-      h1: { fontSize: "2.25rem", lineHeight: "2.75rem", fontWeight: 700, letterSpacing: "-0.02em" },
-      h2: { fontSize: "1.5rem", lineHeight: "2rem", fontWeight: 600, letterSpacing: "-0.01em" },
-      h3: { fontSize: "1.25rem", lineHeight: "1.75rem", fontWeight: 600 },
-      h4: { fontSize: "1rem", lineHeight: "1.5rem", fontWeight: 600 },
-      h5: { fontSize: "1rem", lineHeight: "1.5rem", fontWeight: 600 },
-      h6: { fontSize: "0.875rem", lineHeight: "1.25rem", fontWeight: 600 },
+      // Headings use a serif display face with UNITLESS line-heights so wrapped
+      // titles never collide when a page overrides fontSize.
+      h1: { fontFamily: HEADING_FONT, fontSize: "2.25rem", lineHeight: 1.2, fontWeight: 700, letterSpacing: "-0.01em" },
+      h2: { fontFamily: HEADING_FONT, fontSize: "1.5rem", lineHeight: 1.25, fontWeight: 600, letterSpacing: "-0.005em" },
+      h3: { fontFamily: HEADING_FONT, fontSize: "1.25rem", lineHeight: 1.3, fontWeight: 600 },
+      h4: { fontFamily: HEADING_FONT, fontSize: "1rem", lineHeight: 1.35, fontWeight: 600 },
+      h5: { fontSize: "1rem", lineHeight: 1.5, fontWeight: 600 },
+      h6: { fontSize: "0.875rem", lineHeight: 1.45, fontWeight: 600 },
       body1: { fontSize: "1rem", lineHeight: "1.5rem", fontWeight: 400 },
       body2: { fontSize: "0.875rem", lineHeight: "1.25rem", fontWeight: 400 },
       caption: { fontSize: "0.75rem", lineHeight: "1rem", fontWeight: 400 },

@@ -18,6 +18,7 @@ import { Link as RouterLink, useLocation } from "react-router-dom";
 import { ROUTES } from "../../utils/routes";
 import SymbolIcon from "../SymbolIcon";
 import { trackEvent } from "../../utils/analytics";
+import MarketingEffects from "../effects/MarketingEffects";
 
 const NAV_LINKS = [
   { label: "Home", to: ROUTES.LANDING },
@@ -38,6 +39,7 @@ function MarketingHeader() {
 
   return (
     <>
+      <MarketingEffects />
       <AppBar
         position="sticky"
         elevation={0}

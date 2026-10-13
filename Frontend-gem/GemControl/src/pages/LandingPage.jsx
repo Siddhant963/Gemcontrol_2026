@@ -110,7 +110,7 @@ function LandingPage() {
                 fontWeight: 700,
                 color: theme.palette.text.primary,
                 fontSize: { xs: "2.1rem", sm: "2.75rem", md: "3.1rem" },
-                lineHeight: 1.15,
+                lineHeight: 1.2,
                 mb: 2.5,
               }}
             >
