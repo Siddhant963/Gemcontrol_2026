@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import gsap from "gsap";
@@ -24,7 +25,7 @@ function useSparkleTrail() {
     const spawn = (x, y) => {
       const el = document.createElement("span");
       el.className = "rs-sparkle";
-      const size = gsap.utils.random(5, 11);
+      const size = gsap.utils.random(4, 14);
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.style.background = gsap.utils.random(GOLD_SHADES);
@@ -33,12 +34,12 @@ function useSparkleTrail() {
         el,
         { x, y, scale: 0, opacity: 1, rotate: gsap.utils.random(0, 90) },
         {
-          x: x + gsap.utils.random(-28, 28),
-          y: y + gsap.utils.random(10, 46),
+          x: x + gsap.utils.random(-45, 45),
+          y: y + gsap.utils.random(10, 70),
           scale: 1,
           rotate: "+=180",
           opacity: 0,
-          duration: gsap.utils.random(0.7, 1.2),
+          duration: gsap.utils.random(0.8, 1.5),
           ease: "power2.out",
           onComplete: () => el.remove(),
         }
@@ -48,14 +49,18 @@ function useSparkleTrail() {
     const onMove = (e) => {
       const now = performance.now();
       const dist = Math.hypot(e.clientX - lastX, e.clientY - lastY);
-      if (now - last < 40 || dist < 8) return;
+      if (now - last < 16 || dist < 3) return;
       last = now;
       lastX = e.clientX;
       lastY = e.clientY;
-      spawn(e.clientX, e.clientY);
+      // Several sparkles per move, more when the cursor moves fast.
+      const count = Math.min(5, 2 + Math.floor(dist / 25));
+      for (let i = 0; i < count; i += 1) {
+        spawn(e.clientX + gsap.utils.random(-8, 8), e.clientY + gsap.utils.random(-8, 8));
+      }
     };
     const onClick = (e) => {
-      for (let i = 0; i < 10; i += 1) spawn(e.clientX, e.clientY);
+      for (let i = 0; i < 24; i += 1) spawn(e.clientX, e.clientY);
     };
 
     window.addEventListener("mousemove", onMove, { passive: true });
@@ -179,12 +184,14 @@ function MarketingEffects() {
     };
   }, [theme.palette.mode]);
 
-  return (
+  // Portalled to <body> so it can never take up space in the page layout.
+  return createPortal(
     <div className="rs-orbs" aria-hidden="true">
       <span className="rs-orb rs-orb-gold" />
       <span className="rs-orb rs-orb-blue" />
       <span className="rs-orb rs-orb-gold2" />
-    </div>
+    </div>,
+    document.body
   );
 }
 

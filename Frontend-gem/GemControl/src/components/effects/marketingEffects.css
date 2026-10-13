@@ -12,7 +12,10 @@
 /* Blurred colour orbs sit behind the page so glass panels have something to blur. */
 .rs-orbs {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
@@ -30,7 +33,7 @@
 
 /* Content sits above the orbs. The page wrapper background is made transparent
    so the orbs show through; the body keeps the theme background colour. */
-body.marketing-site #root > div { background: transparent !important; position: relative; z-index: 1; }
+body.marketing-site #root > div:not(.rs-orbs) { background: transparent !important; position: relative; z-index: 1; }
 
 /* Glassmorphism for cards/panels and the header on marketing pages. */
 body.marketing-site main .MuiCard-root,
