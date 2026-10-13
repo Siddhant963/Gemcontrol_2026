@@ -793,12 +793,27 @@ module.exports.createStockCategory = async (req, res) => {
       console.log("Category image URL for database:", imagePath);
     }
 
-    const newCategory = new StockCategoryModel({
-      name,
-      description,
+    const trimmedName = name.trim();
+    // Removing a category only sets removeAt, but the unique {firm, name} index
+    // still covers that row. Revive it instead of failing with a duplicate key.
+    let newCategory = await StockCategoryModel.findOne({
       firm: req.user.firm,
-      CategoryImg: imagePath,
+      name: trimmedName,
+      removeAt: { $ne: null },
     });
+    if (newCategory) {
+      newCategory.description = description;
+      newCategory.removeAt = null;
+      newCategory.createdAt = new Date();
+      if (imagePath) newCategory.CategoryImg = imagePath;
+    } else {
+      newCategory = new StockCategoryModel({
+        name: trimmedName,
+        description,
+        firm: req.user.firm,
+        CategoryImg: imagePath,
+      });
+    }
     await newCategory.save();
     addActivity(
       req.user._id,
