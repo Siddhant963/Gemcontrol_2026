@@ -27,6 +27,7 @@ const { razorpay, verifyPaymentSignature, validateWebhookSignature } = require("
 const appleIap = require("../Utils/appleIap.js");
 const { isAssignableRole } = require("../Utils/roles.js");
 const { staffLimitViolation, describeEntitlements } = require("../Utils/planAccess.js");
+const { ensureStandardCategories, dropStaleNameIndex } = require("../Utils/standardCategories.js");
 const path = require("path");
 const baseUploadDir = path.join(__dirname, "../../Uploads");
 const fs = require("fs");
@@ -794,11 +795,22 @@ module.exports.createStockCategory = async (req, res) => {
     }
 
     const trimmedName = name.trim();
+    await dropStaleNameIndex();
+    const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameRegex = new RegExp(`^${escapedName}$`, "i");
+    const activeDuplicate = await StockCategoryModel.findOne({
+      firm: req.user.firm,
+      removeAt: null,
+      name: nameRegex,
+    });
+    if (activeDuplicate) {
+      return res.status(400).json({ message: `Category "${activeDuplicate.name}" already exists in your firm` });
+    }
     // Removing a category only sets removeAt, but the unique {firm, name} index
     // still covers that row. Revive it instead of failing with a duplicate key.
     let newCategory = await StockCategoryModel.findOne({
       firm: req.user.firm,
-      name: trimmedName,
+      name: nameRegex,
       removeAt: { $ne: null },
     });
     if (newCategory) {
@@ -845,10 +857,11 @@ module.exports.getAllStockCategories = async (req, res) => {
     if (!firm) {
       return res.status(200).json([]);
     }
+    await ensureStandardCategories(firm);
     const categories = await StockCategoryModel.find({
       removeAt: null,
       firm,
-    });
+    }).sort({ name: 1 });
     res.status(200).json(categories);
   } catch (error) {
     console.error("Error fetching stock categories:", error);

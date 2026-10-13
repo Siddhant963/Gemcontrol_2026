@@ -36,8 +36,8 @@
 body.marketing-site #root > div:has(> main) { background: transparent !important; position: relative; z-index: 1; }
 
 /* Glassmorphism for cards/panels and the header on marketing pages. */
-body.marketing-site main .MuiCard-root,
-body.marketing-site main .MuiPaper-root {
+body.marketing-site main .MuiCard-root:not(.rs-no-glass),
+body.marketing-site main .MuiPaper-root:not(.rs-no-glass) {
   background: rgba(255, 255, 255, 0.55) !important;
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -45,8 +45,8 @@ body.marketing-site main .MuiPaper-root {
   box-shadow: 0 8px 32px rgba(10, 37, 64, 0.1) !important;
   transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
-body.marketing-site main .MuiCard-root.rs-card-hover,
-body.marketing-site main .MuiPaper-root.rs-card-hover {
+body.marketing-site main .MuiCard-root:not(.rs-no-glass).rs-card-hover,
+body.marketing-site main .MuiPaper-root:not(.rs-no-glass).rs-card-hover {
   border-color: rgba(212, 175, 55, 0.7) !important;
   box-shadow: 0 16px 44px rgba(212, 175, 55, 0.25), 0 8px 32px rgba(10, 37, 64, 0.14) !important;
 }
@@ -57,8 +57,8 @@ body.marketing-site header.MuiAppBar-root {
 }
 
 /* Dark mode glass */
-body.marketing-site[data-dark="true"] main .MuiCard-root,
-body.marketing-site[data-dark="true"] main .MuiPaper-root {
+body.marketing-site[data-dark="true"] main .MuiCard-root:not(.rs-no-glass),
+body.marketing-site[data-dark="true"] main .MuiPaper-root:not(.rs-no-glass) {
   background: rgba(19, 27, 46, 0.55) !important;
   border-color: rgba(224, 194, 152, 0.18) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;

@@ -141,6 +141,11 @@ const farmSchema = mongoose.Schema({
     type: String,
     default: undefined,
   },
+  // Set once the common jewellery categories have been added to this firm.
+  standardCategoriesSeeded: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

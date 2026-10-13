@@ -1,46 +1,28 @@
-// the box, so item entry never blocks on "create a category first". Safe to
-// re-run — existing categories (matched by name) are left untouched.
+// Gives EVERY existing firm the common jewellery categories (Payal, Chain,
+// Mangalsutra, ...) and drops the old global unique index on category name.
+// New firms get the same list automatically the first time they open Categories,
+// so running this is optional -- it just does all existing firms at once.
+// Safe to re-run: categories a firm already has (even removed ones) are skipped.
 //
-// Usage (run from the Backend/ directory so it picks up the same .env as the
-// server):
+// Usage (run from the Backend/ directory so it picks up the same .env):
 //   node scripts/seedJewelleryCategories.js
 
 require("dotenv").config();
 const mongoose = require("mongoose");
 const connectDB = require("../Config/DbConnection");
-const StockCategoryModel = require("../Models/StockCetegoryModel");
-
-const STANDARD_CATEGORIES = [
-  { name: "Necklace", description: "Necklaces" },
-  { name: "Haar", description: "Long traditional haar sets" },
-  { name: "Mangalsutra", description: "Mangalsutra" },
-  { name: "Earring", description: "Earrings / studs" },
-  { name: "Ring", description: "Rings" },
-  { name: "Bangles", description: "Bangles" },
-  { name: "Bajubandh", description: "Armlets worn on the upper arm" },
-  { name: "Hath Phool", description: "Hand harness / hath phool" },
-  { name: "Kamarbandh", description: "Waist belt / kamarbandh" },
-  { name: "Payal", description: "Anklets / payal" },
-  { name: "Bichiya", description: "Toe rings" },
-  { name: "Manchali", description: "Manchali sets" },
-  { name: "Chain", description: "Chains" },
-  { name: "Pendant", description: "Pendants" },
-  { name: "Bracelet", description: "Bracelets" },
-  { name: "Nose Pin", description: "Nose pins" },
-];
+const FirmModel = require("../Models/FirmModel");
+const { ensureStandardCategories, dropStaleNameIndex } = require("../Utils/standardCategories");
 
 async function main() {
   await connectDB();
+  await dropStaleNameIndex();
 
-  let created = 0;
-  for (const category of STANDARD_CATEGORIES) {
-    const existing = await StockCategoryModel.findOne({ name: category.name });
-    if (existing) continue;
-    await StockCategoryModel.create(category);
-    created += 1;
+  const firms = await FirmModel.find({}).select("_id");
+  for (const firm of firms) {
+    await ensureStandardCategories(firm._id);
   }
 
-  console.log(`Created ${created} of ${STANDARD_CATEGORIES.length} standard categories (rest already existed).`);
+  console.log(`Standard categories ensured for ${firms.length} firm(s).`);
   await mongoose.disconnect();
   process.exit(0);
 }

@@ -141,7 +141,7 @@ function useCardHover() {
   useEffect(() => {
     if (!hasFinePointer() || prefersReducedMotion()) return undefined;
 
-    const SELECTOR = ".MuiCard-root, .MuiPaper-root";
+    const SELECTOR = ".MuiCard-root:not(.rs-no-glass), .MuiPaper-root:not(.rs-no-glass)";
     const resolve = (e) => {
       const card = e.target.closest?.(SELECTOR);
       if (!card || !card.closest("main") || card.contains(e.relatedTarget)) return null;

@@ -166,6 +166,7 @@ function LandingPage() {
           {/* Abstract product visualization -- built from real UI tokens/data,
               not a stock photo or fabricated screenshot. */}
           <Paper
+            className="rs-no-glass"
             sx={{
               borderRadius: 4,
               p: 3,
