@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/user.dart';
@@ -13,6 +14,7 @@ import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/form_error_banner.dart';
 import '../subscription/subscription_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 final allUsersProvider = FutureProvider.autoDispose<List<AppUser>>((ref) {
   return ref.watch(authRepositoryProvider).getAllUsers();
@@ -188,7 +190,7 @@ class _AddUserSheetState extends ConsumerState<AddUserSheet> {
               textCapitalization: TextCapitalization.words,
               inputFormatters: lengthLimit(kNameMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+              decoration: InputDecoration(labelText: tr('Name'), errorText: _v.errorFor('name')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -200,7 +202,7 @@ class _AddUserSheetState extends ConsumerState<AddUserSheet> {
               keyboardType: TextInputType.emailAddress,
               inputFormatters: lengthLimit(kEmailMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Email', errorText: _v.errorFor('email')),
+              decoration: InputDecoration(labelText: tr('Email'), errorText: _v.errorFor('email')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -213,8 +215,8 @@ class _AddUserSheetState extends ConsumerState<AddUserSheet> {
               inputFormatters: phoneFormatters,
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(
-                labelText: 'Contact',
-                helperText: '10 digit mobile number',
+                labelText: tr('Contact'),
+                helperText: tr('10 digit mobile number'),
                 errorText: _v.errorFor('contact'),
               ),
             ),
@@ -229,8 +231,8 @@ class _AddUserSheetState extends ConsumerState<AddUserSheet> {
               inputFormatters: lengthLimit(kPasswordMax),
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(
-                labelText: 'Password',
-                helperText: 'At least $kPasswordMin characters',
+                labelText: tr('Password'),
+                helperText: tr('At least $kPasswordMin characters'),
                 errorText: _v.errorFor('password'),
                 suffixIcon: IconButton(
                   tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -243,7 +245,7 @@ class _AddUserSheetState extends ConsumerState<AddUserSheet> {
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
             initialValue: _role,
-            decoration: const InputDecoration(labelText: 'Role'),
+            decoration: InputDecoration(labelText: tr('Role')),
             items: const [
               DropdownMenuItem(value: 'staff', child: Text('Staff')),
               DropdownMenuItem(value: 'admin', child: Text('Admin')),

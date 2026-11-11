@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/notifications/notifications_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 /// Standard top app bar for every authenticated screen: the RatnSetu
 /// logo mark next to the screen title, so the brand stays visible
@@ -63,7 +65,7 @@ class GcAppBar extends ConsumerWidget implements PreferredSizeWidget {
       actions: [
         if (showAppActions) ...[
           IconButton(
-            tooltip: 'Notifications',
+            tooltip: tr('Notifications'),
             onPressed: () => context.push('/notifications'),
             icon: Badge(
               isLabelVisible: unreadCount > 0,
@@ -72,7 +74,7 @@ class GcAppBar extends ConsumerWidget implements PreferredSizeWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Settings',
+            tooltip: tr('Settings'),
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push('/settings'),
           ),

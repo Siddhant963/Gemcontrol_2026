@@ -41,7 +41,7 @@ const tertiary = {
   },
 };
 
-const HEADING_FONT = '"Playfair Display", Georgia, "Times New Roman", serif';
+const HEADING_FONT = '"Playfair Display", "Noto Serif Devanagari", Georgia, "Times New Roman", serif';
 
 export const getTheme = (mode) =>
   createTheme({
@@ -104,7 +104,7 @@ export const getTheme = (mode) =>
         mode === "light" ? "rgba(116, 119, 126, 0.20)" : "rgba(196, 198, 206, 0.16)",
     },
     typography: {
-      fontFamily: "Plus Jakarta Sans, sans-serif",
+      fontFamily: '"Plus Jakarta Sans", "Noto Sans Devanagari", sans-serif',
       // Headings use a serif display face with UNITLESS line-heights so wrapped
       // titles never collide when a page overrides fontSize.
       h1: { fontFamily: HEADING_FONT, fontSize: "2.25rem", lineHeight: 1.2, fontWeight: 700, letterSpacing: "-0.01em" },

@@ -49,6 +49,7 @@ import PlatformFirmDetail from "./pages/platform/PlatformFirmDetail.jsx";
 import PlatformUsage from "./pages/platform/PlatformUsage.jsx";
 import SplashScreen from "./components/SplashScreen.jsx";
 import ToastProvider from "./components/ToastProvider.jsx";
+import AutoTranslate from "./i18n/AutoTranslate.jsx";
 
 const SPLASH_DURATION_MS = 2000;
 
@@ -80,6 +81,7 @@ function MainApp() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <AutoTranslate />
       <SplashScreen visible={showSplash} />
       <ToastProvider>
       <BrowserRouter>

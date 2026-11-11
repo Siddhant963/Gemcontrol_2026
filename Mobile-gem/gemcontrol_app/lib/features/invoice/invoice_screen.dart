@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
@@ -13,6 +14,7 @@ import '../../core/utils/number_to_words.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
 import 'invoice_pdf.dart';
+import '../../core/i18n/app_language.dart';
 
 /// GST invoice layout per the reference "Krishna Jewellers" screenshots
 /// (invoice-format-spec memory): header / bill-to / line items / payment +
@@ -43,12 +45,12 @@ class InvoiceScreen extends ConsumerWidget {
         title: sale.invoiceNumber.isNotEmpty ? sale.invoiceNumber : 'Invoice',
         actions: [
           IconButton(
-            tooltip: 'Print',
+            tooltip: tr('Print'),
             icon: const Icon(Icons.print_outlined),
             onPressed: () => Printing.layoutPdf(onLayout: (_) => buildInvoicePdf(sale, firm)),
           ),
           IconButton(
-            tooltip: 'Download / Share',
+            tooltip: tr('Download / Share'),
             icon: const Icon(Icons.download_outlined),
             onPressed: () async {
               final bytes = await buildInvoicePdf(sale, firm);

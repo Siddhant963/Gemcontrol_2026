@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +8,7 @@ import '../../core/auth/auth_state.dart';
 import '../../core/repositories/auth_repository.dart';
 import '../../core/repositories/daily_rate_repository.dart';
 import '../../core/repositories/export_repository.dart';
+import '../../core/i18n/language_toggle.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../shared/widgets/app_drawer.dart';
@@ -15,6 +17,7 @@ import '../../shared/widgets/app_toast.dart';
 import '../subscription/subscription_presentation.dart';
 import '../subscription/subscription_providers.dart';
 import 'daily_rate_sheet.dart';
+import '../../core/i18n/app_language.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -60,6 +63,8 @@ class SettingsScreen extends ConsumerWidget {
                   .setMode(value ? ThemeMode.dark : ThemeMode.light),
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
+          const Card(child: LanguageSettingTile()),
           const SizedBox(height: AppSpacing.md),
           if (isAdmin) ...[
             Card(
@@ -262,7 +267,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
               obscureText: true,
               autofocus: true,
               enabled: !_submitting,
-              decoration: const InputDecoration(labelText: 'Confirm your password'),
+              decoration: InputDecoration(labelText: tr('Confirm your password')),
               onSubmitted: (_) => _confirm(),
             ),
             if (_error != null) ...[

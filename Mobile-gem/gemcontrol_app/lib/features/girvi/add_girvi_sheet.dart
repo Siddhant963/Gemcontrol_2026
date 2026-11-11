@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -14,6 +15,7 @@ import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/form_error_banner.dart';
 import '../customers/customers_providers.dart';
 import 'girvi_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 class AddGirviSheet extends ConsumerStatefulWidget {
   const AddGirviSheet({super.key});
@@ -165,7 +167,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                   key: _v.keyFor('customer'),
                   initialValue: _customer,
                   isExpanded: true,
-                  decoration: InputDecoration(labelText: 'Customer', errorText: _v.errorFor('customer')),
+                  decoration: InputDecoration(labelText: tr('Customer'), errorText: _v.errorFor('customer')),
                   items: customers
                       .map((c) => DropdownMenuItem(value: c, child: Text(c.name, overflow: TextOverflow.ellipsis)))
                       .toList(),
@@ -187,7 +189,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                 textCapitalization: TextCapitalization.words,
                 inputFormatters: lengthLimit(kNameMax),
                 onChanged: (_) => _v.changed(),
-                decoration: InputDecoration(labelText: 'Item name', errorText: _v.errorFor('itemName')),
+                decoration: InputDecoration(labelText: tr('Item name'), errorText: _v.errorFor('itemName')),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -202,7 +204,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                       controller: _itemTypeCtrl,
                       inputFormatters: lengthLimit(kShortTextMax),
                       onChanged: (_) => _v.changed(),
-                      decoration: InputDecoration(labelText: 'Item type', errorText: _v.errorFor('itemType')),
+                      decoration: InputDecoration(labelText: tr('Item type'), errorText: _v.errorFor('itemType')),
                     ),
                   ),
                 ),
@@ -217,7 +219,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                       inputFormatters: decimalFormatters(decimals: 3, maxLength: 10),
                       onChanged: (_) => _v.changed(),
                       decoration: InputDecoration(
-                        labelText: 'Weight (g)',
+                        labelText: tr('Weight (g)'),
                         errorText: _v.errorFor('weight'),
                         errorMaxLines: 2,
                       ),
@@ -240,7 +242,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                       inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
                       onChanged: (_) => _v.changed(),
                       decoration: InputDecoration(
-                        labelText: 'Item value / loan (₹)',
+                        labelText: tr('Item value / loan (₹)'),
                         errorText: _v.errorFor('value'),
                         errorMaxLines: 2,
                       ),
@@ -258,7 +260,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                       inputFormatters: decimalFormatters(decimals: 2, maxLength: 6),
                       onChanged: (_) => _v.changed(),
                       decoration: InputDecoration(
-                        labelText: 'Monthly interest %',
+                        labelText: tr('Monthly interest %'),
                         errorText: _v.errorFor('interest'),
                         errorMaxLines: 2,
                       ),
@@ -276,7 +278,7 @@ class _AddGirviSheetState extends ConsumerState<AddGirviSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 inputFormatters: lengthLimit(kDescriptionMax),
                 onChanged: (_) => _v.changed(),
-                decoration: InputDecoration(labelText: 'Description', errorText: _v.errorFor('description')),
+                decoration: InputDecoration(labelText: tr('Description'), errorText: _v.errorFor('description')),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),

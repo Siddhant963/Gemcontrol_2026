@@ -1,5 +1,6 @@
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,6 +17,7 @@ import '../../shared/widgets/form_error_banner.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/i18n/app_language.dart';
 
 class FirmScreen extends ConsumerWidget {
   const FirmScreen({super.key});
@@ -244,8 +246,8 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
       inputFormatters: formatters ?? lengthLimit(max),
       onChanged: (_) => _v.changed(),
       decoration: InputDecoration(
-        labelText: label,
-        helperText: helper,
+        labelText: tr(label),
+        helperText: helper == null ? null : tr(helper),
         errorText: _v.errorFor(key),
         errorMaxLines: 2,
       ),
@@ -423,7 +425,7 @@ class _FirmFormSheetState extends ConsumerState<_FirmFormSheet> {
                   child: InkWell(
                     onTap: _pickFirmStartDate,
                     child: InputDecorator(
-                      decoration: const InputDecoration(labelText: 'Firm start date'),
+                      decoration: InputDecoration(labelText: tr('Firm start date')),
                       child: Text(
                         _firmStartDate == null
                             ? 'Not set'

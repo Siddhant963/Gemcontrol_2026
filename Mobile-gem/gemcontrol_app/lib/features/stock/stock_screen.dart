@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +14,7 @@ import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'stock_form_sheet.dart';
 import 'stock_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 class StockScreen extends ConsumerStatefulWidget {
   const StockScreen({super.key});
@@ -53,12 +55,12 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
         actions: [
           IconButton(
             icon: const Icon(Icons.category_outlined),
-            tooltip: 'Categories',
+            tooltip: tr('Categories'),
             onPressed: () => context.push('/inventory/categories'),
           ),
           IconButton(
             icon: const Icon(Icons.diamond_outlined),
-            tooltip: 'Raw Materials',
+            tooltip: tr('Raw Materials'),
             onPressed: () => context.push('/inventory/raw-materials'),
           ),
         ],
@@ -90,8 +92,8 @@ class _StockScreenState extends ConsumerState<StockScreen> with SingleTickerProv
             child: TextField(
               controller: _searchCtrl,
               onChanged: (v) => setState(() => _query = v.toLowerCase()),
-              decoration: const InputDecoration(
-                hintText: 'Search by name, code, karat...',
+              decoration: InputDecoration(
+                hintText: tr('Search by name, code, karat...'),
                 prefixIcon: Icon(Icons.search),
               ),
             ),

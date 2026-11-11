@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
@@ -11,6 +12,7 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gold_divider.dart';
+import '../../core/i18n/app_language.dart';
 
 final allUdharProvider = FutureProvider.autoDispose<List<Udhar>>((ref) {
   return ref.watch(udharRepositoryProvider).getAllUdhar();
@@ -374,7 +376,7 @@ class _UdharEntryTile extends ConsumerWidget {
                 setDialogState(() => error = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000));
               }
             },
-            decoration: InputDecoration(labelText: 'Amount received (₹)', errorText: error),
+            decoration: InputDecoration(labelText: tr('Amount received (₹)'), errorText: error),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

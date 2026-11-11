@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/raw_material.dart';
@@ -9,6 +10,7 @@ import '../../core/utils/currency.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../raw_materials/raw_materials_providers.dart';
 import '../stock/stock_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 /// Bottom sheet to pick a Stock or RawMaterial item to add to the sale cart.
 /// Returns a SaleItem (with quantity=1, amount=price) via Navigator.pop, or
@@ -63,8 +65,8 @@ class _ItemPickerSheetState extends ConsumerState<ItemPickerSheet>
             padding: const EdgeInsets.all(AppSpacing.md),
             child: TextField(
               onChanged: (v) => setState(() => _query = v.toLowerCase()),
-              decoration: const InputDecoration(
-                hintText: 'Search...',
+              decoration: InputDecoration(
+                hintText: tr('Search...'),
                 prefixIcon: Icon(Icons.search),
               ),
             ),

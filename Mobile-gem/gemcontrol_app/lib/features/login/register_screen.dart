@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/language_toggle.dart';
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +10,7 @@ import '../../core/repositories/auth_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/i18n/app_language.dart';
 
 /// Self-signup: creates a brand-new shop (Firm) and its admin account
 /// together in one step, mirroring the web app's "Set Up Your Shop" page --
@@ -93,6 +96,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Align(alignment: Alignment.centerRight, child: LanguageToggle()),
+                  const SizedBox(height: 12),
                   Center(
                     child: Text(
                       'Set Up Your Shop',
@@ -118,7 +123,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _nameCtrl,
                     textCapitalization: TextCapitalization.words,
                     inputFormatters: lengthLimit(kNameMax),
-                    decoration: const InputDecoration(labelText: 'Name'),
+                    decoration: InputDecoration(labelText: tr('Name')),
                     validator: (v) => nameRule(v ?? '', label: 'Name'),
                   ),
                   const SizedBox(height: 16),
@@ -126,7 +131,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
                     inputFormatters: lengthLimit(kEmailMax),
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(labelText: tr('Email')),
                     validator: (v) => emailRule(v ?? ''),
                   ),
                   const SizedBox(height: 16),
@@ -134,9 +139,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _contactCtrl,
                     keyboardType: TextInputType.phone,
                     inputFormatters: phoneFormatters,
-                    decoration: const InputDecoration(
-                      labelText: 'Contact',
-                      helperText: '10 digit mobile number',
+                    decoration: InputDecoration(
+                      labelText: tr('Contact'),
+                      helperText: tr('10 digit mobile number'),
                     ),
                     validator: (v) => phoneRule(v ?? '', label: 'Contact'),
                   ),
@@ -146,7 +151,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     obscureText: _obscure,
                     inputFormatters: lengthLimit(kPasswordMax),
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: tr('Password'),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -168,14 +173,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _firmNameCtrl,
                     textCapitalization: TextCapitalization.words,
                     inputFormatters: lengthLimit(kNameMax),
-                    decoration: const InputDecoration(labelText: 'Shop Name'),
+                    decoration: InputDecoration(labelText: tr('Shop Name')),
                     validator: (v) => nameRule(v ?? '', label: 'Shop name'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _firmLocationCtrl,
                     inputFormatters: lengthLimit(kAddressMax),
-                    decoration: const InputDecoration(labelText: 'Shop Location'),
+                    decoration: InputDecoration(labelText: tr('Shop Location')),
                     validator: (v) => textRule(v ?? '', 'Shop location', max: kAddressMax),
                   ),
                   const SizedBox(height: 16),
@@ -183,7 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _firmSizeCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: decimalFormatters(decimals: 2, maxLength: 9),
-                    decoration: const InputDecoration(labelText: 'Shop Size (sq. ft.)'),
+                    decoration: InputDecoration(labelText: tr('Shop Size (sq. ft.)')),
                     validator: (v) => positiveNumberRule(v ?? '', 'Shop size', max: 10000000),
                   ),
                   if (_error != null) ...[

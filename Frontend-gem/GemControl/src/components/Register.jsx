@@ -21,6 +21,8 @@ const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const PHONE_REGEX = /^\d{10}$/;
 const MIN_PASSWORD_LENGTH = 6;
 
+import LanguageToggle from "../i18n/LanguageToggle";
+
 function Register() {
   const [userData, setUserData] = useState({
     name: "",
@@ -83,6 +85,7 @@ function Register() {
 
   return (
     <Box sx={{ maxWidth: 400, mx: "auto", mt: 8, p: 2 }}>
+      <LanguageToggle floating />
       <Typography variant="h4" gutterBottom>
         Set Up Your Shop
       </Typography>

@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -16,6 +17,7 @@ import '../../shared/widgets/form_error_banner.dart';
 import '../categories/categories_providers.dart';
 import 'karat_options.dart';
 import 'stock_providers.dart';
+import '../../core/i18n/app_language.dart';
 
 class StockFormSheet extends ConsumerStatefulWidget {
   final Stock? existing;
@@ -346,7 +348,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 textCapitalization: TextCapitalization.words,
                 inputFormatters: lengthLimit(kNameMax),
                 onChanged: (_) => _v.changed(),
-                decoration: InputDecoration(labelText: 'Item name', errorText: _v.errorFor('name')),
+                decoration: InputDecoration(labelText: tr('Item name'), errorText: _v.errorFor('name')),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -355,7 +357,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _materialType,
-                    decoration: const InputDecoration(labelText: 'Material'),
+                    decoration: InputDecoration(labelText: tr('Material')),
                     items: const ['gold', 'silver', 'platinum', 'diamond', 'other']
                         .map((m) => DropdownMenuItem(value: m, child: Text(materialTypeLabel(m))))
                         .toList(),
@@ -373,7 +375,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                 Expanded(
                   child: DropdownButtonFormField<StockType>(
                     initialValue: _stockType,
-                    decoration: const InputDecoration(labelText: 'Stock type'),
+                    decoration: InputDecoration(labelText: tr('Stock type')),
                     items: const [
                       DropdownMenuItem(value: StockType.retail, child: Text('Retail')),
                       DropdownMenuItem(value: StockType.wholesale, child: Text('Wholesale')),
@@ -412,7 +414,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                         initialValue: _categoryId,
                         isExpanded: true,
                         decoration: InputDecoration(
-                          labelText: 'Category',
+                          labelText: tr('Category'),
                           errorText: _v.errorFor('category'),
                         ),
                         items: categories
@@ -589,7 +591,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
                       keyboardType: TextInputType.number,
                       inputFormatters: digitsFormatters(8),
                       onChanged: (_) => _v.changed(),
-                      decoration: InputDecoration(labelText: 'HSN code', errorText: _v.errorFor('hsn')),
+                      decoration: InputDecoration(labelText: tr('HSN code'), errorText: _v.errorFor('hsn')),
                     ),
                   ),
                 ),
@@ -615,7 +617,7 @@ class _StockFormSheetState extends ConsumerState<StockFormSheet> {
   Widget _unitDropdown(ChargeUnit value, void Function(ChargeUnit) assign) {
     return DropdownButtonFormField<ChargeUnit>(
       initialValue: value,
-      decoration: const InputDecoration(labelText: 'Unit'),
+      decoration: InputDecoration(labelText: tr('Unit')),
       items: ChargeUnit.values
           .map((u) => DropdownMenuItem(value: u, child: Text(chargeUnitLabel(u))))
           .toList(),

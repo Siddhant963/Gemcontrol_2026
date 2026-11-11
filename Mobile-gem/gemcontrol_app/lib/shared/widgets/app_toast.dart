@@ -1,8 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/i18n/app_language.dart';
 
 enum AppToastType { success, error, warning, info }
 
@@ -133,7 +135,7 @@ class _ToastView extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Dismiss',
+                            tooltip: tr('Dismiss'),
                             visualDensity: VisualDensity.compact,
                             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                             icon: Icon(Icons.close, color: fg, size: 18),

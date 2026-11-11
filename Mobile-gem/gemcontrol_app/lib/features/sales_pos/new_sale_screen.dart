@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,6 +18,7 @@ import '../sales_history/sales_history_providers.dart';
 import 'item_picker_sheet.dart';
 import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/i18n/app_language.dart';
 
 const _paymentMethods = ['cash', 'card', 'online', 'bankTransfer', 'Upi', 'cheque'];
 
@@ -93,7 +95,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 return customersAsync.when(
                   data: (customers) => DropdownButtonFormField<Customer>(
                     initialValue: _customer,
-                    decoration: const InputDecoration(hintText: 'Select customer'),
+                    decoration: InputDecoration(hintText: tr('Select customer')),
                     items: customers
                         .map((c) => DropdownMenuItem(value: c, child: Text('${c.name} · ${c.contact}')))
                         .toList(),
@@ -149,7 +151,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                     controller: _discountCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
-                    decoration: const InputDecoration(labelText: 'Value'),
+                    decoration: InputDecoration(labelText: tr('Value')),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -202,7 +204,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             initialValue: _payments[i].method,
-                            decoration: const InputDecoration(labelText: 'Mode'),
+                            decoration: InputDecoration(labelText: tr('Mode')),
                             items: _paymentMethods
                                 .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                                 .toList(),
@@ -215,7 +217,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                             controller: _payments[i].amountCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
-                            decoration: const InputDecoration(labelText: '₹'),
+                            decoration: InputDecoration(labelText: tr('₹')),
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
@@ -231,7 +233,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                   controller: _udharCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
-                  decoration: const InputDecoration(labelText: 'Udhar (credit) amount'),
+                  decoration: InputDecoration(labelText: tr('Udhar (credit) amount')),
                   onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -464,7 +466,7 @@ class _CartRowState extends State<_CartRow> {
                   controller: _qtyCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: digitsFormatters(6),
-                  decoration: const InputDecoration(labelText: 'Qty', isDense: true),
+                  decoration: InputDecoration(labelText: tr('Qty'), isDense: true),
                   onChanged: (_) => _update(),
                 ),
               ),
@@ -475,7 +477,7 @@ class _CartRowState extends State<_CartRow> {
                   controller: _amountCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: decimalFormatters(decimals: 2, maxLength: 12),
-                  decoration: const InputDecoration(labelText: 'Amount per unit (₹)', isDense: true),
+                  decoration: InputDecoration(labelText: tr('Amount per unit (₹)'), isDense: true),
                   onChanged: (_) => _update(),
                 ),
               ),

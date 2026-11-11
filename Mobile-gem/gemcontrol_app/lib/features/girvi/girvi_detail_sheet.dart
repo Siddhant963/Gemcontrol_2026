@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
@@ -11,6 +12,7 @@ import '../../shared/widgets/gold_divider.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'girvi_providers.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/i18n/app_language.dart';
 
 class GirviDetailSheet extends ConsumerStatefulWidget {
   final Girvi girvi;
@@ -184,12 +186,12 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
                     setDialogState(() => error = positiveNumberRule(ctrl.text, 'Amount', max: 1000000000));
                   }
                 },
-                decoration: InputDecoration(labelText: 'Amount (₹)', errorText: error),
+                decoration: InputDecoration(labelText: tr('Amount (₹)'), errorText: error),
               ),
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<String>(
                 initialValue: method,
-                decoration: const InputDecoration(labelText: 'Method'),
+                decoration: InputDecoration(labelText: tr('Method')),
                 items: const ['cash', 'online', 'bankTransfer', 'upi']
                     .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                     .toList(),
@@ -263,7 +265,7 @@ class _GirviDetailSheetState extends ConsumerState<GirviDetailSheet> {
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<String>(
                 initialValue: method,
-                decoration: const InputDecoration(labelText: 'Final payment method'),
+                decoration: InputDecoration(labelText: tr('Final payment method')),
                 items: const ['cash', 'online', 'bankTransfer', 'upi']
                     .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                     .toList(),

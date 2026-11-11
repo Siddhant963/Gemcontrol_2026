@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -17,6 +18,7 @@ import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import 'categories_providers.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/i18n/app_language.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -271,7 +273,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
               textCapitalization: TextCapitalization.words,
               inputFormatters: lengthLimit(kNameMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Category name', errorText: _v.errorFor('name')),
+              decoration: InputDecoration(labelText: tr('Category name'), errorText: _v.errorFor('name')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -282,7 +284,7 @@ class _AddCategorySheetState extends ConsumerState<_AddCategorySheet> {
               textCapitalization: TextCapitalization.sentences,
               inputFormatters: lengthLimit(kDescriptionMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Description', errorText: _v.errorFor('description')),
+              decoration: InputDecoration(labelText: tr('Description'), errorText: _v.errorFor('description')),
             ),
           ),
           const SizedBox(height: AppSpacing.md),

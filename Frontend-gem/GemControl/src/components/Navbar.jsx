@@ -23,6 +23,7 @@ import api from "../utils/api";
 import { useTheme } from "@mui/material/styles";
 import PropTypes from "prop-types";
 import { SAFE_LEFT, SAFE_RIGHT, SAFE_TOP } from "../config/layout";
+import LanguageToggle from "../i18n/LanguageToggle";
 
 function Navbar({ onMenuClick }) {
   const dispatch = useDispatch();
@@ -110,6 +111,9 @@ function Navbar({ onMenuClick }) {
         >
           RatnSetu
         </Typography>
+        <Box sx={{ mr: { xs: 0.5, sm: 1.5 } }}>
+          <LanguageToggle />
+        </Box>
         {isAuthenticated && (
           <Box
             sx={{

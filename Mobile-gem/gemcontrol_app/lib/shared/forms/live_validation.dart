@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/i18n/app_language.dart';
 
 /// Per-form helper that decides WHEN a field error is shown, using the form's
 /// own pure rules (a function returning `{field: message}` for every invalid
@@ -21,7 +22,10 @@ class LiveValidation {
   /// (normally `() => setState(() {})`).
   LiveValidation(this._rules, this._notify);
 
-  String? errorFor(String field) => _shown[field];
+  String? errorFor(String field) {
+    final message = _shown[field];
+    return message == null ? null : tr(message);
+  }
 
   String? _formError;
 

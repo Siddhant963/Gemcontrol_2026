@@ -131,6 +131,7 @@ const ProfessionalInvoice = ({ sale, customer, firm, items, stocks, materials })
 
   return (
     <Box
+      translate="no"
       sx={{
         width: '100%',
         maxWidth: '210mm',

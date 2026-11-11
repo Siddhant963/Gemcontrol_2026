@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,6 +19,7 @@ import '../../shared/widgets/app_toast.dart';
 import '../../shared/forms/live_validation.dart';
 import '../../shared/forms/validators.dart';
 import '../../shared/widgets/form_error_banner.dart';
+import '../../core/i18n/app_language.dart';
 
 class RawMaterialsScreen extends ConsumerWidget {
   const RawMaterialsScreen({super.key});
@@ -134,7 +136,7 @@ class _RawMaterialCard extends ConsumerWidget {
             onChanged: (_) {
               if (error != null) setState(() => error = positiveNumberRule(ctrl.text, 'Quantity', max: 1000000));
             },
-            decoration: InputDecoration(labelText: 'Quantity to add (grams)', errorText: error),
+            decoration: InputDecoration(labelText: tr('Quantity to add (grams)'), errorText: error),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -290,13 +292,13 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
               textCapitalization: TextCapitalization.words,
               inputFormatters: lengthLimit(kNameMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+              decoration: InputDecoration(labelText: tr('Name'), errorText: _v.errorFor('name')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
             initialValue: _materialType,
-            decoration: const InputDecoration(labelText: 'Material type'),
+            decoration: InputDecoration(labelText: tr('Material type')),
             items: const ['gold', 'silver', 'platinum', 'diamond', 'other']
                 .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                 .toList(),
@@ -311,7 +313,7 @@ class _AddRawMaterialSheetState extends ConsumerState<_AddRawMaterialSheet> {
               inputFormatters: decimalFormatters(decimals: 3, maxLength: 12),
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(
-                labelText: 'Initial quantity (grams)',
+                labelText: tr('Initial quantity (grams)'),
                 errorText: _v.errorFor('quantity'),
               ),
             ),

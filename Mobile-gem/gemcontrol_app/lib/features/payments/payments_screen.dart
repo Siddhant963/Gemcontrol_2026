@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/payment.dart';
@@ -9,6 +10,7 @@ import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/async_value_widget.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../../core/i18n/app_language.dart';
 
 final allPaymentsProvider = FutureProvider.autoDispose<List<Payment>>((ref) {
   return ref.watch(paymentRepositoryProvider).getAllPayments();
@@ -36,8 +38,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: TextField(
               onChanged: (v) => setState(() => _query = v.toLowerCase()),
-              decoration: const InputDecoration(
-                hintText: 'Search by customer, mode...',
+              decoration: InputDecoration(
+                hintText: tr('Search by customer, mode...'),
                 prefixIcon: Icon(Icons.search),
               ),
             ),

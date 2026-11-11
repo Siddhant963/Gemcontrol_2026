@@ -19,6 +19,7 @@ import { ROUTES } from "../../utils/routes";
 import SymbolIcon from "../SymbolIcon";
 import { trackEvent } from "../../utils/analytics";
 import MarketingEffects from "../effects/MarketingEffects";
+import LanguageToggle from "../../i18n/LanguageToggle";
 
 const NAV_LINKS = [
   { label: "Home", to: ROUTES.LANDING },
@@ -81,6 +82,7 @@ function MarketingHeader() {
           </Box>
 
           <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 1.5, ml: 2 }}>
+            <LanguageToggle />
             <Button
               component={RouterLink}
               to={ROUTES.LOGIN}
@@ -105,6 +107,9 @@ function MarketingHeader() {
             </Button>
           </Box>
 
+          <Box sx={{ display: { xs: "flex", md: "none" } }}>
+            <LanguageToggle />
+          </Box>
           <IconButton
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../core/i18n/tr_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,6 +15,7 @@ import '../../shared/forms/live_validation.dart';
 import '../../shared/forms/validators.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/form_error_banner.dart';
+import '../../core/i18n/app_language.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -48,8 +50,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: TextField(
               onChanged: (v) => setState(() => _query = v.toLowerCase()),
-              decoration: const InputDecoration(
-                hintText: 'Search customers...',
+              decoration: InputDecoration(
+                hintText: tr('Search customers...'),
                 prefixIcon: Icon(Icons.search),
               ),
             ),
@@ -251,7 +253,7 @@ class _AddCustomerSheetState extends ConsumerState<AddCustomerSheet> {
               textCapitalization: TextCapitalization.words,
               inputFormatters: lengthLimit(kNameMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Name', errorText: _v.errorFor('name')),
+              decoration: InputDecoration(labelText: tr('Name'), errorText: _v.errorFor('name')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -264,8 +266,8 @@ class _AddCustomerSheetState extends ConsumerState<AddCustomerSheet> {
               inputFormatters: phoneFormatters,
               onChanged: (_) => _v.changed(),
               decoration: InputDecoration(
-                labelText: 'Contact number',
-                helperText: '10 digit mobile number',
+                labelText: tr('Contact number'),
+                helperText: tr('10 digit mobile number'),
                 errorText: _v.errorFor('contact'),
               ),
             ),
@@ -279,7 +281,7 @@ class _AddCustomerSheetState extends ConsumerState<AddCustomerSheet> {
               keyboardType: TextInputType.emailAddress,
               inputFormatters: lengthLimit(kEmailMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Email', errorText: _v.errorFor('email')),
+              decoration: InputDecoration(labelText: tr('Email'), errorText: _v.errorFor('email')),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -291,7 +293,7 @@ class _AddCustomerSheetState extends ConsumerState<AddCustomerSheet> {
               textCapitalization: TextCapitalization.sentences,
               inputFormatters: lengthLimit(kAddressMax),
               onChanged: (_) => _v.changed(),
-              decoration: InputDecoration(labelText: 'Address', errorText: _v.errorFor('address')),
+              decoration: InputDecoration(labelText: tr('Address'), errorText: _v.errorFor('address')),
             ),
           ),
           const SizedBox(height: AppSpacing.md),

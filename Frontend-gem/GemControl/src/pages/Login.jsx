@@ -10,6 +10,7 @@ import { homeRouteFor } from "../utils/roles";
 import api from "../utils/api";
 import { jwtDecode } from "jwt-decode";
 import NotificationModal from "../components/NotificationModal";
+import LanguageToggle from "../i18n/LanguageToggle";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -114,6 +115,7 @@ function Login() {
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible">
+      <LanguageToggle floating />
       <Box
         sx={{
           maxWidth: 400,
